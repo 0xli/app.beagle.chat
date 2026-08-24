@@ -16902,9 +16902,9 @@
       }, 400);
     };
   }
-  async function createBackendC({ keyPair, onEvent }) {
+  async function createBackendC({ keyPair, onEvent, profile: sharedProfile }) {
     const self2 = describeIdentity(keyPair);
-    const profile = await kvGet(PROFILE_KEY) || { name: "", description: "" };
+    const profile = sharedProfile || await kvGet(PROFILE_KEY) || { name: "", description: "" };
     let autoAccept = await kvGet(AUTOACCEPT_KEY) ?? false;
     let pending = await kvGet(PENDING_KEY) || [];
     const aliases = await kvGet(ALIAS_KEY) || {};
@@ -17651,6 +17651,69 @@
       lastTime: shortClock(lm?.ts)
     };
   }
+  function createEarlyRouter(identity, profile, persist) {
+    return async function route(path, init) {
+      const method = (init?.method || "GET").toUpperCase();
+      const url = new URL(path, location.origin);
+      const p = url.pathname;
+      if (UNSUPPORTED.has(p))
+        return json({ ok: false, unsupported: true, error: "not available in the browser client" });
+      const punkOne = /^\/api\/punk\/(\d{1,5})$/.exec(p);
+      if (method === "GET" && punkOne) {
+        try {
+          const punk = await punkById(punkOne[1]);
+          return punk ? json({ ok: true, punk }) : json({ ok: false, error: "no such punk" }, 404);
+        } catch (err) {
+          return json({ ok: false, error: String(err?.message || err) }, 502);
+        }
+      }
+      switch (`${method} ${p}`) {
+        case "GET /api/backend":
+          return json({ ok: true, kind: "browser", hasVirtualLan: false, state: "starting", switchable: false, releaseSecondsLeft: 0, command: "" });
+        case "GET /api/desktop":
+        case "GET /api/state": {
+          const me = meFrom({ identity, online: false, transport: "tcp-relay" }, profile, false, await ensNames());
+          return p === "/api/state" ? json({ me, friends: [], pending: [] }) : json({ me, peers: [], requests: [], exits: [], activeExit: null });
+        }
+        case "POST /api/set-profile": {
+          let body = {};
+          if (typeof init?.body === "string") {
+            try {
+              body = JSON.parse(init.body);
+            } catch {
+              body = {};
+            }
+          }
+          if (body.name !== void 0)
+            profile.name = body.name;
+          if (body.description !== void 0)
+            profile.description = body.description;
+          if (body.punkId !== void 0)
+            profile.punkId = body.punkId === null ? null : Number(body.punkId);
+          if (body.onboarded !== void 0)
+            profile.onboarded = !!body.onboarded;
+          try {
+            await persist(profile);
+          } catch {
+          }
+          return json({ ok: true, data: profile });
+        }
+        case "GET /api/punk-list": {
+          const type2 = (url.searchParams.get("type") || "any").toLowerCase().replace(/[^a-z]/g, "") || "any";
+          const limit = Math.min(60, Math.max(1, Number(url.searchParams.get("limit")) || 24));
+          try {
+            return json({ ok: true, list: await punkList({ type: type2, limit }) });
+          } catch (err) {
+            return json({ ok: false, error: String(err?.message || err) }, 502);
+          }
+        }
+        case "GET /api/chat-history":
+          return json({ chats: {} });
+        default:
+          return json({ ok: false, booting: true, error: "peer is still starting" }, 503);
+      }
+    };
+  }
   function createApiRouter(backend, getProfile) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
@@ -17893,6 +17956,7 @@
 
   // src/web-entry.js
   var IDENTITY_KEY = "identity";
+  var PROFILE_KEY2 = "profile";
   var resolveReady;
   var ready = new Promise((r) => {
     resolveReady = r;
@@ -17924,7 +17988,11 @@
       this.keyPair = keyPair;
       this.identity = describeIdentity(keyPair);
       this.identity.fresh = fresh;
-      this.persistence = await requestPersistence();
+      this.persistence = null;
+      requestPersistence().then((r) => {
+        this.persistence = r;
+      }).catch(() => {
+      });
       this.lock = createTabLock({ onLost: (r) => this.onLockLost?.(r) });
       this.lockState = await this.lock.acquire();
       if (!this.lockState.held) {
@@ -17934,14 +18002,36 @@
         ));
         return this.status();
       }
-      this.backend = await createBackendC({
+      const profile = await kvGet(PROFILE_KEY2) || { name: "", description: "" };
+      this.profile = profile;
+      let full = null;
+      const early = createEarlyRouter(this.identity, profile, (p) => kvPut(PROFILE_KEY2, p));
+      resolveReady((path, init) => (full || early)(path, init));
+      try {
+        performance.mark("beagle:api-ready");
+      } catch {
+      }
+      createBackendC({
         keyPair,
+        profile,
+        // one shared record — see createEarlyRouter
         onEvent: (e) => {
           this.events.push(e);
           this.onEvent?.(e);
         }
+      }).then((backend) => {
+        this.backend = backend;
+        full = createApiRouter(backend, () => backend.profile());
+        backend.call({ op: "set-profile", name: profile.name, description: profile.description }).catch(() => {
+        });
+        try {
+          performance.mark("beagle:peer-ready");
+        } catch {
+        }
+        this.onEvent?.({ type: "backend-ready" });
+      }).catch((err) => {
+        this.events.push({ type: "backend-failed", error: String(err?.message || err) });
       });
-      resolveReady(createApiRouter(this.backend, () => this.backend.profile()));
       return this.status();
     },
     status() {

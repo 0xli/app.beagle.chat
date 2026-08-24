@@ -3695,13 +3695,13 @@ const DK_WELCOME_T = {
     intro: "one line about you",
     introPh: "e.g. building decentralised things in SF",
     avatar: "avatar",
-    pick: "choose a punk",
+    pick: "choose an avatar",
     shuffle: "shuffle",
-    useIdent: "use identicon",
+    useIdent: "use the default",
     addr: "your address",
     addrHint: "Share this and anyone can reach you \u2014 from a phone, a desktop, or another tab.",
     travels: "Your name and intro travel inside the friend request, so the other side sees them before accepting.",
-    avatarLocal: "The punk shows in this window. Friends see an identicon of your key until beagles.eth registration works here.",
+    avatarLocal: "Your avatar shows in this window. Friends see a pattern generated from your key until beagles.eth registration works here.",
     next: "continue",
     back: "back",
     later: "skip for now",
@@ -3709,7 +3709,12 @@ const DK_WELCOME_T = {
     add: "add",
     added: "requested",
     browse: "Browse the directory instead \u2192",
-    needName: "Pick a name first \u2014 a request with no name is just a key."
+    needName: "Pick a name first \u2014 a request with no name is just a key.",
+    langLabel: "Language",
+    pickTitle: "choose an avatar",
+    shuffle: "shuffle",
+    loading: "loading\u2026",
+    types: { any: "any", female: "female", male: "male", zombie: "zombie", ape: "ape", alien: "alien" }
   },
   zh: {
     title: "\u6D4F\u89C8\u5668\u5C31\u662F\u4F60\u5728\u4E92\u8054\u7F51\u4E0A\u7684\u5BB6",
@@ -3721,13 +3726,13 @@ const DK_WELCOME_T = {
     intro: "\u4E00\u53E5\u8BDD\u4ECB\u7ECD",
     introPh: "\u4F8B\u5982 \u5728\u65E7\u91D1\u5C71\u505A\u53BB\u4E2D\u5FC3\u5316\u7684\u4E1C\u897F",
     avatar: "\u5934\u50CF",
-    pick: "\u9009\u4E00\u4E2A punk",
+    pick: "\u9009\u4E00\u4E2A\u5934\u50CF",
     shuffle: "\u6362\u4E00\u6279",
     useIdent: "\u7528\u9ED8\u8BA4\u56FE\u6848",
     addr: "\u4F60\u7684\u5730\u5740",
     addrHint: "\u628A\u5B83\u53D1\u7ED9\u522B\u4EBA\uFF0C\u624B\u673A\u3001\u684C\u9762\u7AEF\u6216\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u90FD\u80FD\u627E\u5230\u4F60\u3002",
     travels: "\u6635\u79F0\u548C\u4ECB\u7ECD\u4F1A\u968F\u597D\u53CB\u8BF7\u6C42\u4E00\u8D77\u53D1\u9001\uFF0C\u5BF9\u65B9\u5728\u540C\u610F\u4E4B\u524D\u5C31\u80FD\u770B\u5230\u3002",
-    avatarLocal: "Punk \u5934\u50CF\u53EA\u5728\u672C\u7A97\u53E3\u663E\u793A\u3002\u5728\u6D4F\u89C8\u5668\u7AEF\u652F\u6301 beagles.eth \u6CE8\u518C\u4E4B\u524D\uFF0C\u597D\u53CB\u770B\u5230\u7684\u662F\u4F60\u5BC6\u94A5\u751F\u6210\u7684\u56FE\u6848\u3002",
+    avatarLocal: "\u5934\u50CF\u53EA\u5728\u672C\u7A97\u53E3\u663E\u793A\u3002\u5728\u6D4F\u89C8\u5668\u7AEF\u652F\u6301 beagles.eth \u6CE8\u518C\u4E4B\u524D\uFF0C\u597D\u53CB\u770B\u5230\u7684\u662F\u4F60\u5BC6\u94A5\u751F\u6210\u7684\u56FE\u6848\u3002",
     next: "\u7EE7\u7EED",
     back: "\u8FD4\u56DE",
     later: "\u4EE5\u540E\u518D\u8BF4",
@@ -3735,10 +3740,15 @@ const DK_WELCOME_T = {
     add: "\u6DFB\u52A0",
     added: "\u5DF2\u53D1\u9001",
     browse: "\u76F4\u63A5\u6D4F\u89C8\u76EE\u5F55 \u2192",
-    needName: "\u5148\u53D6\u4E2A\u540D\u5B57 \u2014\u2014 \u6CA1\u6709\u540D\u5B57\u7684\u8BF7\u6C42\u5C31\u53EA\u662F\u4E00\u4E32\u5BC6\u94A5\u3002"
+    needName: "\u5148\u53D6\u4E2A\u540D\u5B57 \u2014\u2014 \u6CA1\u6709\u540D\u5B57\u7684\u8BF7\u6C42\u5C31\u53EA\u662F\u4E00\u4E32\u5BC6\u94A5\u3002",
+    langLabel: "\u8BED\u8A00",
+    pickTitle: "\u9009\u4E00\u4E2A\u5934\u50CF",
+    shuffle: "\u6362\u4E00\u6279",
+    loading: "\u52A0\u8F7D\u4E2D\u2026",
+    types: { any: "\u5168\u90E8", female: "\u5973", male: "\u7537", zombie: "\u50F5\u5C38", ape: "\u733F", alien: "\u5916\u661F\u4EBA" }
   }
 };
-function DkWelcome({ lang, me, onSave, onAdd, onBrowse, onClose }) {
+function DkWelcome({ lang, onLang, me, onSave, onAdd, onBrowse, onClose }) {
   var _a;
   const W = DK_WELCOME_T[lang === "zh" ? "zh" : "en"];
   const [step, setStep] = React.useState(1);
@@ -3794,7 +3804,25 @@ function DkWelcome({ lang, me, onSave, onAdd, onBrowse, onClose }) {
     marginBottom: 6
   };
   const note = { fontFamily: "var(--ui)", fontSize: 11.5, lineHeight: 1.55, color: "var(--faint)" };
-  return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 120, background: "color-mix(in oklab, #000, transparent 26%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 520, maxWidth: "96vw", maxHeight: "92vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: 24, display: "flex", flexDirection: "column", gap: 18 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 19, fontWeight: 700, color: "var(--text)", lineHeight: 1.3 } }, W.title), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 13, color: "var(--dim)", marginTop: 8, lineHeight: 1.6 } }, W.sub)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { height: 3, flex: 1, borderRadius: 999, background: step >= n ? "var(--accent)" : "var(--line)" } })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, step, "/2")), step === 1 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0 } }, punk != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punk, size: 72, radius: 16, fallbackSeed: me.userId }) : /* @__PURE__ */ React.createElement(DkIdenticon, { seed: me.userId || "beagle", size: 72, radius: 16 }), /* @__PURE__ */ React.createElement(Btn, { size: "sm", onClick: () => setPicking(true) }, W.pick), punk != null && /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "ghost", onClick: () => setPunk(null) }, W.useIdent)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: label }, W.name), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 120, background: "color-mix(in oklab, #000, transparent 26%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 520, maxWidth: "96vw", maxHeight: "92vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: 24, display: "flex", flexDirection: "column", gap: 18 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), [["en", "EN"], ["zh", "\u4E2D\u6587"]].map(([v, txt]) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: v,
+      onClick: () => onLang && onLang(v),
+      title: W.langLabel,
+      style: {
+        padding: "3px 10px",
+        borderRadius: 999,
+        cursor: "pointer",
+        fontFamily: "var(--ui)",
+        fontSize: 12,
+        border: "1px solid var(--line)",
+        background: lang === v ? "var(--accent)" : "transparent",
+        color: lang === v ? "#fff" : "var(--dim)"
+      }
+    },
+    txt
+  ))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 19, fontWeight: 700, color: "var(--text)", lineHeight: 1.3 } }, W.title), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 13, color: "var(--dim)", marginTop: 8, lineHeight: 1.6 } }, W.sub)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { height: 3, flex: 1, borderRadius: 999, background: step >= n ? "var(--accent)" : "var(--line)" } })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, step, "/2")), step === 1 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0 } }, punk != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punk, size: 72, radius: 16, fallbackSeed: me.userId }) : /* @__PURE__ */ React.createElement(DkIdenticon, { seed: me.userId || "beagle", size: 72, radius: 16 }), /* @__PURE__ */ React.createElement(Btn, { size: "sm", onClick: () => setPicking(true) }, W.pick), punk != null && /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "ghost", onClick: () => setPunk(null) }, W.useIdent)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: label }, W.name), /* @__PURE__ */ React.createElement(
     "input",
     {
       autoFocus: true,
@@ -3833,10 +3861,27 @@ function DkWelcome({ lang, me, onSave, onAdd, onBrowse, onClose }) {
       style: { background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--accent)" }
     },
     W.browse
-  ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(Btn, { size: "lg", onClick: () => setStep(1) }, W.back), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "solid", size: "lg", onClick: finish }, W.done))), picking && /* @__PURE__ */ React.createElement(DkPunkPicker, { T: {}, onPick: (id) => {
-    setPunk(id);
-    setPicking(false);
-  }, onClose: () => setPicking(false) })));
+  ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(Btn, { size: "lg", onClick: () => setStep(1) }, W.back), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "solid", size: "lg", onClick: finish }, W.done))), picking && /* @__PURE__ */ React.createElement(
+    DkPunkPicker,
+    {
+      T: {
+        ensPickPunk: W.pickTitle,
+        ensShuffle: W.shuffle,
+        dirLoading: W.loading,
+        pt_any: W.types.any,
+        pt_female: W.types.female,
+        pt_male: W.types.male,
+        pt_zombie: W.types.zombie,
+        pt_ape: W.types.ape,
+        pt_alien: W.types.alien
+      },
+      onPick: (id) => {
+        setPunk(id);
+        setPicking(false);
+      },
+      onClose: () => setPicking(false)
+    }
+  )));
 }
 const DK_FILE_RTC_KIND = "file";
 const DK_FILE_RTC_CHUNK = 16 * 1024;
@@ -4627,6 +4672,20 @@ const DK_DEFAULTS = (
     "startTab": "chat"
   }
 );
+function dkDetectLang() {
+  try {
+    const tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""];
+    for (const tag of tags) {
+      const l = String(tag).toLowerCase();
+      if (l.startsWith("zh"))
+        return "zh";
+      if (l.startsWith("en"))
+        return "en";
+    }
+  } catch (e) {
+  }
+  return "en";
+}
 function dkTheme(theme, accent) {
   const base = {
     "--ui": "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace",
@@ -5107,7 +5166,7 @@ function DkUpdateModal({ T, info, onClose }) {
   })(), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, (phase === "idle" || phase === "error" || phase === "lan-done" || phase === "lan-norestart") && btn(phase === "idle" ? T.updLater || "Later" : T.receivedClose || "Close", onClose), phase === "idle" && lanBehind && btn(T.updLanNow || "Update lan", doLanUpdate, !appBehind), phase === "idle" && appBehind && info.mode === "global" && btn(T.updNow || "Update now", doUpdate, true), phase === "idle" && appBehind && info.mode === "npx" && btn(T.updRestart || "Restart", doRestart, true), phase === "error" && btn(T.updRestart || "Restart", doRestart, true), phase === "done" && btn(T.updRestart || "Restart", doRestart, true))));
 }
 function DkApp() {
-  const [t, setTweak] = useTweaks(DK_DEFAULTS);
+  const [t, setTweak] = useTweaks({ ...DK_DEFAULTS, lang: dkDetectLang() });
   const [tab, setTab] = React.useState(t.startTab || "chat");
   const [activeId, setActiveId] = React.useState(null);
   const data = useDaemonData();
@@ -5348,6 +5407,7 @@ function DkApp() {
     DkWelcome,
     {
       lang: t.lang,
+      onLang: (v) => setTweak("lang", v),
       me,
       onSave: (p) => dkApi.setProfileFull(p).then(data.refresh),
       onAdd: (address) => dkApi.add(address).then((r) => {
