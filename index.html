@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beagle Chat</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230d1117'/%3E%3Cg fill='none' stroke='%233fb950' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4.5 17 6-6-6-6'/%3E%3Cpath d='M12 18.5h7.5'/%3E%3C/g%3E%3C/svg%3E" />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: oklch(0.165 0.012 264);
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  #root { width: 100%; height: 100%; }
+  button { -webkit-tap-highlight-color: transparent; font-family: inherit; }
+  input { font-family: inherit; }
+  input::placeholder { color: var(--faint); }
+  input:focus { border-color: var(--accent) !important; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .dk-md { white-space: normal; }
+  .dk-md p { margin: 0; }
+  .dk-md p + p, .dk-md p + ul, .dk-md p + ol, .dk-md p + pre,
+  .dk-md ul + p, .dk-md ol + p, .dk-md pre + p,
+  .dk-md h1 + p, .dk-md h2 + p, .dk-md h3 + p { margin-top: 0.5em; }
+  .dk-md h1, .dk-md h2, .dk-md h3, .dk-md h4, .dk-md h5, .dk-md h6 {
+    margin: 0 0 0.35em; font-size: 1em; line-height: 1.25; font-weight: 800;
+  }
+  .dk-md ul, .dk-md ol { margin: 0.25em 0; padding-left: 1.35em; }
+  .dk-md li { margin: 0.15em 0; }
+  .dk-md code { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 0.92em; background: rgba(0,0,0,0.18); border-radius: 4px; padding: 0.08em 0.3em; }
+  .dk-md pre { margin: 0.45em 0 0; padding: 8px 10px; overflow: auto; border-radius: 8px; background: rgba(0,0,0,0.22); }
+  .dk-md pre code { display: block; background: transparent; padding: 0; white-space: pre; }
+  /* color:inherit is deliberate — the same rule has to read well on the dark
+     incoming bubble AND on the accent-coloured outgoing one, where a blue link
+     would clash. The affordance comes from the underline and the cursor. */
+  .dk-md a { color: inherit; text-decoration: underline; text-underline-offset: 2px;
+             cursor: pointer; overflow-wrap: anywhere; }
+  .dk-md a:hover { text-decoration-thickness: 2px; opacity: 0.85; }
+  @keyframes dkpulse { 0% { transform: scale(0.9); opacity: 0.7; } 70% { transform: scale(1.5); opacity: 0; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<!-- Vendored React (no CDN — works offline / behind the GFW). -->
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<!-- QR encoder (Kazuhiko Arase, MIT) — exposes window.qrcode for the QR-code button. -->
+<script src="vendor/qrcode.js"></script>
+<!-- peer-webrtc call engine (bundled IIFE) — exposes window.PeerWebRTC. -->
+<script src="vendor/peer-webrtc.js"></script>
+<!-- chat form schema (bundled IIFE) — exposes window.ChatComponents. The only
+     place the format is interpreted; the backend just carries the message. -->
+<script src="vendor/chat-components.js"></script>
+<!-- The whole desktop app, esbuild-transpiled from src/ui/desktop/*.jsx. -->
+<!-- backend C: identity, storage, tab lock, /api interception. Must precede app.js. -->
+<script>globalThis.__BEAGLE_BRIDGE__ = "wss://im.beagle.chat/relay-ws";</script>
+<script src="beagle-web.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
