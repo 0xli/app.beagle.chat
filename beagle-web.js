@@ -17250,8 +17250,29 @@
         case "call-signal": {
           if (!req.userid || req.data == null)
             return fail("call-signal requires userid and data");
+          const CAP = 8192;
+          const enc2 = new TextEncoder();
+          let payload = req.data;
+          const sizeOf = (d) => typeof d === "string" ? enc2.encode(d).length : d.byteLength ?? d.length ?? 0;
+          if (typeof payload === "string" && sizeOf(payload) > CAP) {
+            try {
+              const sig = JSON.parse(payload);
+              if (typeof sig.sdp === "string") {
+                sig.sdp = sig.sdp.split(/\r?\n/).filter((l) => !/^a=(candidate:|end-of-candidates)/i.test(l)).join("\r\n");
+                const trimmed = JSON.stringify(sig);
+                if (sizeOf(trimmed) <= CAP) {
+                  onEvent?.({ type: "call-sdp-trimmed", from: sizeOf(payload), to: sizeOf(trimmed) });
+                  payload = trimmed;
+                }
+              }
+            } catch {
+            }
+          }
+          if (sizeOf(payload) > CAP) {
+            return fail(`call signal is ${sizeOf(payload)} bytes, over the ${CAP}-byte Carrier invite cap`);
+          }
           try {
-            await peer.sendInvite(req.userid, req.data, { ext: "carrier", establishTimeoutMs: 8e3 });
+            await peer.sendInvite(req.userid, payload, { ext: "carrier", establishTimeoutMs: 8e3 });
             return ok({ sent: true });
           } catch (err) {
             return fail(String(err?.message || err));
