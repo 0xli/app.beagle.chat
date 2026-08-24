@@ -17142,7 +17142,17 @@
             transport: "tcp-relay",
             online: joined,
             dht: dht(),
-            friends: await friendList()
+            friends: await friendList(),
+            // What the peer will actually put in a friend-request packet and push
+            // to friends on connect. Reported separately from the stored profile
+            // so a setUserInfo that silently failed is visible, not assumed.
+            advertised: (() => {
+              try {
+                return peer.userInfo();
+              } catch {
+                return null;
+              }
+            })()
           });
         case "sign": {
           if (typeof req.text !== "string")
@@ -17153,6 +17163,10 @@
         case "set-profile":
           profile.name = req.name ?? profile.name;
           profile.description = req.description ?? profile.description;
+          if (req.punkId !== void 0)
+            profile.punkId = req.punkId === null ? null : Number(req.punkId);
+          if (req.onboarded !== void 0)
+            profile.onboarded = !!req.onboarded;
           await kvPut(PROFILE_KEY, profile);
           try {
             peer.setUserInfo({ name: profile.name, description: profile.description });
@@ -17330,6 +17344,10 @@
       identity: self2,
       expressNodes: bootstrapNodes,
       call,
+      // The live profile. The router needs the CURRENT object, not a snapshot
+      // taken at boot — set-profile mutates this one, so a copy handed out at
+      // startup would make an edited name silently revert on the next poll.
+      profile: () => profile,
       async stop() {
         try {
           await peer.stop();
@@ -17342,6 +17360,89 @@
   // src/api-router.js
   init_buffer_global();
   init_process_global();
+
+  // src/punks.js
+  init_buffer_global();
+  init_process_global();
+  var ZERO = "0".repeat(32);
+  var mainPromise = null;
+  var rarePromise = null;
+  var main = null;
+  var rare = null;
+  function loadMain() {
+    if (!mainPromise) {
+      mainPromise = fetch("punks.json", { cache: "force-cache" }).then((r) => r.ok ? r.json() : Promise.reject(new Error(`punks.json HTTP ${r.status}`))).then((d) => {
+        main = d;
+        return d;
+      }).catch((err) => {
+        mainPromise = null;
+        throw err;
+      });
+    }
+    return mainPromise;
+  }
+  function loadRare() {
+    if (!rarePromise) {
+      rarePromise = fetch("punks-rare.json", { cache: "force-cache" }).then((r) => r.ok ? r.json() : Promise.reject(new Error(`punks-rare.json HTTP ${r.status}`))).then((d) => {
+        rare = d;
+        return d;
+      }).catch((err) => {
+        rarePromise = null;
+        throw err;
+      });
+    }
+    return rarePromise;
+  }
+  function hashAt(id) {
+    if (!main || id < 0 || id >= 1e4)
+      return null;
+    const h = main.h.slice(id * 32, id * 32 + 32);
+    return h === ZERO ? null : h;
+  }
+  function punkTypeOf(id) {
+    if (!main)
+      return "";
+    const i = Number(main.t[id]);
+    return main.types[i] || "";
+  }
+  async function punkById(id) {
+    const n = Number(id);
+    if (!Number.isInteger(n) || n < 0 || n > 9999)
+      return null;
+    await loadMain();
+    const h = hashAt(n);
+    if (h)
+      return { id: n, image: main.prefix + h, type: punkTypeOf(n) };
+    await loadRare();
+    const uri = rare && rare[n];
+    return uri ? { id: n, image: uri, type: punkTypeOf(n) } : null;
+  }
+  async function punkList({ type: type2 = "any", limit = 24 } = {}) {
+    await loadMain();
+    const want = String(type2 || "any").toLowerCase();
+    const pool = [];
+    for (let i = 0; i < 1e4; i++) {
+      if (want !== "any" && punkTypeOf(i).toLowerCase() !== want)
+        continue;
+      pool.push(i);
+    }
+    const n = Math.min(limit, pool.length);
+    for (let i = 0; i < n; i++) {
+      const j = i + Math.floor(Math.random() * (pool.length - i));
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const p = await punkById(pool[i]);
+      if (p)
+        out.push(p);
+    }
+    return out;
+  }
+
+  // src/api-router.js
   var ENS_NAMES = "https://ens-gateway.beaglechat.workers.dev/names";
   function looksLikeName(raw) {
     const s = String(raw ?? "").trim();
@@ -17454,7 +17555,15 @@
       // name so a registered user's own name/avatar shows without setting one.
       name: profile?.name || mine?.name || "",
       description: profile?.description || mine?.description || "",
-      punkId: mine?.punkId ?? null,
+      // A locally-picked punk wins over the published one, same rule as the name.
+      // Until beagles.eth registration works from the browser this is what makes
+      // the avatar visible at all — in this client. See onboarding.jsx.
+      punkId: profile?.punkId ?? mine?.punkId ?? null,
+      // First-run state: the welcome flow runs until a name has been set, since
+      // a nameless peer's friend request shows the other side nothing but a key.
+      onboarded: !!profile?.onboarded,
+      // What the running peer advertises, straight from the SDK.
+      advertised: diag?.advertised ?? null,
       avatarUrl: mine?.avatarUrl ?? null,
       ens: mine?.ens ?? "",
       handle: "",
@@ -17559,6 +17668,15 @@
         }
       }
       const call = (op, extra = {}) => backend.call({ op, ...extra });
+      const punkOne = /^\/api\/punk\/(\d{1,5})$/.exec(p);
+      if (method === "GET" && punkOne) {
+        try {
+          const punk = await punkById(punkOne[1]);
+          return punk ? json({ ok: true, punk }) : json({ ok: false, error: "no such punk" }, 404);
+        } catch (err) {
+          return json({ ok: false, error: String(err?.message || err) }, 502);
+        }
+      }
       switch (`${method} ${p}`) {
         case "GET /api/backend":
           return json({ ok: true, kind: "browser", hasVirtualLan: false, state: "browser", switchable: false, releaseSecondsLeft: 0, command: "" });
@@ -17679,7 +17797,12 @@
         case "POST /api/friend-alias":
           return json(await call("friend-set-alias", { userid: body.userid, alias: body.alias }));
         case "POST /api/set-profile":
-          return json(await call("set-profile", { name: body.name, description: body.description }));
+          return json(await call("set-profile", {
+            name: body.name,
+            description: body.description,
+            punkId: body.punkId,
+            onboarded: body.onboarded
+          }));
         case "POST /api/file-send": {
           const userid = url.searchParams.get("userid");
           const name = url.searchParams.get("name") || "file";
@@ -17709,6 +17832,15 @@
               "content-disposition": `${dl ? "attachment" : "inline"}; filename="${encodeURIComponent(name || "file")}"`
             }
           });
+        }
+        case "GET /api/punk-list": {
+          const type2 = (url.searchParams.get("type") || "any").toLowerCase().replace(/[^a-z]/g, "") || "any";
+          const limit = Math.min(60, Math.max(1, Number(url.searchParams.get("limit")) || 24));
+          try {
+            return json({ ok: true, list: await punkList({ type: type2, limit }) });
+          } catch (err) {
+            return json({ ok: false, error: String(err?.message || err) }, 502);
+          }
         }
         case "GET /api/call-ice-servers":
           return json({ ok: true, iceServers: await iceServers() });
@@ -17761,7 +17893,6 @@
 
   // src/web-entry.js
   var IDENTITY_KEY = "identity";
-  var PROFILE_KEY2 = "profile";
   var resolveReady;
   var ready = new Promise((r) => {
     resolveReady = r;
@@ -17810,11 +17941,7 @@
           this.onEvent?.(e);
         }
       });
-      const getProfile = () => this.profileCache ?? {};
-      kvGet(PROFILE_KEY2).then((p) => {
-        this.profileCache = p || {};
-      });
-      resolveReady(createApiRouter(this.backend, getProfile));
+      resolveReady(createApiRouter(this.backend, () => this.backend.profile()));
       return this.status();
     },
     status() {
