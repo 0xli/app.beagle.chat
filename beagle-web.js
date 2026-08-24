@@ -16987,9 +16987,13 @@
         }
       }
     };
-    const stashFile = (name, data) => {
+    const stashFile = async (name, data) => {
       fileBytes.set(name, data);
-      kvPut(`file:${name}`, data).catch((err) => onEvent?.({ type: "file-persist-skip", name, error: String(err?.message || err) }));
+      try {
+        await kvPut(`file:${name}`, data);
+      } catch (err) {
+        onEvent?.({ type: "file-persist-skip", name, error: String(err?.message || err) });
+      }
     };
     peer.onFile((offer) => {
       onEvent?.({
@@ -17033,12 +17037,14 @@
         return;
       }
       const rname = uniqueName(p.name);
-      if (p.data)
-        stashFile(rname, p.data);
-      else
-        onEvent?.({ type: "file-complete-no-data", userid: p.friendId, name: p.name, size: p.size });
-      void recordMessage(p.friendId, "in", "", "online", { name: rname, size: p.size, status: "received" });
-      onEvent?.({ type: "file-received", userid: p.friendId, name: rname, size: p.size });
+      void (async () => {
+        if (p.data)
+          await stashFile(rname, p.data);
+        else
+          onEvent?.({ type: "file-complete-no-data", userid: p.friendId, name: p.name, size: p.size });
+        await recordMessage(p.friendId, "in", "", "online", { name: rname, size: p.size, status: "received" });
+        onEvent?.({ type: "file-received", userid: p.friendId, name: rname, size: p.size });
+      })();
     });
     const dec2 = new TextDecoder();
     const callSignals = [];
@@ -17241,7 +17247,7 @@
             const fileId = peer.sendFile(req.userid, req.data, { name: wire });
             if (!fileId)
               return fail("no live session \u2014 file not sent (peer offline?)");
-            stashFile(name, req.data);
+            await stashFile(name, req.data);
             const m = await recordMessage(req.userid, "out", "", "online", { name, size: req.data.length, status: "sending", sent: 0 });
             sendingMsgByFileId.set(fileId, m.id);
             return ok({ fileId, name });
@@ -17253,7 +17259,7 @@
           if (!req.data)
             return fail("webrtc-file-save requires data");
           const wname = uniqueName(req.name || "file");
-          stashFile(wname, req.data);
+          await stashFile(wname, req.data);
           const outgoing2 = req.dir === "out";
           if (req.userid) {
             await recordMessage(

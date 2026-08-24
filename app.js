@@ -162,11 +162,28 @@ function dkSpeed(kbps) {
 function dkPct(p) {
   return p == null ? "\u2026" : (p >= 100 ? "100" : p.toFixed(2)) + "%";
 }
+const dkBlobUrls = /* @__PURE__ */ new Map();
+const DK_BLOB_MAX = 64 * 1024 * 1024;
 function dkFileUrl(name) {
-  return "/api/file-download?name=" + encodeURIComponent(name);
+  return dkBlobUrls.get(name) || "/api/file-download?name=" + encodeURIComponent(name);
 }
 function dkFileDownloadUrl(name) {
-  return dkFileUrl(name) + "&dl=1";
+  return dkBlobUrls.get(name) || dkFileUrl(name) + "&dl=1";
+}
+async function dkEnsureBlob(name, size) {
+  if (!name || dkBlobUrls.has(name))
+    return;
+  if (size && size > DK_BLOB_MAX)
+    return;
+  try {
+    const r = await fetch("/api/file-download?name=" + encodeURIComponent(name));
+    if (!r.ok)
+      return;
+    const b = await r.blob();
+    if (b.size && !dkBlobUrls.has(name))
+      dkBlobUrls.set(name, URL.createObjectURL(b));
+  } catch (e) {
+  }
 }
 function dkFileMediaKind(name) {
   const ext = (String(name || "").split(".").pop() || "").toLowerCase();
@@ -336,6 +353,7 @@ function useDaemonData() {
     try {
       const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId));
       const arr = d.chats && d.chats[peerId] || [];
+      await Promise.all(arr.filter((m) => m.file && m.file.name && m.file.status !== "sending" && m.file.status !== "queued").map((m) => dkEnsureBlob(m.file.name, m.file.size)));
       const msgs = arr.map((m) => ({
         id: m.id,
         from: m.dir === "out" ? "me" : "them",
@@ -2063,6 +2081,11 @@ function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onReveal, onO
       {
         src: rtcFile.url,
         alt: rtcFile.name,
+        onError: (e) => {
+          const w = e.currentTarget.closest("[data-media]");
+          if (w)
+            w.style.display = "none";
+        },
         style: { display: "block", width: "100%", maxHeight: "72vh", borderRadius: 8, objectFit: "contain" }
       }
     ) : /* @__PURE__ */ React.createElement(
@@ -2071,6 +2094,11 @@ function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onReveal, onO
         src: rtcFile.url,
         controls: true,
         preload: "metadata",
+        onError: (e) => {
+          const w = e.currentTarget.closest("[data-media]");
+          if (w)
+            w.style.display = "none";
+        },
         style: { display: "block", width: "100%", maxHeight: "72vh", borderRadius: 8, objectFit: "contain", background: "#000" }
       }
     ), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 8, right: 8, display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(
@@ -2115,6 +2143,11 @@ function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onReveal, onO
           {
             src: dkFileUrl(m.file.name),
             alt: m.file.name,
+            onError: (e) => {
+              const w = e.currentTarget.closest("[data-media]");
+              if (w)
+                w.style.display = "none";
+            },
             style: { display: "block", width: "100%", maxHeight: "72vh", borderRadius: 8, objectFit: "contain" }
           }
         ) : /* @__PURE__ */ React.createElement(
@@ -2123,6 +2156,11 @@ function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onReveal, onO
             src: dkFileUrl(m.file.name),
             controls: true,
             preload: "metadata",
+            onError: (e) => {
+              const w = e.currentTarget.closest("[data-media]");
+              if (w)
+                w.style.display = "none";
+            },
             style: { display: "block", width: "100%", maxHeight: "72vh", borderRadius: 8, objectFit: "contain", background: "#000" }
           }
         ), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 8, right: 8, display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(
