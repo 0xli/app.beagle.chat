@@ -5052,6 +5052,11 @@ function DkApp() {
       return;
     dkApi.send(activeId, text.trim()).then(() => data.loadThread(activeId)).then(data.refresh);
   };
+  const peerTakesRtcFile = (id) => {
+    const p = (peers || []).find((x) => x.id === id || x.userId === id);
+    const plat = String(p && p.platform || "").toLowerCase();
+    return plat === "js" || plat === "browser" || plat === "web";
+  };
   const onSendFile = (file, onProgress) => {
     if (!activeId || !file)
       return Promise.resolve({ ok: false });
@@ -5061,6 +5066,8 @@ function DkApp() {
       data.refresh();
       return rr;
     });
+    if (!peerTakesRtcFile(peerId))
+      return toxcore();
     return rtcFileCtl.sendFile(peerId, file, onProgress).then((r) => {
       if (r && r.ok && r.via === "webrtc") {
         return fetch(

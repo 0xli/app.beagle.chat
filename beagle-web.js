@@ -16992,17 +16992,35 @@
       kvPut(`file:${name}`, data).catch((err) => onEvent?.({ type: "file-persist-skip", name, error: String(err?.message || err) }));
     };
     peer.onFile((offer) => {
+      onEvent?.({
+        type: "file-offer",
+        userid: offer.friendId,
+        name: offer.name,
+        size: offer.size
+      });
       try {
         peer.acceptFile(offer.friendId, offer.fileNumber);
-      } catch {
+        onEvent?.({ type: "file-accepted", userid: offer.friendId, name: offer.name });
+      } catch (err) {
+        onEvent?.({
+          type: "file-accept-failed",
+          userid: offer.friendId,
+          name: offer.name,
+          error: String(err?.message || err)
+        });
       }
     });
     peer.onFileProgress((p) => {
-      if (!p.sending)
+      if (!p.sending) {
+        onEvent?.({ type: "file-receiving", userid: p.friendId, received: p.received, total: p.total });
         return;
+      }
       const id = sendingMsgByFileId.get(p.fileId);
       if (id != null)
         void updateMessage(id, { file: { sent: p.received, status: "sending" } });
+    });
+    peer.onFileCancel?.((p) => {
+      onEvent?.({ type: "file-cancelled", userid: p.friendId, sending: !!p.sending });
     });
     peer.onFileComplete((p) => {
       if (p.sending) {
@@ -17017,6 +17035,8 @@
       const rname = uniqueName(p.name);
       if (p.data)
         stashFile(rname, p.data);
+      else
+        onEvent?.({ type: "file-complete-no-data", userid: p.friendId, name: p.name, size: p.size });
       void recordMessage(p.friendId, "in", "", "online", { name: rname, size: p.size, status: "received" });
       onEvent?.({ type: "file-received", userid: p.friendId, name: rname, size: p.size });
     });
@@ -17071,6 +17091,11 @@
         name: aliases[uid] || f.name || "",
         alias: aliases[uid] || "",
         status: pending2 ? "requested" : isOnline(uid) ? "online" : "offline",
+        // Advertised client metadata (userinfo extension). The UI uses this to
+        // decide whether a peer can take a WebRTC DataChannel file — a phone
+        // cannot, and treats the offer as an incoming CALL.
+        platform: f.platform || "",
+        appVersion: f.appVersion || "",
         unread: s?.unread ?? 0,
         lastMessage: s?.lastMessage ?? null
       };
@@ -17495,6 +17520,9 @@
       pending: f.status === "requested",
       ip: "",
       ens: dir?.ens ?? "",
+      // Advertised client, so the UI can pick a file transport the peer supports.
+      platform: f.platform ?? "",
+      appVersion: f.appVersion ?? "",
       avatarUrl: dir?.avatarUrl ?? null,
       punkId: dir?.punkId ?? null,
       points: 0,
