@@ -17052,22 +17052,45 @@
         return {};
       }
     };
+    const outgoing = /* @__PURE__ */ new Map();
+    const isOnline = (uid) => {
+      try {
+        const st = peer.sessionStatus(uid);
+        return !!(st && st.established && (st.udpRemote || st.hasTcpRoute));
+      } catch {
+        return false;
+      }
+    };
     const friendView = (f, stats) => {
       const uid = f.userid || f.pubkey;
       const s = stats?.get(uid);
+      const pending2 = f.status === "requested" && !f.acceptedAt;
       return {
         userid: uid,
         address: f.address,
         name: aliases[uid] || f.name || "",
         alias: aliases[uid] || "",
-        status: f.status,
+        status: pending2 ? "requested" : isOnline(uid) ? "online" : "offline",
         unread: s?.unread ?? 0,
         lastMessage: s?.lastMessage ?? null
       };
     };
     const friendList = async () => {
       const stats = await messageStats();
-      return peer.friends().filter((f) => f.status !== "removed").map((f) => friendView(f, stats));
+      const known = peer.friends().filter((f) => f.status !== "removed");
+      const list = known.map((f) => friendView(f, stats));
+      const seen = new Set(list.map((f) => f.userid));
+      for (const [uid, o] of outgoing) {
+        if (seen.has(uid)) {
+          outgoing.delete(uid);
+          continue;
+        }
+        list.push(friendView(
+          { userid: uid, address: o.address, status: "requested", requestedAt: o.requestedAt },
+          stats
+        ));
+      }
+      return list;
     };
     async function call(req) {
       const ok = (data) => ({ ok: true, data });
@@ -17114,12 +17137,13 @@
           } catch {
             return fail("that does not look like a Carrier address");
           }
-          try {
-            await peer.sendFriendRequest(req.address, req.hello ?? "hi");
-          } catch (err) {
-            return fail(String(err?.message || err));
-          }
-          return ok({ userid, via: "onion" });
+          outgoing.set(userid, { address: req.address, requestedAt: Date.now() });
+          void peer.sendFriendRequest(req.address, req.hello ?? "hi").then(() => onEvent?.({ type: "friend-request-sent", userid })).catch((err) => onEvent?.({
+            type: "friend-request-failed",
+            userid,
+            error: String(err?.message || err)
+          }));
+          return ok({ userid, via: "onion", queued: true });
         }
         case "friends-pending":
           return ok({ pending });
@@ -17205,14 +17229,14 @@
             return fail("webrtc-file-save requires data");
           const wname = uniqueName(req.name || "file");
           stashFile(wname, req.data);
-          const outgoing = req.dir === "out";
+          const outgoing2 = req.dir === "out";
           if (req.userid) {
             await recordMessage(
               req.userid,
-              outgoing ? "out" : "in",
+              outgoing2 ? "out" : "in",
               "",
               "online",
-              { name: wname, size: req.data.length, status: outgoing ? "sent" : "received" }
+              { name: wname, size: req.data.length, status: outgoing2 ? "sent" : "received" }
             );
           }
           return ok({ name: wname, size: req.data.length });
@@ -17494,13 +17518,24 @@
           const profile = getProfile();
           const me = meFrom(diag.data, profile, diag.data?.autoAccept, ens);
           const peers = (flist.data?.friends ?? []).filter((f) => f.status !== "removed").map((f) => peerFrom(f, ens));
-          const requests = (pend.data?.pending ?? []).map((r) => ({
-            userId: r.userid,
-            userid: r.userid,
-            name: r.name || ens.byUserid.get(r.userid)?.name || "",
-            hello: r.hello || "",
-            ts: r.ts
-          }));
+          const requests = (pend.data?.pending ?? []).map((r, i) => {
+            const dir = ens.byUserid.get(r.userid);
+            const who = r.name || dir?.name || "";
+            return {
+              id: r.userid || r.address || `r${i}`,
+              carrier: r.address || r.userid || "",
+              userid: r.userid || "",
+              userId: r.userid || "",
+              name: who,
+              ens: dir?.ens || "",
+              punkId: dir?.punkId ?? null,
+              avatarUrl: dir?.avatarUrl ?? null,
+              hello: r.hello || "",
+              via: who || (r.hello ? `"${r.hello}"` : "carrier"),
+              time: shortClock(r.ts),
+              ts: r.ts
+            };
+          });
           return p === "/api/state" ? json({ me, friends: peers, pending: requests }) : json({ me, peers, requests, exits: [], activeExit: null });
         }
         case "GET /api/friends-list": {
