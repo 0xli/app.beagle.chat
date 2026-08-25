@@ -851,9 +851,39 @@ function useTweaks(defaults) {
 }
 Object.assign(window, { useTweaks });
 function RequestsBlock({ T, requests, onAct }) {
-  if (!requests.length)
+  const [acted, setActed] = React.useState({});
+  const [failed, setFailed] = React.useState({});
+  const act = (r, kind) => {
+    if (acted[r.id])
+      return;
+    setActed((a) => ({ ...a, [r.id]: kind }));
+    setFailed((f) => {
+      const n = { ...f };
+      delete n[r.id];
+      return n;
+    });
+    Promise.resolve(onAct(r.id, kind)).then((res) => {
+      if (res && res.ok === false) {
+        setActed((a) => {
+          const n = { ...a };
+          delete n[r.id];
+          return n;
+        });
+        setFailed((f) => ({ ...f, [r.id]: res.error || "failed" }));
+      }
+    }).catch((e) => {
+      setActed((a) => {
+        const n = { ...a };
+        delete n[r.id];
+        return n;
+      });
+      setFailed((f) => ({ ...f, [r.id]: String(e && e.message || e) }));
+    });
+  };
+  const visible = requests.filter((r) => !acted[r.id]);
+  if (!visible.length)
     return null;
-  return /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 0 8px" } }, /* @__PURE__ */ React.createElement(Section, { label: T.requests, count: requests.length, style: { margin: "4px 4px 8px" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, requests.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, style: {
+  return /* @__PURE__ */ React.createElement("div", { style: { padding: "4px 0 8px" } }, /* @__PURE__ */ React.createElement(Section, { label: T.requests, count: visible.length, style: { margin: "4px 4px 8px" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, visible.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.id, style: {
     padding: "9px 10px",
     borderRadius: 8,
     background: "var(--panel-2)",
@@ -861,7 +891,7 @@ function RequestsBlock({ T, requests, onAct }) {
     display: "flex",
     flexDirection: "column",
     gap: 8
-  } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkIdenticon, { seed: r.carrier, size: 26, radius: 6 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React.createElement(Mono, { size: 12, copy: r.carrier, title: r.carrier }, shortKey(r.carrier, 8, 6)), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)", marginTop: 2 } }, "via ", r.via, " \xB7 ", r.time))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => onAct(r.id, "accept"), style: { flex: 1 } }, T.accept), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "x", size: "sm", onClick: () => onAct(r.id, "reject"), style: { flex: 1 } }, T.reject))))));
+  } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkIdenticon, { seed: r.carrier, size: 26, radius: 6 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React.createElement(Mono, { size: 12, copy: r.carrier, title: r.carrier }, shortKey(r.carrier, 8, 6)), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)", marginTop: 2 } }, "via ", r.via, " \xB7 ", r.time))), failed[r.id] && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11, color: "var(--danger)" } }, failed[r.id]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => act(r, "accept"), style: { flex: 1 } }, T.accept), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "x", size: "sm", onClick: () => act(r, "reject"), style: { flex: 1 } }, T.reject))))));
 }
 function PeerRow({ peer, T, active, onClick }) {
   const name = peer.alias || peer.userId;
@@ -5278,7 +5308,10 @@ function DkApp() {
   const onAct = (id, kind) => {
     const r = requests.find((x) => x.id === id);
     const uid = r && r.userid || id;
-    (kind === "accept" ? dkApi.accept(uid) : dkApi.reject(uid)).then(data.refresh);
+    return (kind === "accept" ? dkApi.accept(uid) : dkApi.reject(uid)).then((res) => {
+      data.refresh();
+      return res;
+    });
   };
   const onRemove = (peer) => {
     dkApi.remove(peer.id).then(data.refresh);

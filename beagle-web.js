@@ -17312,22 +17312,24 @@
           const idx = pending.findIndex((p) => p.userid === req.userid);
           if (idx < 0)
             return fail("no such pending request");
+          const [entry] = pending.splice(idx, 1);
           try {
             await peer.acceptFriendRequest(req.userid);
           } catch (err) {
+            pending.splice(idx, 0, entry);
             return fail(String(err?.message || err));
           }
-          pending.splice(idx, 1);
-          await savePending();
+          void savePending();
+          onEvent?.({ type: "friend-accepted", userid: req.userid });
           return ok({ userid: req.userid });
         }
         case "friends-reject": {
           pending = pending.filter((p) => p.userid !== req.userid);
-          await savePending();
           try {
             peer.rejectFriendRequest(req.userid);
           } catch {
           }
+          void savePending();
           return ok({ userid: req.userid });
         }
         case "friends-autoaccept":
