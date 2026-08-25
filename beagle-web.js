@@ -16652,7 +16652,9 @@
     return dbPromise;
   }
   var TX_TIMEOUT_MS = 1e4;
-  function tx(db, store, mode, fn) {
+  var BOOT_TIMEOUT_MS = 1500;
+  var storageWedged = false;
+  function tx(db, store, mode, fn, timeoutMs = TX_TIMEOUT_MS) {
     return new Promise((resolve2, reject) => {
       let done = false;
       const settle = (fn2, v) => {
@@ -16663,8 +16665,8 @@
         }
       };
       const timer = setTimeout(
-        () => settle(reject, new Error(`IndexedDB ${mode} on '${store}' did not settle in ${TX_TIMEOUT_MS}ms`)),
-        TX_TIMEOUT_MS
+        () => settle(reject, new Error(`IndexedDB ${mode} on '${store}' did not settle in ${timeoutMs}ms`)),
+        timeoutMs
       );
       let t, req;
       try {
@@ -16679,13 +16681,24 @@
       t.oncomplete = () => settle(resolve2, req && req.result);
     });
   }
-  async function kvGet(key2) {
+  async function kvGet(key2, { timeoutMs } = {}) {
     const db = await openDB();
-    return tx(db, KV, "readonly", (s) => s.get(key2));
+    return tx(db, KV, "readonly", (s) => s.get(key2), timeoutMs);
   }
-  async function kvPut(key2, value) {
+  async function kvGetSafe(key2, fallback = null, onFail) {
+    if (storageWedged)
+      return fallback;
+    try {
+      return await kvGet(key2, { timeoutMs: BOOT_TIMEOUT_MS }) ?? fallback;
+    } catch (err) {
+      storageWedged = true;
+      onFail?.(err);
+      return fallback;
+    }
+  }
+  async function kvPut(key2, value, { timeoutMs } = {}) {
     const db = await openDB();
-    return tx(db, KV, "readwrite", (s) => s.put(value, key2));
+    return tx(db, KV, "readwrite", (s) => s.put(value, key2), timeoutMs);
   }
   async function appendMessage(msg) {
     const db = await openDB();
@@ -16909,7 +16922,7 @@
     }));
   }
   async function seedVfs() {
-    const snapshot = await kvGet(VFS_KEY) || {};
+    const snapshot = await kvGetSafe(VFS_KEY, null) || {};
     const vfs2 = globalThis.__beagleVfs ?? (globalThis.__beagleVfs = /* @__PURE__ */ new Map());
     for (const [path, content] of Object.entries(snapshot))
       vfs2.set(path, content);
@@ -16934,12 +16947,12 @@
       }, 400);
     };
   }
-  async function createBackendC({ keyPair, onEvent, profile: sharedProfile }) {
-    const self2 = describeIdentity(keyPair);
-    const profile = sharedProfile || await kvGet(PROFILE_KEY) || { name: "", description: "" };
-    let autoAccept = await kvGet(AUTOACCEPT_KEY) ?? false;
-    let pending = await kvGet(PENDING_KEY) || [];
-    const aliases = await kvGet(ALIAS_KEY) || {};
+  async function createBackendC({ keyPair, onEvent, profile: sharedProfile, ephemeral }) {
+    const self2 = { ...describeIdentity(keyPair), ephemeral: !!ephemeral };
+    const profile = sharedProfile || await kvGetSafe(PROFILE_KEY, null) || { name: "", description: "" };
+    let autoAccept = await kvGetSafe(AUTOACCEPT_KEY, false) ?? false;
+    let pending = await kvGetSafe(PENDING_KEY, null) || [];
+    const aliases = await kvGetSafe(ALIAS_KEY, null) || {};
     const savePending = () => kvPut(PENDING_KEY, pending);
     const saveAliases = () => kvPut(ALIAS_KEY, aliases);
     async function recordMessage(peer2, dir, text, via, file) {
@@ -16999,8 +17012,11 @@
     });
     const fileBytes = /* @__PURE__ */ new Map();
     const takenNames = /* @__PURE__ */ new Set();
-    for (const n of await usedFileNames())
-      takenNames.add(n);
+    try {
+      for (const n of await usedFileNames())
+        takenNames.add(n);
+    } catch {
+    }
     const sendingMsgByFileId = /* @__PURE__ */ new Map();
     const loadFile = async (name) => fileBytes.get(name) ?? await kvGet(`file:${name}`) ?? null;
     const uniqueName = (name) => {
@@ -17184,7 +17200,8 @@
               } catch {
                 return null;
               }
-            })()
+            })(),
+            ephemeral: !!self2.ephemeral
           });
         case "sign": {
           if (typeof req.text !== "string")
@@ -17637,6 +17654,10 @@
       // What the running peer advertises, straight from the SDK.
       advertised: diag?.advertised ?? null,
       hasIdentity: !!id.userid,
+      // Carried through from the early router: a session whose key never
+      // reached storage stays flagged once the peer is up, or the warning would
+      // vanish the moment the backend took over.
+      ephemeral: !!diag?.ephemeral,
       avatarUrl: profile?.avatarDataUrl ?? mine?.avatarUrl ?? null,
       ens: mine?.ens ?? "",
       handle: "",
@@ -17724,7 +17745,7 @@
       lastTime: shortClock(lm?.ts)
     };
   }
-  function createEarlyRouter({ getIdentity, profile, persist, createIdentity: createIdentity2 }) {
+  function createEarlyRouter({ getIdentity, profile, persist, createIdentity: createIdentity2, storageOk }) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
       const url = new URL(path, location.origin);
@@ -17748,7 +17769,7 @@
           const identity = getIdentity();
           const me = meFrom({ identity: identity ?? {}, online: false, transport: "tcp-relay" }, profile, false, await ensNames());
           me.hasIdentity = !!identity;
-          me.ephemeral = !!identity?.ephemeral;
+          me.ephemeral = !!identity?.ephemeral || storageOk?.() === false;
           return p === "/api/state" ? json({ me, friends: [], pending: [] }) : json({ me, peers: [], requests: [], exits: [], activeExit: null });
         }
         case "POST /api/create-identity": {
@@ -18059,8 +18080,8 @@
   }
   fetchExpressNodes().then((nodes) => nodes.forEach((n) => relayHosts.add(n.host))).catch(() => {
   });
-  async function loadIdentity() {
-    const stored = await kvGet(IDENTITY_KEY);
+  async function loadIdentity(onStorageFail) {
+    const stored = await kvGetSafe(IDENTITY_KEY, null, onStorageFail);
     if (!stored)
       return null;
     try {
@@ -18073,7 +18094,14 @@
   var app = {
     events: [],
     async boot() {
-      const keyPair = await loadIdentity();
+      this.storageOk = true;
+      const noteStorageFail = (err) => {
+        if (!this.storageOk)
+          return;
+        this.storageOk = false;
+        this.events.push({ type: "storage-unavailable", error: String(err?.message || err) });
+      };
+      const keyPair = await loadIdentity(noteStorageFail);
       this.keyPair = keyPair;
       this.identity = keyPair ? describeIdentity(keyPair) : null;
       this.persistence = null;
@@ -18093,9 +18121,10 @@
         const r = this.routers.full || this.routers.early;
         if (r)
           return r(path, init);
+        const locked = this.lockState && this.lockState.held === false;
         return new Response(
-          JSON.stringify({ ok: false, locked: true, error: "another tab owns this identity" }),
-          { status: 409, headers: { "content-type": "application/json" } }
+          JSON.stringify(locked ? { ok: false, locked: true, error: "another tab owns this identity" } : { ok: false, starting: true, error: "still starting" }),
+          { status: locked ? 409 : 503, headers: { "content-type": "application/json" } }
         );
       });
       try {
@@ -18103,10 +18132,16 @@
       } catch {
       }
       this.lockState = await this.lock.acquire();
-      const profile = await kvGet(PROFILE_KEY2) || { name: "", description: "" };
+      const profile = { name: "", description: "" };
       this.profile = profile;
+      const profileLoaded = kvGetSafe(PROFILE_KEY2, null, noteStorageFail).then((stored) => {
+        if (stored)
+          Object.assign(profile, stored);
+      }).catch(() => {
+      });
       const startBackend = (kp) => createBackendC({
         keyPair: kp,
+        ephemeral: this.storageOk === false,
         profile,
         // one shared record — see createEarlyRouter
         onEvent: (e) => {
@@ -18132,9 +18167,10 @@
         const kp = createIdentity();
         let ephemeral = false;
         try {
-          await kvPut(IDENTITY_KEY, exportIdentity(kp));
+          await kvPut(IDENTITY_KEY, exportIdentity(kp), { timeoutMs: BOOT_TIMEOUT_MS });
         } catch (err) {
           ephemeral = true;
+          this.storageOk = false;
           this.events.push({ type: "identity-not-persisted", error: String(err?.message || err) });
         }
         this.keyPair = kp;
@@ -18148,11 +18184,12 @@
         this.routers.early = createEarlyRouter({
           getIdentity: () => this.identity,
           profile,
-          persist: (p) => kvPut(PROFILE_KEY2, p),
-          createIdentity: () => this.mintIdentity()
+          persist: (p) => kvPut(PROFILE_KEY2, p, { timeoutMs: BOOT_TIMEOUT_MS }),
+          createIdentity: () => this.mintIdentity(),
+          storageOk: () => this.storageOk !== false
         });
         if (this.keyPair)
-          startBackend(this.keyPair);
+          profileLoaded.then(() => startBackend(this.keyPair));
       };
       if (this.lockState.held)
         this.bringUp();
@@ -18161,6 +18198,7 @@
     status() {
       return {
         identity: this.identity,
+        storageOk: this.storageOk !== false,
         persistence: this.persistence,
         lock: { supported: this.lock?.supported, ...this.lockState },
         secureContext: window.isSecureContext,

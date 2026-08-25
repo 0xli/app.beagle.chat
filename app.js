@@ -333,12 +333,19 @@ function useDaemonData() {
     locked: false
   });
   const [threads, setThreads] = React.useState({});
+  const refreshRef = React.useRef(null);
   const refresh = React.useCallback(async () => {
     var _a;
     try {
       const d = await dkGet("/api/desktop");
       if (d && d.locked) {
         setSnap((s) => ({ ...s, locked: true, loaded: true }));
+        return;
+      }
+      if (d && d.starting) {
+        setTimeout(() => {
+          refreshRef.current && refreshRef.current();
+        }, 300);
         return;
       }
       setSnap({
@@ -354,6 +361,7 @@ function useDaemonData() {
     }
   }, []);
   React.useEffect(() => {
+    refreshRef.current = refresh;
     refresh();
     const t = setInterval(refresh, 2500);
     return () => clearInterval(t);
@@ -3386,7 +3394,7 @@ const OB_T = {
     h1Busy: "Pick a name while we set up your key.",
     b1Busy: "No email, no password, no server \u2014 the key is being generated in this tab and stays on this device. It will be done before you finish typing.",
     helpBusy: "Keep typing \u2014 this finishes on its own.",
-    ephemeral: "This browser would not let the key be saved, so it lasts until you close the tab. Private browsing usually causes this.",
+    ephemeral: "This browser will not let Beagle save anything, so this identity lasts until you close the tab. Private browsing, or a wedged storage layer \u2014 quitting and reopening the browser usually clears it.",
     failed: "Could not create the key here:"
   },
   zh: {
@@ -3431,7 +3439,7 @@ const OB_T = {
     h1Busy: "\u5148\u53D6\u4E2A\u540D\u5B57\uFF0C\u5BC6\u94A5\u8FD9\u8FB9\u540C\u65F6\u5728\u751F\u6210\u3002",
     b1Busy: "\u4E0D\u7528\u90AE\u7BB1\u3001\u4E0D\u7528\u5BC6\u7801\u3001\u4E0D\u7528\u670D\u52A1\u5668 \u2014\u2014 \u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210\uFF0C\u53EA\u7559\u5728\u8FD9\u53F0\u8BBE\u5907\u4E0A\u3002\u4F60\u540D\u5B57\u8FD8\u6CA1\u6253\u5B8C\u5B83\u5C31\u597D\u4E86\u3002",
     helpBusy: "\u7EE7\u7EED\u8F93\u5165\u5C31\u597D\uFF0C\u8FD9\u4E2A\u4F1A\u81EA\u5DF1\u5B8C\u6210\u3002",
-    ephemeral: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u4E0D\u5141\u8BB8\u4FDD\u5B58\u5BC6\u94A5\uFF0C\u6240\u4EE5\u5B83\u53EA\u5728\u672C\u6807\u7B7E\u9875\u6709\u6548\uFF0C\u5173\u6389\u5C31\u6CA1\u4E86\u3002\u901A\u5E38\u662F\u9690\u79C1\u6A21\u5F0F\u5BFC\u81F4\u7684\u3002",
+    ephemeral: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u4E0D\u8BA9 Beagle \u4FDD\u5B58\u4EFB\u4F55\u6570\u636E\uFF0C\u6240\u4EE5\u8FD9\u4E2A\u8EAB\u4EFD\u53EA\u5728\u672C\u6807\u7B7E\u9875\u6709\u6548\uFF0C\u5173\u6389\u5C31\u6CA1\u4E86\u3002\u901A\u5E38\u662F\u9690\u79C1\u6A21\u5F0F\uFF0C\u6216\u8005\u6D4F\u89C8\u5668\u7684\u5B58\u50A8\u5361\u4F4F\u4E86 \u2014\u2014 \u9000\u51FA\u5E76\u91CD\u5F00\u6D4F\u89C8\u5668\u4E00\u822C\u80FD\u6062\u590D\u3002",
     failed: "\u65E0\u6CD5\u5728\u8FD9\u91CC\u751F\u6210\u5BC6\u94A5\uFF1A"
   }
 };
@@ -3505,6 +3513,10 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity 
   const hasKey = !!me.hasIdentity && !!me.carrier;
   React.useEffect(() => {
     obInstallCss();
+    try {
+      performance.mark("beagle:welcome");
+    } catch (e) {
+    }
   }, []);
   const startKey = React.useCallback(() => {
     if (mintRef.current || me.hasIdentity || !onCreateIdentity)
