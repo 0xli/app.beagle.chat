@@ -16746,6 +16746,21 @@
       return [];
     }
   }
+  async function queuedPeers() {
+    try {
+      const db = await openDB();
+      const all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
+      const peers = /* @__PURE__ */ new Set();
+      for (const m of all || []) {
+        if (m.dir === "out" && !m.file && (m.status === "queued" || m.status === "sending"))
+          peers.add(m.peer);
+      }
+      return [...peers];
+    } catch {
+      storageWedged = true;
+      return [];
+    }
+  }
   async function usedFileNames() {
     let all;
     try {
@@ -17030,8 +17045,17 @@
     });
     peer.onText((msg) => {
       void recordMessage(msg.pubkey, "in", msg.text, "online");
+      void scheduleFlush(msg.pubkey);
     });
     const sendChains = /* @__PURE__ */ new Map();
+    const scheduleFlush = (uid) => {
+      const prev = sendChains.get(uid) ?? Promise.resolve();
+      const job = prev.then(() => flushOutbox(uid).catch(() => {
+      }));
+      sendChains.set(uid, job.catch(() => {
+      }));
+      return job;
+    };
     const flushOutbox = async (uid) => {
       for (const m of await queuedOutgoing(uid)) {
         try {
@@ -17046,16 +17070,8 @@
     };
     peer.onFriendConnection((ev) => {
       onEvent?.({ type: "friend-connection", userid: ev.pubkey, status: ev.status });
-      if (ev.status !== "connected")
-        return;
-      void flushOutbox(ev.pubkey).catch(() => {
-      }).then(async () => {
-        if ((await queuedOutgoing(ev.pubkey)).length === 0)
-          return;
-        await new Promise((r) => setTimeout(r, 4e3));
-        await flushOutbox(ev.pubkey).catch(() => {
-        });
-      });
+      if (ev.status === "connected")
+        void scheduleFlush(ev.pubkey);
     });
     peer.onFriendInfo((ev) => {
       onEvent?.({ type: "friend-info", userid: ev.pubkey, name: ev.name });
@@ -17231,6 +17247,26 @@
         return false;
       }
     };
+    const SWEEP_MS = 8e3;
+    let sweeping = false;
+    const sweepTimer = setInterval(() => {
+      if (sweeping)
+        return;
+      sweeping = true;
+      void (async () => {
+        try {
+          const waiting = await queuedPeers();
+          if (!waiting.length)
+            return;
+          const reachable = waiting.filter((uid) => isOnline(uid));
+          onEvent?.({ type: "outbox-sweep", waiting: waiting.length, reachable: reachable.length });
+          for (const uid of reachable)
+            await scheduleFlush(uid);
+        } finally {
+          sweeping = false;
+        }
+      })();
+    }, SWEEP_MS);
     const friendView = (f, stats) => {
       const uid = f.userid || f.pubkey;
       const s = stats?.get(uid);
@@ -17526,6 +17562,7 @@
       // startup would make an edited name silently revert on the next poll.
       profile: () => profile,
       async stop() {
+        clearInterval(sweepTimer);
         try {
           await peer.stop();
         } catch {
