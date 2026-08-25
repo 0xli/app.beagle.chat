@@ -3883,7 +3883,7 @@ function DkLockedOut({ lang, onTakeover }) {
 function dkBrowser() {
   const ua = navigator.userAgent || "";
   if (/Edg\//.test(ua))
-    return "edge";
+    return "chrome";
   if (/Firefox\//.test(ua))
     return "firefox";
   if (/OPR\//.test(ua))

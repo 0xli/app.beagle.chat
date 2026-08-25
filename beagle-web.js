@@ -16964,6 +16964,7 @@
   var PROFILE_KEY = "profile";
   var AUTOACCEPT_KEY = "autoaccept";
   var ALIAS_KEY = "friend-aliases";
+  var CONFIRMED_KEY = "confirmed-friends";
   var VFS_KEY = "peer-vfs";
   var KEY_FILE = "/browser/keypair.json";
   var CONFIG_URL = "https://beagle.chat/assets/bgservers.json";
@@ -17058,6 +17059,7 @@
       })();
     });
     peer.onText((msg) => {
+      confirm(msg.pubkey);
       void recordMessage(msg.pubkey, "in", msg.text, "online");
       void scheduleFlush(msg.pubkey);
     });
@@ -17074,6 +17076,7 @@
       for (const m of await queuedOutgoing(uid)) {
         try {
           await peer.sendText(uid, m.text);
+          confirm(uid);
           await updateMessage(m.id, { status: "sent" });
           onEvent?.({ type: "message-sent", userid: uid, id: m.id });
         } catch (err) {
@@ -17088,6 +17091,7 @@
         void scheduleFlush(ev.pubkey);
     });
     peer.onFriendInfo((ev) => {
+      confirm(ev.pubkey);
       onEvent?.({ type: "friend-info", userid: ev.pubkey, name: ev.name });
     });
     const fileBytes = /* @__PURE__ */ new Map();
@@ -17155,6 +17159,7 @@
       onEvent?.({ type: "file-cancelled", userid: p.friendId, sending: !!p.sending });
     });
     peer.onFileComplete((p) => {
+      confirm(p.friendId);
       if (p.sending) {
         const id = sendingMsgByFileId.get(p.fileId);
         if (id != null) {
@@ -17253,6 +17258,16 @@
       }
     };
     const outgoing = /* @__PURE__ */ new Map();
+    const confirmed = new Set(await kvGetSafe(CONFIRMED_KEY, null) || []);
+    const confirm = (uid) => {
+      if (!uid || confirmed.has(uid))
+        return;
+      confirmed.add(uid);
+      outgoing.delete(uid);
+      void kvPut(CONFIRMED_KEY, [...confirmed]).catch(() => {
+      });
+      onEvent?.({ type: "friend-confirmed", userid: uid });
+    };
     const isOnline = (uid) => {
       try {
         const st = peer.sessionStatus(uid);
@@ -17284,7 +17299,7 @@
     const friendView = (f, stats) => {
       const uid = f.userid || f.pubkey;
       const s = stats?.get(uid);
-      const pending2 = f.status === "requested" && !f.acceptedAt;
+      const pending2 = f.status === "requested" && !f.acceptedAt || outgoing.has(uid) && !confirmed.has(uid);
       return {
         userid: uid,
         address: f.address,
@@ -17306,10 +17321,8 @@
       const list = known.map((f) => friendView(f, stats));
       const seen = new Set(list.map((f) => f.userid));
       for (const [uid, o] of outgoing) {
-        if (seen.has(uid)) {
-          outgoing.delete(uid);
+        if (seen.has(uid))
           continue;
-        }
         list.push(friendView(
           { userid: uid, address: o.address, status: "requested", requestedAt: o.requestedAt },
           stats
@@ -17442,6 +17455,7 @@
             });
             try {
               await peer.sendText(req.userid, req.text);
+              confirm(req.userid);
               await updateMessage(msg.id, { status: "sent" });
             } catch (err) {
               await updateMessage(msg.id, { status: "queued", error: String(err?.message || err) });
