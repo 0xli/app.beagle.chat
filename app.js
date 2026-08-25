@@ -256,6 +256,7 @@ function dkCopyLegacy(s) {
 }
 const dkApi = {
   send: (userid, text) => dkPost("/api/chat-send", { userid, text }),
+  retry: (id, userid, text) => dkPost("/api/chat-retry", { id, userid, text }),
   logLocal: (userid, dir, text) => dkPost("/api/chat-log-local", { userid, dir, text }),
   add: (address) => dkPost("/api/add", { address }),
   accept: (userid) => dkPost("/api/accept", { userid }),
@@ -387,7 +388,11 @@ function useDaemonData() {
           pct: m.file.status === "sending" && m.file.size ? Math.min(100, (m.file.sent || 0) / m.file.size * 100) : void 0,
           kbps: m.file.kbps
         } : void 0,
-        status: m.dir === "out" ? m.status === "queued" ? "queued" : "read" : void 0,
+        // Pass the real state through. Collapsing everything that was not
+        // 'queued' to 'read' meant a message still in flight — or one that
+        // never went out at all — rendered as delivered.
+        status: m.dir === "out" ? m.status === "queued" || m.status === "sending" || m.status === "failed" ? m.status : "read" : void 0,
+        error: m.error,
         // Delivery path: "online" = live session, "offline" = express relay.
         // Incoming messages carry this; the bubble colors them differently.
         via: m.via,
@@ -1573,7 +1578,7 @@ function DkChatForm({ form, submitted, peer, onSubmit }) {
     return null;
   }), err && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--danger, #ff6b6b)", fontSize: 11.5, fontFamily: "var(--mono)" } }, err));
 }
-function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onReveal, onOpenFile, onCall, onFormSubmit, onNameCard, answered, selMode, selected, onToggleSel, busy, isGroup }) {
+function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onRetryMsg, onReveal, onOpenFile, onCall, onFormSubmit, onNameCard, answered, selMode, selected, onToggleSel, busy, isGroup }) {
   const mine = m.from === "me";
   const nativeMedia = !m.file ? dkNativeMediaFromText(m.text) : null;
   const grp = isGroup && m.dir !== "out" && !m.file && !nativeMedia ? dkGroupParse(m.text) : null;
@@ -1916,7 +1921,23 @@ function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onReveal, onO
         style: { background: "none", border: "none", cursor: "pointer", padding: 0, marginLeft: 2, display: "inline-flex", opacity: 0.55 }
       },
       /* @__PURE__ */ React.createElement(Icon, { name: "trash", size: 11, stroke: 2, color: "var(--faint)" })
-    ), mine && (m.status === "queued" || m.status === "sending") ? /* @__PURE__ */ React.createElement(
+    ), mine && m.status === "failed" ? (
+      /* Not delivered. Says so, and one tap tries again — silently
+         rendering this as a sent message is how a chat loses mail. */
+      /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          title: m.error || (T.msgFailedHint || "not delivered \u2014 tap to try again"),
+          onClick: (e) => {
+            e.stopPropagation();
+            onRetryMsg && onRetryMsg(m);
+          },
+          style: { display: "inline-flex", alignItems: "center", gap: 3, background: "none", border: "none", cursor: "pointer", padding: 0 }
+        },
+        /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 11, stroke: 2.2, color: "var(--danger)" }),
+        /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--danger)" } }, T.msgFailed || "not sent \xB7 retry")
+      )
+    ) : mine && (m.status === "queued" || m.status === "sending") ? /* @__PURE__ */ React.createElement(
       "span",
       {
         style: { display: "inline-flex", alignItems: "center", gap: 2 },
@@ -2064,6 +2085,11 @@ function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, on
       showFlash("err", msg);
       window.alert(msg);
     }).finally(() => clearBusy(id));
+  };
+  const doRetryMsg = (m) => {
+    if (!m || m.id == null)
+      return;
+    dkApi.retry(m.id, peer.userId, m.text || "").then(() => onReloadThread && onReloadThread());
   };
   const doRetry = (id) => {
     if (!id || fileBusy[id])
@@ -2250,6 +2276,7 @@ ${peer.address}`
         onDelete: (id) => doDelete([id]),
         onCancel: doCancel,
         onRetry: doRetry,
+        onRetryMsg: doRetryMsg,
         onReveal: doReveal,
         onOpenFile: doOpenFile,
         onCall,

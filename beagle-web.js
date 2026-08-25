@@ -6231,71 +6231,71 @@
     const packet = { bb, bb_pos: root };
     const type2 = readUint8Field(packet, 0);
     const bodyType = readUint8Field(packet, 1);
-    const body = readTableField(packet, 2);
-    if (!body) {
+    const body2 = readTableField(packet, 2);
+    if (!body2) {
       throw new Error("carrier packet body is missing");
     }
     if (type2 === PACKET_TYPE_USERINFO && bodyType === ANYBODY_USERINFO) {
       return {
         type: type2,
-        avatar: readBoolField(body, 0),
-        name: readStringField(body, 1) ?? "",
-        descr: readStringField(body, 2) ?? "",
-        phone: readStringField(body, 3) ?? "",
-        gender: readStringField(body, 4) ?? "",
-        email: readStringField(body, 5) ?? "",
-        region: readStringField(body, 6) ?? "",
+        avatar: readBoolField(body2, 0),
+        name: readStringField(body2, 1) ?? "",
+        descr: readStringField(body2, 2) ?? "",
+        phone: readStringField(body2, 3) ?? "",
+        gender: readStringField(body2, 4) ?? "",
+        email: readStringField(body2, 5) ?? "",
+        region: readStringField(body2, 6) ?? "",
         // Appended AgentNet fields — absent (default) from legacy peers.
-        protoVersion: readUint32Field(body, 7),
-        platform: readStringField(body, 8) ?? "",
-        osVersion: readStringField(body, 9) ?? "",
-        appVersion: readStringField(body, 10) ?? ""
+        protoVersion: readUint32Field(body2, 7),
+        platform: readStringField(body2, 8) ?? "",
+        osVersion: readStringField(body2, 9) ?? "",
+        appVersion: readStringField(body2, 10) ?? ""
       };
     }
     if (type2 === PACKET_TYPE_FRIEND_REQUEST && bodyType === ANYBODY_FRIENDREQ) {
       return {
         type: type2,
-        name: readStringField(body, 0) ?? "",
-        descr: readStringField(body, 1) ?? "",
-        hello: readStringField(body, 2) ?? ""
+        name: readStringField(body2, 0) ?? "",
+        descr: readStringField(body2, 1) ?? "",
+        hello: readStringField(body2, 2) ?? ""
       };
     }
     if (type2 === PACKET_TYPE_MESSAGE && bodyType === ANYBODY_FRIENDMSG) {
       return {
         type: type2,
-        ext: readStringField(body, 0) ?? void 0,
-        data: readByteVectorField(body, 1) ?? new Uint8Array()
+        ext: readStringField(body2, 0) ?? void 0,
+        data: readByteVectorField(body2, 1) ?? new Uint8Array()
       };
     }
     if (type2 === PACKET_TYPE_BULKMSG && bodyType === ANYBODY_BULKMSG) {
       return {
         type: type2,
-        ext: readStringField(body, 0) ?? void 0,
-        totalsz: readUint32Field(body, 1),
-        tid: readInt64Field(body, 2),
-        data: readByteVectorField(body, 3) ?? new Uint8Array()
+        ext: readStringField(body2, 0) ?? void 0,
+        totalsz: readUint32Field(body2, 1),
+        tid: readInt64Field(body2, 2),
+        data: readByteVectorField(body2, 3) ?? new Uint8Array()
       };
     }
     if (type2 === PACKET_TYPE_INVITE_REQUEST && bodyType === ANYBODY_INVITEREQ) {
       return {
         type: type2,
-        ext: readStringField(body, 0) ?? void 0,
-        tid: readInt64Field(body, 1),
-        bundle: readStringField(body, 2) ?? void 0,
-        totalsz: readUint32Field(body, 3),
-        data: readByteVectorField(body, 4) ?? new Uint8Array()
+        ext: readStringField(body2, 0) ?? void 0,
+        tid: readInt64Field(body2, 1),
+        bundle: readStringField(body2, 2) ?? void 0,
+        totalsz: readUint32Field(body2, 3),
+        data: readByteVectorField(body2, 4) ?? new Uint8Array()
       };
     }
     if (type2 === PACKET_TYPE_INVITE_RESPONSE && bodyType === ANYBODY_INVITERSP) {
       return {
         type: type2,
-        ext: readStringField(body, 0) ?? void 0,
-        tid: readInt64Field(body, 1),
-        bundle: readStringField(body, 2) ?? void 0,
-        totalsz: readUint32Field(body, 3),
-        status: readInt32Field(body, 4),
-        reason: readStringField(body, 5) ?? void 0,
-        data: readByteVectorField(body, 6) ?? new Uint8Array()
+        ext: readStringField(body2, 0) ?? void 0,
+        tid: readInt64Field(body2, 1),
+        bundle: readStringField(body2, 2) ?? void 0,
+        totalsz: readUint32Field(body2, 3),
+        status: readInt32Field(body2, 4),
+        reason: readStringField(body2, 5) ?? void 0,
+        data: readByteVectorField(body2, 6) ?? new Uint8Array()
       };
     }
     throw new Error(`unsupported carrier packet type/body: ${type2}/${bodyType}`);
@@ -7662,11 +7662,11 @@
       _sendAck = new WeakSet();
       sendAck_fn = function(friendId, st) {
         st.ackDirty = false;
-        const body = new Uint8Array(9);
-        body.set(u32be(st.contiguous), 0);
-        body.set(u32be(st.maxByte), 4);
-        body[8] = __privateMethod(this, _measureLoss, measureLoss_fn).call(this, st);
-        void this.send(friendId, PACKET_ID_FILE_CONTROL, encodeFileControl(1, st.fileNumber, FILECONTROL.ACK, body)).catch(() => void 0);
+        const body2 = new Uint8Array(9);
+        body2.set(u32be(st.contiguous), 0);
+        body2.set(u32be(st.maxByte), 4);
+        body2[8] = __privateMethod(this, _measureLoss, measureLoss_fn).call(this, st);
+        void this.send(friendId, PACKET_ID_FILE_CONTROL, encodeFileControl(1, st.fileNumber, FILECONTROL.ACK, body2)).catch(() => void 0);
       };
       _onAck = new WeakSet();
       onAck_fn = function(friendId, st, data) {
@@ -8453,20 +8453,20 @@
     const cipher = encrypted.slice(NONCE_SIZE6);
     return import_tweetnacl9.default.secretbox.open(cipher, nonce, key2) ?? void 0;
   }
-  function parseExpressResponseFrames(body) {
+  function parseExpressResponseFrames(body2) {
     const out = [];
     let offset = 0;
-    while (offset + 8 <= body.length) {
-      const magic = readUint32Be2(body, offset);
-      const len = readUint32Be2(body, offset + 4);
+    while (offset + 8 <= body2.length) {
+      const magic = readUint32Be2(body2, offset);
+      const len = readUint32Be2(body2, offset + 4);
       offset += 8;
       if (magic !== EXPRESS_MAGIC) {
         break;
       }
-      if (len === 0 || offset + len > body.length) {
+      if (len === 0 || offset + len > body2.length) {
         break;
       }
-      out.push(body.slice(offset, offset + len));
+      out.push(body2.slice(offset, offset + len));
       offset += len;
     }
     return out;
@@ -8588,13 +8588,13 @@
             return;
           }
           for (const node of __privateGet(this, _nodes2)) {
-            let body;
+            let body2;
             try {
-              body = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
+              body2 = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
             } catch {
               continue;
             }
-            const messages = parseExpressResponseFrames(body);
+            const messages = parseExpressResponseFrames(body2);
             if (messages.length === 0) {
               continue;
             }
@@ -8689,7 +8689,7 @@
         throw lastError instanceof Error ? lastError : new Error(String(lastError));
       };
       _http = new WeakSet();
-      http_fn = async function(node, method, path, body) {
+      http_fn = async function(node, method, path, body2) {
         const scheme = node.tls ? "https" : "http";
         const url = `${scheme}://${node.host}:${node.port}/${path}`;
         const controller = new AbortController();
@@ -8697,8 +8697,8 @@
         try {
           const response = await fetch(url, {
             method,
-            body: body ? Buffer2.from(body) : void 0,
-            headers: body ? { "Content-Type": "application/binary" } : void 0,
+            body: body2 ? Buffer2.from(body2) : void 0,
+            headers: body2 ? { "Content-Type": "application/binary" } : void 0,
             signal: controller.signal
           });
           if (method === "POST" && response.status !== 201 || method === "GET" && response.status !== 200 || method === "DELETE" && response.status !== 205) {
@@ -9263,13 +9263,13 @@
         if (plain.length === 0)
           return;
         const type2 = plain[0];
-        const body = plain.subarray(1);
+        const body2 = plain.subarray(1);
         switch (type2) {
           case TCP_PACKET_ROUTING_RESPONSE: {
-            if (body.length < 1 + KEY_SIZE4)
+            if (body2.length < 1 + KEY_SIZE4)
               return;
-            const connectionId = body[0];
-            const friendKey = body.subarray(1, 1 + KEY_SIZE4);
+            const connectionId = body2[0];
+            const friendKey = body2.subarray(1, 1 + KEY_SIZE4);
             if (connectionId !== 0) {
               const friendHex = Buffer2.from(friendKey).toString("hex");
               __privateGet(this, _cidByFriend).set(friendHex, connectionId);
@@ -9279,9 +9279,9 @@
             return;
           }
           case TCP_PACKET_CONNECTION_NOTIFICATION: {
-            if (body.length < 1)
+            if (body2.length < 1)
               return;
-            const cid = body[0];
+            const cid = body2[0];
             const friendKey = __privateGet(this, _friendByCid).get(cid);
             if (friendKey) {
               this.emit("friendOnline", friendKey);
@@ -9289,9 +9289,9 @@
             return;
           }
           case TCP_PACKET_DISCONNECT_NOTIFICATION: {
-            if (body.length < 1)
+            if (body2.length < 1)
               return;
-            const cid = body[0];
+            const cid = body2[0];
             const friendKey = __privateGet(this, _friendByCid).get(cid);
             if (friendKey) {
               this.emit("friendOffline", friendKey);
@@ -9299,40 +9299,40 @@
             return;
           }
           case TCP_PACKET_PING: {
-            if (body.length < 8)
+            if (body2.length < 8)
               return;
-            const pingId = body.subarray(0, 8);
+            const pingId = body2.subarray(0, 8);
             __privateMethod(this, _sendFrame, sendFrame_fn).call(this, concatBytes([Uint8Array.of(TCP_PACKET_PONG), pingId]));
             return;
           }
           case TCP_PACKET_PONG: {
-            if (body.length < 8)
+            if (body2.length < 8)
               return;
             let v = 0n;
             for (let i = 0; i < 8; i++)
-              v = v << 8n | BigInt(body[i]);
+              v = v << 8n | BigInt(body2[i]);
             this.emit("pong", v);
             return;
           }
           case TCP_PACKET_OOB_RECV: {
-            if (body.length < KEY_SIZE4)
+            if (body2.length < KEY_SIZE4)
               return;
-            const sender = body.subarray(0, KEY_SIZE4);
-            const payload = body.subarray(KEY_SIZE4);
+            const sender = body2.subarray(0, KEY_SIZE4);
+            const payload = body2.subarray(KEY_SIZE4);
             this.emit("oob", sender, payload);
             return;
           }
           case TCP_PACKET_ONION_RESPONSE: {
-            if (body.length === 0)
+            if (body2.length === 0)
               return;
-            this.emit("onionResponse", new Uint8Array(body));
+            this.emit("onionResponse", new Uint8Array(body2));
             return;
           }
           default: {
             if (type2 >= 16) {
               const friendKey = __privateGet(this, _friendByCid).get(type2);
               if (friendKey) {
-                this.emit("peerData", friendKey, body);
+                this.emit("peerData", friendKey, body2);
               }
               return;
             }
@@ -10103,37 +10103,37 @@
     return concatBytes(parts);
   }
   function encodeStun(message, opts = {}) {
-    let body = encodeAttributes(message.attributes);
+    let body2 = encodeAttributes(message.attributes);
     if (opts.integrityKey) {
       const reserved = 24;
-      const lengthWithIntegrity = body.length + reserved + (opts.fingerprint ? 8 : 0);
+      const lengthWithIntegrity = body2.length + reserved + (opts.fingerprint ? 8 : 0);
       const headerForHmac = concatBytes([
         u16(message.type),
-        u16(body.length + reserved),
+        u16(body2.length + reserved),
         u32(STUN_MAGIC_COOKIE),
         message.transactionId
       ]);
-      const hmacInput = concatBytes([headerForHmac, body]);
+      const hmacInput = concatBytes([headerForHmac, body2]);
       const hmac = createHmac("sha1", Buffer2.from(opts.integrityKey)).update(hmacInput).digest();
-      body = concatBytes([
-        body,
+      body2 = concatBytes([
+        body2,
         u16(STUN_ATTR_MESSAGE_INTEGRITY),
         u16(20),
         Uint8Array.from(hmac)
       ]);
     }
     if (opts.fingerprint) {
-      const lengthWithFingerprint = body.length + 8;
+      const lengthWithFingerprint = body2.length + 8;
       const headerForCrc = concatBytes([
         u16(message.type),
         u16(lengthWithFingerprint),
         u32(STUN_MAGIC_COOKIE),
         message.transactionId
       ]);
-      const crcInput = concatBytes([headerForCrc, body]);
+      const crcInput = concatBytes([headerForCrc, body2]);
       const crc = crc32(crcInput) ^ FINGERPRINT_XOR;
-      body = concatBytes([
-        body,
+      body2 = concatBytes([
+        body2,
         u16(STUN_ATTR_FINGERPRINT),
         u16(4),
         u32(crc >>> 0)
@@ -10141,11 +10141,11 @@
     }
     const header = concatBytes([
       u16(message.type),
-      u16(body.length),
+      u16(body2.length),
       u32(STUN_MAGIC_COOKIE),
       message.transactionId
     ]);
-    return concatBytes([header, body]);
+    return concatBytes([header, body2]);
   }
   function decodeStun(data) {
     if (data.length < 20)
@@ -16972,8 +16972,10 @@
     const aliases = await kvGetSafe(ALIAS_KEY, null) || {};
     const savePending = () => kvPut(PENDING_KEY, pending);
     const saveAliases = () => kvPut(ALIAS_KEY, aliases);
-    async function recordMessage(peer2, dir, text, via, file) {
+    async function recordMessage(peer2, dir, text, via, file, status) {
       const msg = { peer: peer2, dir, text, via, ts: Date.now(), read: dir === "out" };
+      if (status)
+        msg.status = status;
       if (file)
         msg.file = file;
       const id = await appendMessage(msg);
@@ -17114,6 +17116,21 @@
     const dec2 = new TextDecoder();
     const callSignals = [];
     let callSeq = 0;
+    const CHUNK_TTL_MS = 6e4;
+    const chunkBuf = /* @__PURE__ */ new Map();
+    const chunkSignal = (payload, cap) => {
+      const enc2 = new TextEncoder();
+      const id = Math.random().toString(36).slice(2, 10);
+      const envelope = (i, n, d) => JSON.stringify({ _bc: 1, id, i, n, d });
+      let slice = cap - 200;
+      while (slice > 64 && enc2.encode(envelope(0, 9, payload.slice(0, slice))).length > cap) {
+        slice = Math.floor(slice * 0.8);
+      }
+      const parts = [];
+      for (let o = 0; o < payload.length; o += slice)
+        parts.push(payload.slice(o, o + slice));
+      return parts.map((d, i) => envelope(i, parts.length, d));
+    };
     const onInvite = (evt) => {
       if (evt.ext && evt.ext !== "carrier")
         return;
@@ -17122,6 +17139,37 @@
         data = dec2.decode(evt.data);
       } catch {
         return;
+      }
+      if (data.startsWith('{"_bc"')) {
+        let c;
+        try {
+          c = JSON.parse(data);
+        } catch {
+          return;
+        }
+        if (!c || c._bc !== 1 || typeof c.id !== "string" || typeof c.d !== "string")
+          return;
+        const now = Date.now();
+        for (const [k, v] of chunkBuf)
+          if (now - v.at > CHUNK_TTL_MS)
+            chunkBuf.delete(k);
+        if (chunkBuf.size > 32)
+          return;
+        let e = chunkBuf.get(c.id);
+        if (!e) {
+          e = { n: c.n, parts: new Array(c.n), at: now };
+          chunkBuf.set(c.id, e);
+        }
+        if (c.i < 0 || c.i >= e.n)
+          return;
+        e.parts[c.i] = c.d;
+        if (e.parts.some((p) => p === void 0)) {
+          onEvent?.({ type: "call-signal-chunk", userid: evt.pubkey, have: e.parts.filter((p) => p !== void 0).length, of: e.n });
+          return;
+        }
+        chunkBuf.delete(c.id);
+        data = e.parts.join("");
+        onEvent?.({ type: "call-signal-reassembled", userid: evt.pubkey, parts: e.n, bytes: data.length });
       }
       callSignals.push({ seq: ++callSeq, pubkey: evt.pubkey, userid: evt.pubkey, data });
       if (callSignals.length > 256)
@@ -17188,7 +17236,7 @@
       }
       return list;
     };
-    async function call(req) {
+    async function call2(req) {
       const ok = (data) => ({ ok: true, data });
       const fail = (error) => ({ ok: false, error });
       switch (req.op) {
@@ -17304,13 +17352,19 @@
         case "chat-send": {
           if (!req.userid || typeof req.text !== "string")
             return fail("chat-send requires userid and text");
-          try {
-            await peer.sendText(req.userid, req.text);
-          } catch (err) {
-            return fail(String(err?.message || err));
-          }
-          const msg = await recordMessage(req.userid, "out", req.text, "online");
-          return ok({ via: "online", ts: msg.ts });
+          const msg = await recordMessage(req.userid, "out", req.text, "online", null, "sending");
+          void peer.sendText(req.userid, req.text).then(() => updateMessage(msg.id, { status: "sent" })).catch((err) => {
+            void updateMessage(msg.id, { status: "failed", error: String(err?.message || err) });
+            onEvent?.({ type: "message-failed", userid: req.userid, error: String(err?.message || err) });
+          });
+          return ok({ via: "online", ts: msg.ts, id: msg.id, status: "sending" });
+        }
+        case "chat-retry": {
+          if (req.id == null || !req.userid || typeof req.text !== "string")
+            return fail("chat-retry requires id, userid and text");
+          await updateMessage(req.id, { status: "sending", error: null });
+          void peer.sendText(req.userid, req.text).then(() => updateMessage(req.id, { status: "sent" })).catch((err) => updateMessage(req.id, { status: "failed", error: String(err?.message || err) }));
+          return ok({ id: req.id, status: "sending" });
         }
         case "chat-history":
           return ok({ messages: await historyFor(req.userid, req.limit ?? 200) });
@@ -17381,6 +17435,18 @@
             } catch {
             }
           }
+          if (sizeOf(payload) > CAP && typeof payload === "string") {
+            const parts = chunkSignal(payload, CAP);
+            onEvent?.({ type: "call-signal-chunking", bytes: sizeOf(payload), parts: parts.length });
+            try {
+              for (const part of parts) {
+                await peer.sendInvite(req.userid, part, { ext: "carrier", establishTimeoutMs: 8e3 });
+              }
+              return ok({ sent: true, chunks: parts.length });
+            } catch (err) {
+              return fail(String(err?.message || err));
+            }
+          }
           if (sizeOf(payload) > CAP) {
             return fail(`call signal is ${sizeOf(payload)} bytes, over the ${CAP}-byte Carrier invite cap`);
           }
@@ -17411,7 +17477,7 @@
       hasVirtualLan: false,
       identity: self2,
       expressNodes: bootstrapNodes,
-      call,
+      call: call2,
       // The live profile. The router needs the CURRENT object, not a snapshot
       // taken at boot — set-profile mutates this one, so a copy handed out at
       // startup would make an edited name silently revert on the next poll.
@@ -17797,25 +17863,27 @@
             return json({ ok: false, error: String(err?.message || err) }, 500);
           }
         }
+        case "POST /api/chat-retry":
+          return json(await call("chat-retry", { id: body.id, userid: body.userid, text: body.text }));
         case "POST /api/set-profile": {
-          let body = {};
+          let body2 = {};
           if (typeof init?.body === "string") {
             try {
-              body = JSON.parse(init.body);
+              body2 = JSON.parse(init.body);
             } catch {
-              body = {};
+              body2 = {};
             }
           }
-          if (body.name !== void 0)
-            profile.name = body.name;
-          if (body.description !== void 0)
-            profile.description = body.description;
-          if (body.punkId !== void 0)
-            profile.punkId = body.punkId === null ? null : Number(body.punkId);
-          if (body.avatarDataUrl !== void 0)
-            profile.avatarDataUrl = body.avatarDataUrl || null;
-          if (body.onboarded !== void 0)
-            profile.onboarded = !!body.onboarded;
+          if (body2.name !== void 0)
+            profile.name = body2.name;
+          if (body2.description !== void 0)
+            profile.description = body2.description;
+          if (body2.punkId !== void 0)
+            profile.punkId = body2.punkId === null ? null : Number(body2.punkId);
+          if (body2.avatarDataUrl !== void 0)
+            profile.avatarDataUrl = body2.avatarDataUrl || null;
+          if (body2.onboarded !== void 0)
+            profile.onboarded = !!body2.onboarded;
           try {
             await persist(profile);
           } catch {
@@ -17846,15 +17914,15 @@
       if (UNSUPPORTED.has(p))
         return json({ ok: false, unsupported: true, error: "not available in the browser client" });
       const raw = init?.body;
-      let body = {};
+      let body2 = {};
       if (typeof raw === "string") {
         try {
-          body = JSON.parse(raw);
+          body2 = JSON.parse(raw);
         } catch {
-          body = {};
+          body2 = {};
         }
       }
-      const call = (op, extra = {}) => backend.call({ op, ...extra });
+      const call2 = (op, extra = {}) => backend.call({ op, ...extra });
       const punkOne = /^\/api\/punk\/(\d{1,5})$/.exec(p);
       if (method === "GET" && punkOne) {
         try {
@@ -17870,9 +17938,9 @@
         case "GET /api/desktop":
         case "GET /api/state": {
           const [diag, pend, flist, ens] = await Promise.all([
-            call("diag"),
-            call("friends-pending"),
-            call("friends-list"),
+            call2("diag"),
+            call2("friends-pending"),
+            call2("friends-list"),
             ensNames()
           ]);
           const profile = getProfile();
@@ -17899,7 +17967,7 @@
           return p === "/api/state" ? json({ me, friends: peers, pending: requests }) : json({ me, peers, requests, exits: [], activeExit: null });
         }
         case "GET /api/friends-list": {
-          const [r, ens] = await Promise.all([call("friends-list"), ensNames()]);
+          const [r, ens] = await Promise.all([call2("friends-list"), ensNames()]);
           return json({ friends: (r.data?.friends ?? []).map((f) => peerFrom(f, ens)) });
         }
         case "GET /api/discover-registered": {
@@ -17921,7 +17989,7 @@
           return json({ ok: true, list: ens.list.filter((e) => e.userid) });
         }
         case "GET /api/ens-name": {
-          const [ens, diag] = await Promise.all([ensNames(), call("diag")]);
+          const [ens, diag] = await Promise.all([ensNames(), call2("diag")]);
           const uid = diag.data?.identity?.userid;
           const rec = uid ? ens.recByUserid.get(uid) : null;
           return json({ ok: true, registered: !!rec, record: rec || null, mineOwned: !!rec });
@@ -17952,18 +18020,18 @@
         }
         case "GET /api/chat-history": {
           const peer = url.searchParams.get("peer") || void 0;
-          const r = await call("chat-history", { userid: peer });
+          const r = await call2("chat-history", { userid: peer });
           const messages = r.data?.messages ?? [];
           return json({ chats: peer ? { [peer]: messages } : {} });
         }
         case "POST /api/chat-send":
-          return json(await call("chat-send", { userid: body.userid, text: body.text }));
+          return json(await call2("chat-send", { userid: body2.userid, text: body2.text }));
         case "POST /api/chat-log-local":
-          return json(await call("chat-log-local", { userid: body.userid, dir: body.dir, text: body.text }));
+          return json(await call2("chat-log-local", { userid: body2.userid, dir: body2.dir, text: body2.text }));
         case "POST /api/chat-mark-read":
-          return json(await call("chat-mark-read", { userid: body.userid }));
+          return json(await call2("chat-mark-read", { userid: body2.userid }));
         case "POST /api/add": {
-          let address = String(body.address ?? "").trim();
+          let address = String(body2.address ?? "").trim();
           if (looksLikeName(address)) {
             try {
               address = await resolveBeaglesName(address);
@@ -17971,29 +18039,29 @@
               return json({ ok: false, error: err.message }, 400);
             }
           }
-          return json(await call("friend-request", { address, hello: body.hello }));
+          return json(await call2("friend-request", { address, hello: body2.hello }));
         }
         case "POST /api/accept":
-          return json(await call("friends-accept", { userid: body.userid }));
+          return json(await call2("friends-accept", { userid: body2.userid }));
         case "POST /api/reject":
-          return json(await call("friends-reject", { userid: body.userid }));
+          return json(await call2("friends-reject", { userid: body2.userid }));
         case "POST /api/autoaccept":
-          return json(await call("friends-autoaccept", { enabled: body.enabled }));
+          return json(await call2("friends-autoaccept", { enabled: body2.enabled }));
         case "POST /api/friend-remove":
-          return json(await call("friend-remove", { userid: body.userid }));
+          return json(await call2("friend-remove", { userid: body2.userid }));
         case "POST /api/friend-alias":
-          return json(await call("friend-set-alias", { userid: body.userid, alias: body.alias }));
+          return json(await call2("friend-set-alias", { userid: body2.userid, alias: body2.alias }));
         case "POST /api/create-identity": {
-          const d = await call("diag");
+          const d = await call2("diag");
           return json({ ok: true, data: { userId: d.data?.identity?.userid ?? "", carrier: d.data?.identity?.address ?? "" } });
         }
         case "POST /api/set-profile":
-          return json(await call("set-profile", {
-            name: body.name,
-            description: body.description,
-            punkId: body.punkId,
-            onboarded: body.onboarded,
-            avatarDataUrl: body.avatarDataUrl
+          return json(await call2("set-profile", {
+            name: body2.name,
+            description: body2.description,
+            punkId: body2.punkId,
+            onboarded: body2.onboarded,
+            avatarDataUrl: body2.avatarDataUrl
           }));
         case "POST /api/file-send": {
           const userid = url.searchParams.get("userid");
@@ -18001,7 +18069,7 @@
           if (!userid || !raw)
             return json({ ok: false, error: "file-send requires userid and a body" }, 400);
           const buf = raw instanceof ArrayBuffer ? raw : await new Response(raw).arrayBuffer();
-          return json(await call("file-send", { userid, name, data: new Uint8Array(buf) }));
+          return json(await call2("file-send", { userid, name, data: new Uint8Array(buf) }));
         }
         case "POST /api/webrtc-file-save": {
           const userid = url.searchParams.get("userid");
@@ -18010,11 +18078,11 @@
           if (!raw)
             return json({ ok: false, error: "webrtc-file-save requires a body" }, 400);
           const buf = raw instanceof ArrayBuffer ? raw : await new Response(raw).arrayBuffer();
-          return json(await call("webrtc-file-save", { userid, name, dir, data: new Uint8Array(buf) }));
+          return json(await call2("webrtc-file-save", { userid, name, dir, data: new Uint8Array(buf) }));
         }
         case "GET /api/file-download": {
           const name = url.searchParams.get("name");
-          const r = await call("file-get", { name });
+          const r = await call2("file-get", { name });
           if (!r.ok || !r.data?.bytes)
             return new Response("not found", { status: 404 });
           const dl = url.searchParams.get("dl") === "1";
@@ -18038,11 +18106,11 @@
           return json({ ok: true, iceServers: await iceServers() });
         case "GET /api/call-poll": {
           const since = url.searchParams.get("since");
-          const r = await call("call-poll", { since });
+          const r = await call2("call-poll", { since });
           return json(r.data ?? { signals: [], cursor: 0 });
         }
         case "POST /api/call-signal":
-          return json(await call("call-signal", { userid: body.userid, data: body.data }));
+          return json(await call2("call-signal", { userid: body2.userid, data: body2.data }));
         default:
           return json({ ok: false, error: `no browser handler for ${method} ${p}` }, 404);
       }
