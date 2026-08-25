@@ -17441,7 +17441,7 @@
         }
         case "friend-set-alias": {
           aliases[req.userid] = req.alias;
-          await saveAliases();
+          void saveAliases();
           const f = peer.friends().find((x) => (x.userid || x.pubkey) === req.userid);
           return ok(f ? friendView(f) : { userid: req.userid, alias: req.alias });
         }
@@ -17490,7 +17490,7 @@
             const fileId = peer.sendFile(req.userid, req.data, { name: wire });
             if (!fileId)
               return fail("no live session \u2014 file not sent (peer offline?)");
-            await stashFile(name, req.data);
+            void stashFile(name, req.data);
             const m = await recordMessage(req.userid, "out", "", "online", { name, size: req.data.length, status: "sending", sent: 0 });
             sendingMsgByFileId.set(fileId, m.id);
             return ok({ fileId, name });
@@ -17502,7 +17502,7 @@
           if (!req.data)
             return fail("webrtc-file-save requires data");
           const wname = uniqueName(req.name || "file");
-          await stashFile(wname, req.data);
+          void stashFile(wname, req.data);
           const outgoing2 = req.dir === "out";
           if (req.userid) {
             await recordMessage(
