@@ -3880,6 +3880,74 @@ function DkLockedOut({ lang, onTakeover }) {
     busy ? W.busy : W.cta
   ))));
 }
+function dkBrowser() {
+  const ua = navigator.userAgent || "";
+  if (/Edg\//.test(ua))
+    return "edge";
+  if (/Firefox\//.test(ua))
+    return "firefox";
+  if (/OPR\//.test(ua))
+    return "opera";
+  if (/Chrome\//.test(ua))
+    return "chrome";
+  if (/Safari\//.test(ua))
+    return "safari";
+  return "other";
+}
+const DK_BROWSER_T = {
+  en: {
+    edge: "Edge blocks this page from reaching the relay, so friend requests never arrive and messages stay queued. Chrome or Firefox works \u2014 or try im.beagle.chat, which serves the relay from its own origin.",
+    safari: "Safari support is incomplete. If the app misbehaves, Chrome or Firefox works.",
+    other: "This browser is untested. Beagle Web is developed against Chrome and Firefox.",
+    dismiss: "dismiss"
+  },
+  zh: {
+    edge: "Edge \u4F1A\u62E6\u4F4F\u8FD9\u4E2A\u9875\u9762\u8FDE\u63A5\u4E2D\u7EE7\uFF0C\u6240\u4EE5\u597D\u53CB\u8BF7\u6C42\u53D1\u4E0D\u51FA\u4E5F\u6536\u4E0D\u5230\uFF0C\u6D88\u606F\u4F1A\u4E00\u76F4\u6392\u961F\u3002\u8BF7\u7528 Chrome \u6216 Firefox \u2014\u2014 \u6216\u8005\u8BD5\u8BD5 im.beagle.chat\uFF0C\u5B83\u7684\u4E2D\u7EE7\u5C31\u5728\u540C\u4E00\u4E2A\u57DF\u540D\u4E0B\u3002",
+    safari: "Safari \u7684\u652F\u6301\u8FD8\u4E0D\u5B8C\u6574\u3002\u5982\u679C\u51FA\u73B0\u5F02\u5E38\uFF0C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
+    other: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u6D4B\u8BD5\u8FC7\u3002Beagle \u7F51\u9875\u7248\u662F\u9488\u5BF9 Chrome \u548C Firefox \u5F00\u53D1\u7684\u3002",
+    dismiss: "\u77E5\u9053\u4E86"
+  }
+};
+function DkBrowserNotice({ lang }) {
+  const kind = React.useMemo(dkBrowser, []);
+  const W = DK_BROWSER_T[lang === "zh" ? "zh" : "en"];
+  const key = "dk-browser-notice-" + kind;
+  const [hidden, setHidden] = React.useState(() => {
+    try {
+      return localStorage.getItem(key) === "1";
+    } catch (e) {
+      return false;
+    }
+  });
+  React.useEffect(() => {
+    obInstallCss();
+  }, []);
+  if (kind === "chrome" || kind === "firefox" || hidden)
+    return null;
+  const msg = W[kind] || W.other;
+  return /* @__PURE__ */ React.createElement("div", { style: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "9px 16px",
+    background: kind === "edge" ? "color-mix(in oklab, #ff8a5c, transparent 86%)" : "var(--chip)",
+    borderBottom: "1px solid var(--line)",
+    flexShrink: 0
+  } }, /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 15, stroke: 2, color: kind === "edge" ? "#ff8a5c" : "var(--faint)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 } }, msg), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      onClick: () => {
+        try {
+          localStorage.setItem(key, "1");
+        } catch (e) {
+        }
+        setHidden(true);
+      },
+      style: { background: "none", border: "none", cursor: "pointer", padding: "2px 6px", fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" }
+    },
+    W.dismiss
+  ));
+}
 const DK_FILE_RTC_KIND = "file";
 const DK_FILE_RTC_CHUNK = 16 * 1024;
 const DK_FILE_RTC_OPEN_TIMEOUT_MS = 2e4;
@@ -5403,7 +5471,7 @@ function DkApp() {
     { id: "network", icon: "network", label: T.network },
     { id: "profile", icon: "userRound", label: T.profile }
   ];
-  return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", nav.find((n) => n.id === tab).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", nav.find((n) => n.id === tab).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
     DkLockedOut,
     {
       lang: t.lang,

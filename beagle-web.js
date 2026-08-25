@@ -8748,6 +8748,16 @@
     if (n > 1)
       bridgeCursor = (bridgeCursor + 1) % n;
   }
+  function wsStat(k) {
+    const s = globalThis.__beagleWsStats ?? (globalThis.__beagleWsStats = {
+      opened: 0,
+      upstream: 0,
+      closed: 0,
+      closedBeforeConnect: 0,
+      errored: 0
+    });
+    s[k] = (s[k] || 0) + 1;
+  }
   function createConnection(opts) {
     return new WsSocket(opts);
   }
@@ -8825,6 +8835,7 @@
         __privateSet(this, _attempt, attempt);
         __privateSet(this, _ws, new WebSocket(bridgeUrl(host, port, attempt)));
         __privateGet(this, _ws).binaryType = "arraybuffer";
+        wsStat("opened");
         __privateGet(this, _ws).onmessage = (ev) => {
           if (typeof ev.data === "string") {
             let msg;
@@ -8835,6 +8846,7 @@
             }
             if (msg.t === "connect") {
               __privateSet(this, _connected, true);
+              wsStat("upstream");
               __privateMethod(this, _emit, emit_fn).call(this, "connect");
             } else if (msg.t === "error")
               __privateMethod(this, _emit, emit_fn).call(this, "error", new Error(msg.m || "bridge error"));
@@ -8843,8 +8855,10 @@
           __privateMethod(this, _emit, emit_fn).call(this, "data", Buffer2.from(ev.data));
         };
         __privateGet(this, _ws).onerror = () => {
+          wsStat("errored");
         };
         __privateGet(this, _ws).onclose = (ev) => {
+          wsStat(__privateGet(this, _connected) ? "closed" : "closedBeforeConnect");
           const bridgeCount = configuredBridges().length;
           if (!__privateGet(this, _connected) && !__privateGet(this, _destroyed) && __privateGet(this, _attempt) + 1 < bridgeCount) {
             rotateBridge();
@@ -18364,6 +18378,13 @@
       return {
         identity: this.identity,
         storageOk: this.storageOk !== false,
+        // Did the relay path ever actually work? `opened` counts bridge sockets,
+        // `upstream` counts the ones where the TCP relay behind the bridge
+        // connected. opened>0 with upstream=0 is the signature of a browser or
+        // network that permits the WebSocket but kills what rides on it — onion
+        // traffic still works, net_crypto sessions never form, so every message
+        // queues while calls appear to ring.
+        relaySockets: globalThis.__beagleWsStats ?? null,
         persistence: this.persistence,
         lock: { supported: this.lock?.supported, ...this.lockState },
         secureContext: window.isSecureContext,
