@@ -17165,6 +17165,8 @@
           profile.description = req.description ?? profile.description;
           if (req.punkId !== void 0)
             profile.punkId = req.punkId === null ? null : Number(req.punkId);
+          if (req.avatarDataUrl !== void 0)
+            profile.avatarDataUrl = req.avatarDataUrl || null;
           if (req.onboarded !== void 0)
             profile.onboarded = !!req.onboarded;
           await kvPut(PROFILE_KEY, profile);
@@ -17365,6 +17367,33 @@
   init_buffer_global();
   init_process_global();
   var ZERO = "0".repeat(32);
+  var CONFIG_URL2 = "https://beagle.chat/assets/bgservers.json";
+  var API_TIMEOUT_MS = 4e3;
+  var apiPromise = null;
+  function apiBase() {
+    if (!apiPromise) {
+      apiPromise = fetch(CONFIG_URL2, { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((cfg) => {
+        const u = cfg?.punksApi?.[0]?.url;
+        return typeof u === "string" && u ? u.replace(/\/+$/, "") : null;
+      }).catch(() => null);
+    }
+    return apiPromise;
+  }
+  async function apiGet(path) {
+    const base = await apiBase();
+    if (!base)
+      return null;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), API_TIMEOUT_MS);
+    try {
+      const r = await fetch(base + path, { signal: ctl.signal });
+      return r.ok ? await r.json() : null;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   var mainPromise = null;
   var rarePromise = null;
   var main = null;
@@ -17409,6 +17438,9 @@
     const n = Number(id);
     if (!Number.isInteger(n) || n < 0 || n > 9999)
       return null;
+    const live = await apiGet(`/api/punks/${n}`);
+    if (live && live.image)
+      return { id: n, image: live.image, type: live.type || "" };
     await loadMain();
     const h = hashAt(n);
     if (h)
@@ -17418,6 +17450,11 @@
     return uri ? { id: n, image: uri, type: punkTypeOf(n) } : null;
   }
   async function punkList({ type: type2 = "any", limit = 24 } = {}) {
+    const want0 = String(type2 || "any").toLowerCase();
+    const live = await apiGet(`/api/punks/filter/${encodeURIComponent(want0)}/any?limit=${limit}`);
+    if (Array.isArray(live) && live.length) {
+      return live.filter((p) => p && p.image).map((p) => ({ id: Number(p.id), image: p.image, type: p.type || "" }));
+    }
     await loadMain();
     const want = String(type2 || "any").toLowerCase();
     const pool = [];
@@ -17559,13 +17596,16 @@
       // Until beagles.eth registration works from the browser this is what makes
       // the avatar visible at all — in this client. See onboarding.jsx.
       punkId: profile?.punkId ?? mine?.punkId ?? null,
+      // An uploaded picture is this client's own, so it outranks anything
+      // published — same precedence as the name.
+      avatarDataUrl: profile?.avatarDataUrl ?? null,
       // First-run state: the welcome flow runs until a name has been set, since
       // a nameless peer's friend request shows the other side nothing but a key.
       onboarded: !!profile?.onboarded,
       // What the running peer advertises, straight from the SDK.
       advertised: diag?.advertised ?? null,
       hasIdentity: !!id.userid,
-      avatarUrl: mine?.avatarUrl ?? null,
+      avatarUrl: profile?.avatarDataUrl ?? mine?.avatarUrl ?? null,
       ens: mine?.ens ?? "",
       handle: "",
       ip: "",
@@ -17701,6 +17741,8 @@
             profile.description = body.description;
           if (body.punkId !== void 0)
             profile.punkId = body.punkId === null ? null : Number(body.punkId);
+          if (body.avatarDataUrl !== void 0)
+            profile.avatarDataUrl = body.avatarDataUrl || null;
           if (body.onboarded !== void 0)
             profile.onboarded = !!body.onboarded;
           try {
@@ -17879,7 +17921,8 @@
             name: body.name,
             description: body.description,
             punkId: body.punkId,
-            onboarded: body.onboarded
+            onboarded: body.onboarded,
+            avatarDataUrl: body.avatarDataUrl
           }));
         case "POST /api/file-send": {
           const userid = url.searchParams.get("userid");

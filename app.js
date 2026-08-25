@@ -3230,113 +3230,274 @@ function DiscoverTab({ T, kind, peers, meId, onAdd, onOpenChat }) {
     }
   ));
 }
+const OB = {
+  bg: "#0b0b0f",
+  elev: "#0e0e13",
+  field: "#121218",
+  subtle: "#15151b",
+  sec: "#1a1a22",
+  hair: "#1b1b22",
+  border: "#23232c",
+  bfield: "#2a2a35",
+  dashed: "#33333f",
+  text: "#f4f2fa",
+  text2: "#c9c6d6",
+  muted: "#8d8b9a",
+  faint: "#6f6d7d",
+  faint2: "#5d5b6a",
+  ph: "#55535f",
+  accent: "#7c5cff",
+  online: "#4ad1a5",
+  ui: "'IBM Plex Sans','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,sans-serif",
+  mono: "'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace"
+};
+const OB_CSS = `
+.ob-root{position:fixed;inset:0;z-index:200;display:flex;background:${OB.bg};
+  color:${OB.text};font-family:${OB.ui};overflow:hidden}
+.ob-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.ob-body::-webkit-scrollbar{width:8px}
+.ob-body::-webkit-scrollbar-thumb{background:${OB.border};border-radius:8px}
+.ob-in{width:100%;background:${OB.field};border:1px solid ${OB.bfield};border-radius:10px;
+  color:${OB.text};font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .12s,background .12s}
+.ob-in::placeholder{color:${OB.ph}}
+.ob-in:focus{border-color:${OB.accent};background:#15131f}
+.ob-btn{border:none;cursor:pointer;font-family:inherit;font-weight:600;
+  background:${OB.accent};color:${OB.onAccent || "#0b0b0f"};border-radius:10px;transition:background .12s}
+.ob-btn:hover{background:#9179ff}
+.ob-btn[disabled]{opacity:.55;cursor:default}
+.ob-sec{background:${OB.sec};border:1px solid ${OB.bfield};color:${OB.text2};
+  border-radius:9px;cursor:pointer;font-family:inherit;transition:border-color .12s,color .12s}
+.ob-sec:hover{border-color:${OB.accent};color:#fff}
+.ob-mut{background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+  color:${OB.faint};transition:color .12s}
+.ob-mut:hover{color:#a8a5b6}
+.ob-link{background:none;border:none;padding:0 0 2px;cursor:pointer;font-family:inherit;
+  color:#9b83ff;border-bottom:1px solid #3a3060;transition:color .12s}
+.ob-link:hover{color:#b8a6ff}
+.ob-tile{padding:0;border:1px solid ${OB.border};border-radius:9px;cursor:pointer;
+  background:${OB.subtle};overflow:hidden;transition:outline-color .1s}
+.ob-tile:hover{border-color:${OB.accent}}
+.ob-tile[data-sel="1"]{outline:2px solid ${OB.accent};outline-offset:2px}
+.ob-shuffle{border:1px dashed ${OB.dashed};border-radius:9px;background:none;color:#7e7c8c;
+  cursor:pointer;font-family:inherit;transition:border-color .12s,color .12s}
+.ob-shuffle:hover{border-color:${OB.accent};color:#b8a6ff}
+.ob-dot{width:6px;height:6px;border-radius:999px;background:${OB.online};
+  animation:obpulse 2.4s ease-in-out infinite}
+@keyframes obpulse{0%,100%{opacity:0}50%{opacity:1}}
+@media (max-width:900px){
+  .ob-root{flex-direction:column}
+  .ob-left{width:100%!important;border-right:none!important}
+  .ob-right{display:none!important}
+}`;
+function obInstallCss() {
+  if (document.getElementById("ob-css"))
+    return;
+  const el = document.createElement("style");
+  el.id = "ob-css";
+  el.textContent = OB_CSS;
+  document.head.appendChild(el);
+}
+const OB_RARE = ["alien", "zombie", "ape"];
+async function obPunks(type, limit) {
+  try {
+    const d = await (await fetch(`/api/punk-list?type=${type}&limit=${limit}`)).json();
+    return d && d.ok && d.list || [];
+  } catch (e) {
+    return [];
+  }
+}
+async function dkPunkBatch(round) {
+  const rare = OB_RARE[round % OB_RARE.length];
+  const maleHeavy = round % 2 === 0;
+  const [m, f, r] = await Promise.all([
+    obPunks("male", maleHeavy ? 3 : 2),
+    obPunks("female", maleHeavy ? 2 : 3),
+    obPunks(rare, 1)
+  ]);
+  const all = m.concat(f, r);
+  const k = round % (all.length || 1);
+  return all.slice(k).concat(all.slice(0, k));
+}
+const OB_ADJ = ["quiet", "bright", "swift", "amber", "violet", "copper", "lunar", "north", "ember", "still"];
+const OB_NOUN = ["otter", "falcon", "cedar", "harbor", "willow", "quartz", "meridian", "sable", "juniper", "wren"];
+function obRandomName() {
+  const p = (a) => a[Math.floor(Math.random() * a.length)];
+  const cap = (s) => s[0].toUpperCase() + s.slice(1);
+  return `${cap(p(OB_ADJ))} ${cap(p(OB_NOUN))}`;
+}
+const OB_T = {
+  en: {
+    step: (n) => `${n} of 2`,
+    h1: "Tell people who you are.",
+    b1: "Your key is generated right here, in this tab, the moment you continue. There is no account to create \u2014 a name is all anyone needs to recognise you.",
+    name: "YOUR NAME",
+    nameReq: "required",
+    namePh: "Wei Li",
+    intro: "ONE LINE ABOUT YOU",
+    optional: "optional",
+    introPh: "Building decentralised things in San Francisco",
+    face: "A FACE",
+    shuffle: "shuffle",
+    upload: "upload",
+    cont: "Continue",
+    skip: "Skip \u2014 use a random name",
+    h2: "Now add one person.",
+    b2: "Beagle stays quiet until you do. Send them your link, or let them scan it \u2014 it reaches them wherever they run Beagle.",
+    yourLink: "YOUR LINK",
+    copyLink: "Copy link",
+    copied: "Copied",
+    share: "Share",
+    worksOn: "Works for a friend on:",
+    tab: "a browser tab",
+    alreadyHere: "Or say hello to someone already here:",
+    add: "add",
+    requested: "requested",
+    open: "Open Beagle",
+    later: "I'll add someone later",
+    req: "FRIEND REQUEST",
+    fallName: "Your name",
+    fallIntro: "wants to connect",
+    addrSoon: "your address \xB7 created when you continue",
+    accept: "Accept",
+    ignore: "Ignore",
+    cap1: "This is what a friend sees when your request lands on their phone.",
+    cap2: "They accept once. After that you are reachable from any of your devices.",
+    needName: "A name is required \u2014 without one your request is just a key.",
+    creating: "creating your key\u2026"
+  },
+  zh: {
+    step: (n) => `\u7B2C ${n} \u6B65 / \u5171 2 \u6B65`,
+    h1: "\u5148\u8BA9\u522B\u4EBA\u8BA4\u51FA\u4F60\u3002",
+    b1: '\u4F60\u7684\u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210 \u2014\u2014 \u70B9\u51FB"\u7EE7\u7EED"\u7684\u90A3\u4E00\u523B\u624D\u4F1A\u521B\u5EFA\u3002\u6CA1\u6709\u8D26\u53F7\u8981\u6CE8\u518C\uFF0C\u522B\u4EBA\u53EA\u9700\u8981\u4E00\u4E2A\u540D\u5B57\u5C31\u80FD\u8BA4\u51FA\u4F60\u3002',
+    name: "\u4F60\u7684\u540D\u5B57",
+    nameReq: "\u5FC5\u586B",
+    namePh: "\u674E\u4F1F",
+    intro: "\u4E00\u53E5\u81EA\u6211\u4ECB\u7ECD",
+    optional: "\u9009\u586B",
+    introPh: "\u5728\u65E7\u91D1\u5C71\u505A\u53BB\u4E2D\u5FC3\u5316\u7684\u4E1C\u897F",
+    face: "\u5934\u50CF",
+    shuffle: "\u6362\u4E00\u6279",
+    upload: "\u4E0A\u4F20",
+    cont: "\u7EE7\u7EED",
+    skip: "\u8DF3\u8FC7\uFF0C\u968F\u673A\u53D6\u4E2A\u540D\u5B57",
+    h2: "\u73B0\u5728\u52A0\u4E00\u4E2A\u4EBA\u3002",
+    b2: "\u5728\u6B64\u4E4B\u524D Beagle \u4F1A\u4E00\u76F4\u5B89\u9759\u3002\u628A\u94FE\u63A5\u53D1\u7ED9\u5BF9\u65B9\uFF0C\u6216\u8005\u8BA9\u5BF9\u65B9\u626B\u7801 \u2014\u2014 \u4ED6\u5728\u54EA\u53F0\u8BBE\u5907\u4E0A\u7528 Beagle \u90FD\u6536\u5F97\u5230\u3002",
+    yourLink: "\u4F60\u7684\u94FE\u63A5",
+    copyLink: "\u590D\u5236\u94FE\u63A5",
+    copied: "\u5DF2\u590D\u5236",
+    share: "\u5206\u4EAB",
+    worksOn: "\u5BF9\u65B9\u53EF\u4EE5\u5728\u8FD9\u4E9B\u8BBE\u5907\u4E0A\uFF1A",
+    tab: "\u6D4F\u89C8\u5668\u6807\u7B7E\u9875",
+    alreadyHere: "\u6216\u8005\uFF0C\u5148\u8DDF\u5DF2\u7ECF\u5728\u8FD9\u91CC\u7684\u4EBA\u6253\u4E2A\u62DB\u547C\uFF1A",
+    add: "\u6DFB\u52A0",
+    requested: "\u5DF2\u53D1\u9001",
+    open: "\u6253\u5F00 Beagle",
+    later: "\u4EE5\u540E\u518D\u52A0\u8054\u7CFB\u4EBA",
+    req: "\u597D\u53CB\u8BF7\u6C42",
+    fallName: "\u4F60\u7684\u540D\u5B57",
+    fallIntro: "\u8BF7\u6C42\u6DFB\u52A0\u4F60\u4E3A\u597D\u53CB",
+    addrSoon: '\u4F60\u7684\u5730\u5740 \xB7 \u70B9\u51FB"\u7EE7\u7EED"\u540E\u751F\u6210',
+    accept: "\u63A5\u53D7",
+    ignore: "\u5FFD\u7565",
+    cap1: "\u8FD9\u5C31\u662F\u5BF9\u65B9\u5728\u624B\u673A\u4E0A\u6536\u5230\u4F60\u7684\u8BF7\u6C42\u65F6\u770B\u5230\u7684\u6837\u5B50\u3002",
+    cap2: "\u5BF9\u65B9\u53EA\u9700\u63A5\u53D7\u4E00\u6B21\uFF0C\u4E4B\u540E\u4F60\u5728\u4EFB\u4F55\u8BBE\u5907\u4E0A\u90FD\u80FD\u88AB\u627E\u5230\u3002",
+    needName: "\u540D\u5B57\u662F\u5FC5\u586B\u7684 \u2014\u2014 \u6CA1\u6709\u540D\u5B57\uFF0C\u4F60\u7684\u8BF7\u6C42\u5C31\u53EA\u662F\u4E00\u4E32\u5BC6\u94A5\u3002",
+    creating: "\u6B63\u5728\u751F\u6210\u5BC6\u94A5\u2026"
+  }
+};
+const OB_PLATFORMS = ["iPhone", "Android", "macOS", "Windows", "Linux"];
 const DK_FIRST_CONTACTS = [
   {
     ens: "help.beagles.eth",
     name: "Beagle Chat Help",
     userid: "FhbohSLrj5UjdyFKCEYNeEWAPq3QD9hRg6hsso5ipag2",
-    address: "ZJxuWL9SDqdvunnCSMLUd5jyGCaBV44G6THYaQS7ZaZAz1wmt4nz",
-    blurb: { en: "Ask anything about Beagle. Always online.", zh: "\u5173\u4E8E Beagle \u7684\u4EFB\u4F55\u95EE\u9898\u90FD\u53EF\u4EE5\u95EE\u5B83\uFF0C\u59CB\u7EC8\u5728\u7EBF\u3002" }
+    address: "ZJxuWL9SDqdvunnCSMLUd5jyGCaBV44G6THYaQS7ZaZAz1wmt4nz"
   },
   {
     ens: "air.beagles.eth",
     name: "air-wli",
     userid: "6dAPAT1RT4YqpHREKhyGDqroaRYr5WaaHW6PNUEb4dAM",
-    address: "DMtGmaH17YMWACJk8ByX9B8WSMX5WvWdLF7v2YmRErAC2Z5xz1X8",
-    blurb: { en: "Wei Li \u2014 the person building this. Say hi.", zh: "Wei Li \u2014 \u672C\u9879\u76EE\u4F5C\u8005\uFF0C\u6B22\u8FCE\u6253\u62DB\u547C\u3002" }
+    address: "DMtGmaH17YMWACJk8ByX9B8WSMX5WvWdLF7v2YmRErAC2Z5xz1X8"
   }
 ];
-const DK_WELCOME_T = {
-  en: {
-    title: "Your browser is your home on the internet",
-    sub: "No signup, no server, nothing to install \u2014 your account here is a key, and it is created in this browser when you continue. First, say who you are, so people know who is knocking.",
-    step1: "Who are you",
-    step2: "Say hello to someone",
-    name: "display name",
-    namePh: "e.g. Wei Li",
-    intro: "one line about you",
-    introPh: "e.g. building decentralised things in SF",
-    avatar: "avatar",
-    pick: "choose an avatar",
-    shuffle: "shuffle",
-    useIdent: "use the default",
-    addr: "your address",
-    addrHint: "Share this and anyone can reach you \u2014 from a phone, a desktop, or another tab.",
-    keyLater: "Your key is generated when you continue, and never leaves this browser.",
-    creating: "creating your key\u2026",
-    travels: "Your name and intro travel inside the friend request, so the other side sees them before accepting.",
-    avatarLocal: "Your avatar shows in this window. Friends see a pattern generated from your key until beagles.eth registration works here.",
-    next: "continue",
-    back: "back",
-    later: "skip for now",
-    done: "start chatting",
-    add: "add",
-    added: "requested",
-    browse: "Browse the directory instead \u2192",
-    needName: "Pick a name first \u2014 a request with no name is just a key.",
-    langLabel: "Language",
-    pickTitle: "choose an avatar",
-    shuffle: "shuffle",
-    loading: "loading\u2026",
-    types: { any: "any", female: "female", male: "male", zombie: "zombie", ape: "ape", alien: "alien" }
-  },
-  zh: {
-    title: "\u6D4F\u89C8\u5668\u5C31\u662F\u4F60\u5728\u4E92\u8054\u7F51\u4E0A\u7684\u5BB6",
-    sub: '\u4E0D\u7528\u6CE8\u518C\u3001\u6CA1\u6709\u670D\u52A1\u5668\u3001\u65E0\u9700\u5B89\u88C5 \u2014\u2014 \u8FD9\u91CC\u7684\u8D26\u53F7\u5C31\u662F\u4E00\u628A\u5BC6\u94A5\uFF0C\u70B9\u51FB"\u7EE7\u7EED"\u65F6\u624D\u4F1A\u5728\u8FD9\u4E2A\u6D4F\u89C8\u5668\u91CC\u751F\u6210\u3002\u5148\u8BF4\u8BF4\u4F60\u662F\u8C01\uFF0C\u522B\u4EBA\u624D\u77E5\u9053\u662F\u8C01\u5728\u6572\u95E8\u3002',
-    step1: "\u4F60\u662F\u8C01",
-    step2: "\u5148\u8DDF\u4EBA\u6253\u4E2A\u62DB\u547C",
-    name: "\u6635\u79F0",
-    namePh: "\u4F8B\u5982 Wei Li",
-    intro: "\u4E00\u53E5\u8BDD\u4ECB\u7ECD",
-    introPh: "\u4F8B\u5982 \u5728\u65E7\u91D1\u5C71\u505A\u53BB\u4E2D\u5FC3\u5316\u7684\u4E1C\u897F",
-    avatar: "\u5934\u50CF",
-    pick: "\u9009\u4E00\u4E2A\u5934\u50CF",
-    shuffle: "\u6362\u4E00\u6279",
-    useIdent: "\u7528\u9ED8\u8BA4\u56FE\u6848",
-    addr: "\u4F60\u7684\u5730\u5740",
-    addrHint: "\u628A\u5B83\u53D1\u7ED9\u522B\u4EBA\uFF0C\u624B\u673A\u3001\u684C\u9762\u7AEF\u6216\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u90FD\u80FD\u627E\u5230\u4F60\u3002",
-    keyLater: '\u4F60\u7684\u5BC6\u94A5\u4F1A\u5728\u70B9\u51FB"\u7EE7\u7EED"\u65F6\u751F\u6210\uFF0C\u5E76\u4E14\u6C38\u8FDC\u4E0D\u4F1A\u79BB\u5F00\u8FD9\u4E2A\u6D4F\u89C8\u5668\u3002',
-    creating: "\u6B63\u5728\u751F\u6210\u5BC6\u94A5\u2026",
-    travels: "\u6635\u79F0\u548C\u4ECB\u7ECD\u4F1A\u968F\u597D\u53CB\u8BF7\u6C42\u4E00\u8D77\u53D1\u9001\uFF0C\u5BF9\u65B9\u5728\u540C\u610F\u4E4B\u524D\u5C31\u80FD\u770B\u5230\u3002",
-    avatarLocal: "\u5934\u50CF\u53EA\u5728\u672C\u7A97\u53E3\u663E\u793A\u3002\u5728\u6D4F\u89C8\u5668\u7AEF\u652F\u6301 beagles.eth \u6CE8\u518C\u4E4B\u524D\uFF0C\u597D\u53CB\u770B\u5230\u7684\u662F\u4F60\u5BC6\u94A5\u751F\u6210\u7684\u56FE\u6848\u3002",
-    next: "\u7EE7\u7EED",
-    back: "\u8FD4\u56DE",
-    later: "\u4EE5\u540E\u518D\u8BF4",
-    done: "\u5F00\u59CB\u804A\u5929",
-    add: "\u6DFB\u52A0",
-    added: "\u5DF2\u53D1\u9001",
-    browse: "\u76F4\u63A5\u6D4F\u89C8\u76EE\u5F55 \u2192",
-    needName: "\u5148\u53D6\u4E2A\u540D\u5B57 \u2014\u2014 \u6CA1\u6709\u540D\u5B57\u7684\u8BF7\u6C42\u5C31\u53EA\u662F\u4E00\u4E32\u5BC6\u94A5\u3002",
-    langLabel: "\u8BED\u8A00",
-    pickTitle: "\u9009\u4E00\u4E2A\u5934\u50CF",
-    shuffle: "\u6362\u4E00\u6279",
-    loading: "\u52A0\u8F7D\u4E2D\u2026",
-    types: { any: "\u5168\u90E8", female: "\u5973", male: "\u7537", zombie: "\u50F5\u5C38", ape: "\u733F", alien: "\u5916\u661F\u4EBA" }
-  }
-};
-function DkWelcome({ lang, onLang, me, onSave, onAdd, onBrowse, onClose, onCreateIdentity }) {
+function ObLabel({ children, note }) {
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, letterSpacing: ".12em", color: OB.muted } }, children), note && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: note.req ? OB.accent : OB.faint2 } }, note.text));
+}
+function ObFace({ url, punk, seed, size, radius }) {
+  if (url)
+    return /* @__PURE__ */ React.createElement("img", { src: url, alt: "", width: size, height: size, style: { width: size, height: size, borderRadius: radius, objectFit: "cover", display: "block", background: OB.subtle } });
+  if (punk != null)
+    return /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punk, size, radius, fallbackSeed: seed || "beagle" });
+  if (seed)
+    return /* @__PURE__ */ React.createElement(DkIdenticon, { seed, size, radius });
+  return /* @__PURE__ */ React.createElement("div", { style: { width: size, height: size, borderRadius: radius, background: OB.subtle, border: `1px solid ${OB.bfield}`, display: "flex", alignItems: "center", justifyContent: "center", color: OB.faint2 } }, /* @__PURE__ */ React.createElement(Icon, { name: "userRound", size: Math.round(size * 0.44), stroke: 1.6 }));
+}
+function ObQr({ value, px = 132 }) {
+  const qr = React.useMemo(() => {
+    if (typeof qrcode === "undefined" || !value)
+      return null;
+    try {
+      const q = qrcode(0, "M");
+      q.addData(value);
+      q.make();
+      return q;
+    } catch (e) {
+      return null;
+    }
+  }, [value]);
+  const count = qr ? qr.getModuleCount() : 0;
+  const quiet = 2;
+  const total = count + quiet * 2;
+  return /* @__PURE__ */ React.createElement("div", { style: { width: px, height: px, background: "#f4f2fa", borderRadius: 10, padding: 10, boxSizing: "border-box", flexShrink: 0 } }, qr ? /* @__PURE__ */ React.createElement("svg", { width: "100%", height: "100%", viewBox: `0 0 ${total} ${total}`, shapeRendering: "crispEdges", style: { display: "block" } }, /* @__PURE__ */ React.createElement("rect", { width: total, height: total, fill: "#f4f2fa" }), Array.from({ length: count }).map((_, r) => Array.from({ length: count }).map(
+    (__, c) => qr.isDark(r, c) ? /* @__PURE__ */ React.createElement("rect", { key: `${r}-${c}`, x: c + quiet, y: r + quiet, width: 1.04, height: 1.04, fill: "#0b0b0f" }) : null
+  ))) : null);
+}
+function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity }) {
   var _a;
-  const W = DK_WELCOME_T[lang === "zh" ? "zh" : "en"];
+  const W = OB_T[lang === "zh" ? "zh" : "en"];
   const [step, setStep] = React.useState(1);
   const [name, setName] = React.useState(me.name || "");
   const [intro, setIntro] = React.useState(me.description || "");
   const [punk, setPunk] = React.useState((_a = me.punkId) != null ? _a : null);
-  const [picking, setPicking] = React.useState(false);
-  const [sent, setSent] = React.useState({});
+  const [upload, setUpload] = React.useState(me.avatarDataUrl || null);
+  const [round, setRound] = React.useState(0);
+  const [tiles, setTiles] = React.useState([]);
   const [warn, setWarn] = React.useState(false);
   const [minting, setMinting] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const [sent, setSent] = React.useState({});
+  const nameRef = React.useRef(null);
+  const fileRef = React.useRef(null);
   const hasKey = !!me.hasIdentity && !!me.carrier;
-  const commit = (extra) => onSave({
-    name: name.trim(),
-    description: intro.trim(),
-    punkId: punk,
-    ...extra
-  });
-  const next = async () => {
-    if (!name.trim()) {
+  React.useEffect(() => {
+    obInstallCss();
+  }, []);
+  React.useEffect(() => {
+    let dead = false;
+    dkPunkBatch(round).then((b) => {
+      if (!dead)
+        setTiles(b);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [round]);
+  React.useEffect(() => {
+    if (step === 1 && nameRef.current)
+      nameRef.current.focus();
+  }, [step]);
+  const link = hasKey ? `${location.origin}${location.pathname}#/chat?address=${me.carrier}` : "";
+  const commit = (extra) => onSave({ name: name.trim(), description: intro.trim(), punkId: punk, avatarDataUrl: upload, ...extra });
+  const advance = async (nm) => {
+    const final = (nm || name).trim();
+    if (!final) {
       setWarn(true);
+      if (nameRef.current)
+        nameRef.current.focus();
       return;
     }
+    if (nm)
+      setName(nm);
     setMinting(true);
     try {
       if (!hasKey && onCreateIdentity)
@@ -3344,122 +3505,182 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onBrowse, onClose, onCreat
     } finally {
       setMinting(false);
     }
-    await commit({});
+    await onSave({ name: final, description: intro.trim(), punkId: punk, avatarDataUrl: upload });
     setStep(2);
   };
   const finish = () => {
     commit({ onboarded: true });
     onClose();
   };
-  const addOne = (c) => {
-    setSent((s) => Object.assign({}, s, { [c.ens]: true }));
-    Promise.resolve(commit({ onboarded: true })).then(() => onAdd && onAdd(c.address));
+  const copyLink = () => {
+    try {
+      navigator.clipboard.writeText(link);
+    } catch (e) {
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2e3);
   };
-  const field = {
-    width: "100%",
-    height: 34,
-    padding: "0 11px",
-    borderRadius: 9,
-    border: "1px solid var(--line)",
-    background: "var(--bg)",
-    color: "var(--text)",
-    fontFamily: "var(--ui)",
-    fontSize: 13.5,
-    outline: "none",
-    boxSizing: "border-box"
+  const share = () => {
+    if (navigator.share)
+      navigator.share({ title: "Beagle", text: name || "Beagle", url: link }).catch(() => {
+      });
+    else
+      copyLink();
   };
-  const label = {
-    fontFamily: "var(--mono)",
-    fontSize: 11,
-    fontWeight: 600,
-    color: "var(--faint)",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    display: "block",
-    marginBottom: 6
+  const onUpload = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f)
+      return;
+    const img = new Image();
+    const url = URL.createObjectURL(f);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const S = 256;
+        const c = document.createElement("canvas");
+        c.width = S;
+        c.height = S;
+        const ctx = c.getContext("2d");
+        const side = Math.min(img.width, img.height);
+        ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+        let d = null;
+        for (const q of [0.9, 0.75, 0.55, 0.4]) {
+          d = c.toDataURL("image/webp", q);
+          if (!d.startsWith("data:image/webp"))
+            d = c.toDataURL("image/jpeg", q);
+          if (d.length < 13e4)
+            break;
+        }
+        setUpload(d);
+        setPunk(null);
+      } catch (err) {
+      }
+    };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
   };
-  const note = { fontFamily: "var(--ui)", fontSize: 11.5, lineHeight: 1.55, color: "var(--faint)" };
-  return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 120, background: "color-mix(in oklab, #000, transparent 26%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 520, maxWidth: "96vw", maxHeight: "92vh", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 18, padding: 24, display: "flex", flexDirection: "column", gap: 18 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), [["en", "EN"], ["zh", "\u4E2D\u6587"]].map(([v, txt]) => /* @__PURE__ */ React.createElement(
+  const input = { padding: "14px 16px", fontSize: 18 };
+  const inputSm = { padding: "13px 16px", fontSize: 15 };
+  const body = { fontSize: 15, lineHeight: 1.6, color: OB.muted, margin: 0 };
+  const h = { fontSize: 36, lineHeight: 1.14, letterSpacing: "-0.02em", fontWeight: 600, color: OB.text, margin: 0 };
+  const langToggle = /* @__PURE__ */ React.createElement("div", { role: "radiogroup", style: { display: "flex", gap: 2, background: OB.field, border: `1px solid ${OB.border}`, borderRadius: 8, padding: 3 } }, [["en", "EN"], ["zh", "\u4E2D\u6587"]].map(([v, txt]) => /* @__PURE__ */ React.createElement(
     "button",
     {
       key: v,
+      role: "radio",
+      "aria-checked": lang === v,
       onClick: () => onLang && onLang(v),
-      title: W.langLabel,
       style: {
-        padding: "3px 10px",
-        borderRadius: 999,
+        border: "none",
         cursor: "pointer",
-        fontFamily: "var(--ui)",
-        fontSize: 12,
-        border: "1px solid var(--line)",
-        background: lang === v ? "var(--accent)" : "transparent",
-        color: lang === v ? "#fff" : "var(--dim)"
+        borderRadius: 6,
+        padding: "4px 9px",
+        fontSize: 11,
+        fontFamily: v === "en" ? OB.mono : OB.ui,
+        background: lang === v ? OB.accent : "transparent",
+        color: lang === v ? OB.bg : "#8d8b9a"
       }
     },
     txt
-  ))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 19, fontWeight: 700, color: "var(--text)", lineHeight: 1.3 } }, W.title), step === 1 && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 13, color: "var(--dim)", marginTop: 8, lineHeight: 1.6 } }, W.sub)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { height: 3, flex: 1, borderRadius: 999, background: step >= n ? "var(--accent)" : "var(--line)" } })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, step, "/2")), step === 1 ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 16, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0 } }, punk != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punk, size: 72, radius: 16, fallbackSeed: me.userId || "beagle" }) : hasKey ? /* @__PURE__ */ React.createElement(DkIdenticon, { seed: me.userId, size: 72, radius: 16 }) : /* @__PURE__ */ React.createElement("div", { style: { width: 72, height: 72, borderRadius: 16, background: "var(--chip)", border: "1px dashed var(--line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--faint)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "userRound", size: 30, stroke: 1.6 })), /* @__PURE__ */ React.createElement(Btn, { size: "sm", onClick: () => setPicking(true) }, W.pick), punk != null && /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "ghost", onClick: () => setPunk(null) }, W.useIdent)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: label }, W.name), /* @__PURE__ */ React.createElement(
+  )));
+  return /* @__PURE__ */ React.createElement("div", { className: "ob-root" }, /* @__PURE__ */ React.createElement("div", { className: "ob-left", style: { width: 560, flexShrink: 0, boxSizing: "border-box", padding: "44px 44px 32px", borderRight: `1px solid ${OB.hair}`, display: "flex", flexDirection: "column", gap: 28, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { width: 38, height: 3, borderRadius: 2, background: step >= n ? OB.accent : "#26262f" } }))), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint } }, W.step(step)), langToggle), step === 1 ? /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, W.h1), /* @__PURE__ */ React.createElement("p", { style: body }, W.b1), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.nameReq, req: true } }, W.name), /* @__PURE__ */ React.createElement(
     "input",
     {
-      autoFocus: true,
+      ref: nameRef,
+      className: "ob-in",
+      style: input,
       value: name,
       placeholder: W.namePh,
-      style: field,
+      maxLength: 32,
       onChange: (e) => {
         setName(e.target.value);
         setWarn(false);
       },
       onKeyDown: (e) => {
         if (e.key === "Enter")
-          next();
+          advance();
       }
     }
-  )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: label }, W.intro), /* @__PURE__ */ React.createElement(
+  ), warn && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: OB.accent } }, W.needName)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.intro), /* @__PURE__ */ React.createElement(
     "input",
     {
+      className: "ob-in",
+      style: inputSm,
       value: intro,
       placeholder: W.introPh,
-      style: field,
+      maxLength: 80,
       onChange: (e) => setIntro(e.target.value),
       onKeyDown: (e) => {
         if (e.key === "Enter")
-          next();
+          advance();
       }
     }
-  )))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 7, padding: "12px 14px", borderRadius: 12, background: "var(--chip)" } }, /* @__PURE__ */ React.createElement("div", { style: note }, "\u2713 ", W.travels), /* @__PURE__ */ React.createElement("div", { style: note }, "\xB7 ", W.avatarLocal)), hasKey ? /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("span", { style: label }, W.addr), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, me.carrier), /* @__PURE__ */ React.createElement(CopyBtn, { value: me.carrier, copiedText: "copied", copyFailedText: "copy failed", copyTitle: "copy" })), /* @__PURE__ */ React.createElement("div", { style: Object.assign({ marginTop: 6 }, note) }, W.addrHint)) : (
-    /* No key yet — promising an address here would be a lie. */
-    /* @__PURE__ */ React.createElement("div", { style: note }, "\u{1F511} ", W.keyLater)
-  ), warn && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--warn)" } }, W.needName), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", textDecoration: "underline" } }, W.later), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "solid", size: "lg", onClick: minting ? void 0 : next }, minting ? W.creating : W.next))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--text)" } }, W.step2), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, DK_FIRST_CONTACTS.map((c) => /* @__PURE__ */ React.createElement("div", { key: c.ens, style: { display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 12, border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: c.userid, size: 38, radius: 10, fallbackSeed: c.userid }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 13.5, fontWeight: 600, color: "var(--text)" } }, c.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)", marginTop: 1 } }, c.blurb[lang === "zh" ? "zh" : "en"]), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)", marginTop: 2 } }, c.ens)), sent[c.ens] ? /* @__PURE__ */ React.createElement(Tag, { tone: "ok" }, W.added) : /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "solid", onClick: () => addOne(c) }, W.add)))), /* @__PURE__ */ React.createElement(
+  )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.face), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, flexWrap: "wrap" } }, tiles.map((p) => /* @__PURE__ */ React.createElement(
     "button",
     {
+      key: p.id,
+      className: "ob-tile",
+      "data-sel": !upload && punk === p.id ? "1" : "0",
+      title: `#${p.id} \xB7 ${p.type}`,
+      "aria-label": `punk ${p.id}, ${p.type}`,
       onClick: () => {
-        commit({ onboarded: true });
-        onBrowse();
-        onClose();
+        setPunk(p.id);
+        setUpload(null);
       },
-      style: { background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--accent)" }
+      style: { width: 40, height: 40 }
     },
-    W.browse
-  ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement(Btn, { size: "lg", onClick: () => setStep(1) }, W.back), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "solid", size: "lg", onClick: finish }, W.done))), picking && /* @__PURE__ */ React.createElement(
-    DkPunkPicker,
+    /* @__PURE__ */ React.createElement("img", { src: p.image, alt: "", style: { width: "100%", height: "100%", display: "block", imageRendering: "pixelated" } })
+  )), /* @__PURE__ */ React.createElement(
+    "button",
     {
-      T: {
-        ensPickPunk: W.pickTitle,
-        ensShuffle: W.shuffle,
-        dirLoading: W.loading,
-        pt_any: W.types.any,
-        pt_female: W.types.female,
-        pt_male: W.types.male,
-        pt_zombie: W.types.zombie,
-        pt_ape: W.types.ape,
-        pt_alien: W.types.alien
-      },
-      onPick: (id) => {
-        setPunk(id);
-        setPicking(false);
-      },
-      onClose: () => setPicking(false)
-    }
-  )));
+      className: "ob-shuffle",
+      title: W.shuffle,
+      "aria-label": W.shuffle,
+      onClick: () => setRound((r) => r + 1),
+      style: { width: 40, height: 40, fontSize: 15 }
+    },
+    "\u21BB"
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "ob-shuffle",
+      title: W.upload,
+      "aria-label": W.upload,
+      onClick: () => fileRef.current && fileRef.current.click(),
+      style: { width: 40, height: 40, display: "inline-flex", alignItems: "center", justifyContent: "center" }
+    },
+    /* @__PURE__ */ React.createElement(Icon, { name: "image", size: 16, stroke: 1.8 })
+  ), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUpload, style: { display: "none" } })))) : /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 24 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, W.h2), /* @__PURE__ */ React.createElement("p", { style: body }, W.b2), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 18, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement(ObQr, { value: link }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement(ObLabel, null, W.yourLink), /* @__PURE__ */ React.createElement("div", { className: "ob-in", style: { padding: "11px 13px", fontFamily: OB.mono, fontSize: 13, color: OB.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, link), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, marginTop: 9 } }, /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: copyLink }, copied ? W.copied : W.copyLink), /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: share }, W.share)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.worksOn), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 7, flexWrap: "wrap" } }, OB_PLATFORMS.concat([W.tab]).map((p) => /* @__PURE__ */ React.createElement("span", { key: p, style: { fontFamily: OB.mono, fontSize: 12, color: "#a8a5b6", background: OB.subtle, border: `1px solid ${OB.border}`, padding: "6px 11px", borderRadius: 6 } }, p)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.alreadyHere), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, DK_FIRST_CONTACTS.map((c) => /* @__PURE__ */ React.createElement("div", { key: c.ens, style: { display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 9, border: `1px solid ${OB.border}`, background: OB.field } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: c.userid, size: 30, radius: 8, fallbackSeed: c.userid }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: OB.text } }, c.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 10.5, color: OB.faint } }, c.ens)), sent[c.ens] ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.online } }, W.requested) : /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "ob-sec",
+      style: { padding: "6px 12px", fontSize: 12 },
+      onClick: () => {
+        setSent((s) => Object.assign({}, s, { [c.ens]: true }));
+        if (onAdd)
+          onAdd(c.address);
+      }
+    },
+    W.add
+  )))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 18, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "ob-btn",
+      style: { padding: "14px 28px", fontSize: 16 },
+      disabled: minting,
+      onClick: () => step === 1 ? advance() : finish()
+    },
+    minting ? W.creating : step === 1 ? W.cont : W.open
+  ), /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "ob-mut",
+      style: { fontSize: 14 },
+      onClick: () => step === 1 ? advance(obRandomName()) : finish()
+    },
+    step === 1 ? W.skip : W.later
+  ))), /* @__PURE__ */ React.createElement("div", { className: "ob-right", style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40, background: "radial-gradient(600px 400px at 60% 20%, #16132a 0%, #0a0a0e 70%)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 300, boxSizing: "border-box", background: OB.field, border: "1px solid #262630", borderRadius: 20, padding: 22, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 28px 60px rgba(0,0,0,.55)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 10, letterSpacing: ".14em", color: OB.accent } }, W.req), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement(ObFace, { url: upload, punk, seed: me.userId, size: 52, radius: 12 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: OB.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, name.trim() || W.fallName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, intro.trim() || W.fallIntro))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint, background: OB.elev, borderRadius: 8, padding: "9px 11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hasKey ? me.carrier : W.addrSoon), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.accent, color: OB.bg, fontSize: 13, fontWeight: 600 } }, W.accept), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.sec, color: "#a8a5b6", fontSize: 13 } }, W.ignore))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.faint, textAlign: "center", maxWidth: 300, lineHeight: 1.55 } }, step === 1 ? W.cap1 : W.cap2)));
 }
 const DK_FILE_RTC_KIND = "file";
 const DK_FILE_RTC_CHUNK = 16 * 1024;
@@ -4993,7 +5214,6 @@ function DkApp() {
         return r;
       }),
       onCreateIdentity: () => dkApi.createIdentity().then(data.refresh),
-      onBrowse: () => setTab("registered"),
       onClose: () => {
         setWelcome(false);
         setWelcomeDone(true);
