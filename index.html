@@ -26,6 +26,20 @@
     overflow: hidden;
   }
   #root { width: 100%; height: 100%; }
+  #boot {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    background: #0b0b0f; color: #8d8b9a; z-index: 500;
+  }
+  .boot-brand { display: flex; align-items: center; gap: 9px; }
+  .boot-mark { width: 18px; height: 18px; border-radius: 5px; background: #7c5cff; display: block; }
+  .boot-word { font-size: 13px; color: #a8a5b6; }
+  .boot-line { font-size: 13px; color: #6f6d7d; text-align: center; max-width: 320px; line-height: 1.6; padding: 0 20px; }
+  .boot-reset {
+    margin-top: 4px; padding: 9px 16px; border-radius: 9px; cursor: pointer;
+    background: #1a1a22; border: 1px solid #2a2a35; color: #c9c6d6; font-size: 13px;
+  }
+  .boot-reset:hover { border-color: #7c5cff; color: #fff; }
   button { -webkit-tap-highlight-color: transparent; font-family: inherit; }
   input { font-family: inherit; }
   input::placeholder { color: var(--faint); }
@@ -57,6 +71,58 @@
 </head>
 <body>
 <div id="root"></div>
+
+<!-- First paint, before a byte of JS runs.
+     ~1.2MB of render-blocking script (290KB over the wire) stands between the
+     navigation and React's first render, and anything that goes wrong in
+     between — a slow link, a stale cache, a storage layer that will not
+     answer — used to show as a black rectangle with no explanation. This is
+     pure inline HTML and CSS: no script, no font, no request. It paints
+     immediately, names itself, and after a few seconds starts saying what it
+     is still waiting for. app.js removes it on mount. -->
+<div id="boot">
+  <div class="boot-brand"><span class="boot-mark"></span><span class="boot-word">beagle</span></div>
+  <div class="boot-line" id="boot-line">starting…</div>
+  <button class="boot-reset" id="boot-reset" type="button" hidden>Reset this browser&rsquo;s Beagle data</button>
+</div>
+<script>
+(function () {
+  // Deliberately tiny and inline: this has to work when everything else does
+  // not. Escalates the message rather than spinning silently forever.
+  var line = document.getElementById('boot-line');
+  var reset = document.getElementById('boot-reset');
+  var t0 = Date.now();
+  var stages = [
+    [3000, 'still loading\u2026'],
+    [8000, 'this is slower than it should be \u2014 still fetching the app'],
+    [20000, 'something is wrong. The app has not started.'],
+  ];
+  var timer = setInterval(function () {
+    if (!document.getElementById('boot')) { clearInterval(timer); return; }
+    var age = Date.now() - t0;
+    for (var i = stages.length - 1; i >= 0; i--) {
+      if (age >= stages[i][0]) { line.textContent = stages[i][1]; break; }
+    }
+    if (age >= 20000) reset.hidden = false;
+  }, 1000);
+  // Last resort for a browser whose storage is wedged: drop everything for
+  // this origin and reload. It costs the identity, which is why it only
+  // appears after twenty seconds of failure, and says so.
+  reset.addEventListener('click', function () {
+    if (!confirm('Delete this browser\u2019s Beagle identity and stored messages, then reload?\n\nAnything not backed up elsewhere is lost.')) return;
+    try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+    var done = function () { location.reload(); };
+    try {
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); });
+      }
+      var req = indexedDB.deleteDatabase('beagle-web');
+      req.onsuccess = req.onerror = req.onblocked = done;
+      setTimeout(done, 3000);
+    } catch (e) { done(); }
+  });
+})();
+</script>
 <!-- Vendored React (no CDN — works offline / behind the GFW). -->
 <script src="vendor/react.production.min.js"></script>
 <script src="vendor/react-dom.production.min.js"></script>
@@ -70,7 +136,7 @@
 <!-- The whole desktop app, esbuild-transpiled from src/ui/desktop/*.jsx. -->
 <!-- backend C: identity, storage, tab lock, /api interception. Must precede app.js. -->
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://im.beagle.chat/relay-ws";</script>
-<script src="beagle-web.js"></script>
-<script src="app.js"></script>
+<script src="beagle-web.js?v=60a3d1c463"></script>
+<script src="app.js?v=800d0b3547"></script>
 </body>
 </html>

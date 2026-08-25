@@ -5386,3 +5386,12 @@ function DkApp() {
 }
 Object.assign(window, { DkUpdateModal });
 ReactDOM.createRoot(document.getElementById("root")).render(/* @__PURE__ */ React.createElement(DkApp, null));
+(function dkClearBootSplash() {
+  const el = document.getElementById("boot");
+  if (el)
+    el.remove();
+  try {
+    performance.mark("beagle:mounted");
+  } catch (e) {
+  }
+})();

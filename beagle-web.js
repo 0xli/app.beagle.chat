@@ -16651,7 +16651,7 @@
     });
     return dbPromise;
   }
-  var TX_TIMEOUT_MS = 1e4;
+  var TX_TIMEOUT_MS = 4e3;
   var BOOT_TIMEOUT_MS = 1500;
   var storageWedged = false;
   function tx(db, store, mode, fn, timeoutMs = TX_TIMEOUT_MS) {
@@ -16705,13 +16705,24 @@
     return tx(db, MESSAGES, "readwrite", (s) => s.add(msg));
   }
   async function historyFor(peer, limit = 200) {
-    const db = await openDB();
-    const all = await tx(db, MESSAGES, "readonly", (s) => s.index("peer_ts").getAll(IDBKeyRange.bound([peer, 0], [peer, Number.MAX_SAFE_INTEGER])));
-    return (all || []).slice(-limit);
+    try {
+      const db = await openDB();
+      const all = await tx(db, MESSAGES, "readonly", (s) => s.index("peer_ts").getAll(IDBKeyRange.bound([peer, 0], [peer, Number.MAX_SAFE_INTEGER])));
+      return (all || []).slice(-limit);
+    } catch {
+      storageWedged = true;
+      return [];
+    }
   }
   async function messageStats() {
-    const db = await openDB();
-    const all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
+    let all;
+    try {
+      const db = await openDB();
+      all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
+    } catch {
+      storageWedged = true;
+      return /* @__PURE__ */ new Map();
+    }
     const byPeer = /* @__PURE__ */ new Map();
     for (const m of all || []) {
       let e = byPeer.get(m.peer);
@@ -16728,8 +16739,14 @@
     return byPeer;
   }
   async function usedFileNames() {
-    const db = await openDB();
-    const all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
+    let all;
+    try {
+      const db = await openDB();
+      all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
+    } catch {
+      storageWedged = true;
+      return /* @__PURE__ */ new Set();
+    }
     const names = /* @__PURE__ */ new Set();
     for (const m of all || [])
       if (m.file?.name)
