@@ -18081,18 +18081,30 @@
         this.persistence = r;
       }).catch(() => {
       });
-      this.lock = createTabLock({ onLost: (r) => this.onLockLost?.(r) });
-      this.lockState = await this.lock.acquire();
-      if (!this.lockState.held) {
-        resolveReady(async () => new Response(
-          JSON.stringify({ ok: false, error: "another tab owns this identity" }),
+      this.lock = createTabLock({
+        onLost: (r) => {
+          this.routers = { early: null, full: null };
+          this.lockState = { held: false, reason: r || "taken by another tab" };
+          this.onLockLost?.(r);
+        }
+      });
+      this.routers = { early: null, full: null };
+      resolveReady((path, init) => {
+        const r = this.routers.full || this.routers.early;
+        if (r)
+          return r(path, init);
+        return new Response(
+          JSON.stringify({ ok: false, locked: true, error: "another tab owns this identity" }),
           { status: 409, headers: { "content-type": "application/json" } }
-        ));
-        return this.status();
+        );
+      });
+      try {
+        performance.mark("beagle:api-ready");
+      } catch {
       }
+      this.lockState = await this.lock.acquire();
       const profile = await kvGet(PROFILE_KEY2) || { name: "", description: "" };
       this.profile = profile;
-      let full = null;
       const startBackend = (kp) => createBackendC({
         keyPair: kp,
         profile,
@@ -18103,7 +18115,7 @@
         }
       }).then((backend) => {
         this.backend = backend;
-        full = createApiRouter(backend, () => backend.profile());
+        this.routers.full = createApiRouter(backend, () => backend.profile());
         backend.call({ op: "set-profile", name: profile.name, description: profile.description }).catch(() => {
         });
         try {
@@ -18130,19 +18142,20 @@
         startBackend(kp);
         return this.identity;
       };
-      const early = createEarlyRouter({
-        getIdentity: () => this.identity,
-        profile,
-        persist: (p) => kvPut(PROFILE_KEY2, p),
-        createIdentity: () => this.mintIdentity()
-      });
-      resolveReady((path, init) => (full || early)(path, init));
-      try {
-        performance.mark("beagle:api-ready");
-      } catch {
-      }
-      if (keyPair)
-        startBackend(keyPair);
+      this.bringUp = () => {
+        if (this.routers.early)
+          return;
+        this.routers.early = createEarlyRouter({
+          getIdentity: () => this.identity,
+          profile,
+          persist: (p) => kvPut(PROFILE_KEY2, p),
+          createIdentity: () => this.mintIdentity()
+        });
+        if (this.keyPair)
+          startBackend(this.keyPair);
+      };
+      if (this.lockState.held)
+        this.bringUp();
       return this.status();
     },
     status() {
@@ -18155,8 +18168,13 @@
         events: this.events.slice(-5)
       };
     },
+    /** Take ownership from the tab that has it, then actually come into
+     *  service — re-acquiring the lock without installing the routers would
+     *  leave the tab just as dead as before. */
     async takeover() {
       this.lockState = await this.lock.takeover();
+      if (this.lockState.held)
+        this.bringUp?.();
       return this.lockState;
     },
     /**
