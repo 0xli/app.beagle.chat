@@ -3284,6 +3284,17 @@ const OB_CSS = `
 .ob-dot{width:6px;height:6px;border-radius:999px;background:${OB.online};
   animation:obpulse 2.4s ease-in-out infinite}
 @keyframes obpulse{0%,100%{opacity:0}50%{opacity:1}}
+.ob-busydot{width:8px;height:8px;border-radius:999px;background:${OB.muted};
+  animation:obbusy 1.1s ease-in-out infinite;flex-shrink:0}
+@keyframes obbusy{0%,100%{opacity:.25}50%{opacity:1}}
+.ob-track{width:120px;height:3px;border-radius:2px;background:${OB.border};overflow:hidden}
+.ob-fill{height:100%;background:${OB.accent};border-radius:2px;transition:width .35s linear}
+.ob-btn.ob-busy{background:${OB.sec};color:${OB.muted};cursor:default}
+.ob-btn.ob-busy:hover{background:${OB.sec}}
+@media (prefers-reduced-motion:reduce){
+  .ob-busydot,.ob-dot{animation:none;opacity:1}
+  .ob-fill{transition:none}
+}
 @media (max-width:900px){
   .ob-root{flex-direction:column}
   .ob-left{width:100%!important;border-right:none!important}
@@ -3329,7 +3340,7 @@ const OB_T = {
   en: {
     step: (n) => `${n} of 2`,
     h1: "Tell people who you are.",
-    b1: "Your key is generated right here, in this tab, the moment you continue. There is no account to create \u2014 a name is all anyone needs to recognise you.",
+    b1: "Your key is generated right here in this tab, the moment you start typing \u2014 it is never sent anywhere. There is no account to create; a name is all anyone needs to recognise you.",
     name: "YOUR NAME",
     nameReq: "required",
     namePh: "Wei Li",
@@ -3363,12 +3374,19 @@ const OB_T = {
     cap1: "This is what a friend sees when your request lands on their phone.",
     cap2: "They accept once. After that you are reachable from any of your devices.",
     needName: "A name is required \u2014 without one your request is just a key.",
-    creating: "creating your key\u2026"
+    // 2a status vocabulary
+    keyBusy: "creating your key",
+    keyReady: "key ready",
+    h1Busy: "Pick a name while we set up your key.",
+    b1Busy: "No email, no password, no server \u2014 the key is being generated in this tab and stays on this device. It will be done before you finish typing.",
+    helpBusy: "Keep typing \u2014 this finishes on its own.",
+    ephemeral: "This browser would not let the key be saved, so it lasts until you close the tab. Private browsing usually causes this.",
+    failed: "Could not create the key here:"
   },
   zh: {
     step: (n) => `\u7B2C ${n} \u6B65 / \u5171 2 \u6B65`,
     h1: "\u5148\u8BA9\u522B\u4EBA\u8BA4\u51FA\u4F60\u3002",
-    b1: '\u4F60\u7684\u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210 \u2014\u2014 \u70B9\u51FB"\u7EE7\u7EED"\u7684\u90A3\u4E00\u523B\u624D\u4F1A\u521B\u5EFA\u3002\u6CA1\u6709\u8D26\u53F7\u8981\u6CE8\u518C\uFF0C\u522B\u4EBA\u53EA\u9700\u8981\u4E00\u4E2A\u540D\u5B57\u5C31\u80FD\u8BA4\u51FA\u4F60\u3002',
+    b1: "\u4F60\u7684\u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210 \u2014\u2014 \u4ECE\u4F60\u5F00\u59CB\u8F93\u5165\u7684\u90A3\u4E00\u523B\u8D77\uFF0C\u800C\u4E14\u4E0D\u4F1A\u53D1\u9001\u5230\u4EFB\u4F55\u5730\u65B9\u3002\u6CA1\u6709\u8D26\u53F7\u8981\u6CE8\u518C\uFF0C\u522B\u4EBA\u53EA\u9700\u8981\u4E00\u4E2A\u540D\u5B57\u5C31\u80FD\u8BA4\u51FA\u4F60\u3002",
     name: "\u4F60\u7684\u540D\u5B57",
     nameReq: "\u5FC5\u586B",
     namePh: "\u674E\u4F1F",
@@ -3402,7 +3420,13 @@ const OB_T = {
     cap1: "\u8FD9\u5C31\u662F\u5BF9\u65B9\u5728\u624B\u673A\u4E0A\u6536\u5230\u4F60\u7684\u8BF7\u6C42\u65F6\u770B\u5230\u7684\u6837\u5B50\u3002",
     cap2: "\u5BF9\u65B9\u53EA\u9700\u63A5\u53D7\u4E00\u6B21\uFF0C\u4E4B\u540E\u4F60\u5728\u4EFB\u4F55\u8BBE\u5907\u4E0A\u90FD\u80FD\u88AB\u627E\u5230\u3002",
     needName: "\u540D\u5B57\u662F\u5FC5\u586B\u7684 \u2014\u2014 \u6CA1\u6709\u540D\u5B57\uFF0C\u4F60\u7684\u8BF7\u6C42\u5C31\u53EA\u662F\u4E00\u4E32\u5BC6\u94A5\u3002",
-    creating: "\u6B63\u5728\u751F\u6210\u5BC6\u94A5\u2026"
+    keyBusy: "\u6B63\u5728\u751F\u6210\u5BC6\u94A5",
+    keyReady: "\u5BC6\u94A5\u5DF2\u5C31\u7EEA",
+    h1Busy: "\u5148\u53D6\u4E2A\u540D\u5B57\uFF0C\u5BC6\u94A5\u8FD9\u8FB9\u540C\u65F6\u5728\u751F\u6210\u3002",
+    b1Busy: "\u4E0D\u7528\u90AE\u7BB1\u3001\u4E0D\u7528\u5BC6\u7801\u3001\u4E0D\u7528\u670D\u52A1\u5668 \u2014\u2014 \u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210\uFF0C\u53EA\u7559\u5728\u8FD9\u53F0\u8BBE\u5907\u4E0A\u3002\u4F60\u540D\u5B57\u8FD8\u6CA1\u6253\u5B8C\u5B83\u5C31\u597D\u4E86\u3002",
+    helpBusy: "\u7EE7\u7EED\u8F93\u5165\u5C31\u597D\uFF0C\u8FD9\u4E2A\u4F1A\u81EA\u5DF1\u5B8C\u6210\u3002",
+    ephemeral: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u4E0D\u5141\u8BB8\u4FDD\u5B58\u5BC6\u94A5\uFF0C\u6240\u4EE5\u5B83\u53EA\u5728\u672C\u6807\u7B7E\u9875\u6709\u6548\uFF0C\u5173\u6389\u5C31\u6CA1\u4E86\u3002\u901A\u5E38\u662F\u9690\u79C1\u6A21\u5F0F\u5BFC\u81F4\u7684\u3002",
+    failed: "\u65E0\u6CD5\u5728\u8FD9\u91CC\u751F\u6210\u5BC6\u94A5\uFF1A"
   }
 };
 const OB_PLATFORMS = ["iPhone", "Android", "macOS", "Windows", "Linux"];
@@ -3463,7 +3487,11 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity 
   const [round, setRound] = React.useState(0);
   const [tiles, setTiles] = React.useState([]);
   const [warn, setWarn] = React.useState(false);
-  const [minting, setMinting] = React.useState(false);
+  const [keyProgress, setKeyProgress] = React.useState(me.hasIdentity ? 100 : 0);
+  const [keyBusy, setKeyBusy] = React.useState(false);
+  const [keyError, setKeyError] = React.useState(null);
+  const [pendingSubmit, setPendingSubmit] = React.useState(false);
+  const mintRef = React.useRef(null);
   const [copied, setCopied] = React.useState(false);
   const [sent, setSent] = React.useState({});
   const nameRef = React.useRef(null);
@@ -3472,6 +3500,45 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity 
   React.useEffect(() => {
     obInstallCss();
   }, []);
+  const startKey = React.useCallback(() => {
+    if (mintRef.current || me.hasIdentity || !onCreateIdentity)
+      return;
+    setKeyBusy(true);
+    setKeyError(null);
+    let p = 0;
+    const tick = setInterval(() => {
+      p = Math.min(90, p + (90 - p) * 0.18 + 3);
+      setKeyProgress(Math.round(p));
+    }, 120);
+    mintRef.current = Promise.resolve(onCreateIdentity()).then((r) => {
+      if (r && r.ok === false)
+        throw new Error(r.error || "key creation failed");
+      setKeyProgress(100);
+    }).catch((err) => {
+      setKeyError(String((err == null ? void 0 : err.message) || err));
+      mintRef.current = null;
+      setKeyProgress(0);
+      throw err;
+    }).finally(() => {
+      clearInterval(tick);
+      setKeyBusy(false);
+    });
+    mintRef.current.catch(() => {
+    });
+    return mintRef.current;
+  }, [me.hasIdentity, onCreateIdentity]);
+  const keyReady = keyProgress >= 100 || !!me.hasIdentity;
+  const [statusVisible, setStatusVisible] = React.useState(false);
+  React.useEffect(() => {
+    if (keyBusy) {
+      setStatusVisible(true);
+      return;
+    }
+    if (!keyReady || !statusVisible)
+      return;
+    const t = setTimeout(() => setStatusVisible(false), 2500);
+    return () => clearTimeout(t);
+  }, [keyBusy, keyReady, statusVisible]);
   React.useEffect(() => {
     let dead = false;
     dkPunkBatch(round).then((b) => {
@@ -3498,12 +3565,15 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity 
     }
     if (nm)
       setName(nm);
-    setMinting(true);
-    try {
-      if (!hasKey && onCreateIdentity)
-        await onCreateIdentity();
-    } finally {
-      setMinting(false);
+    if (!hasKey) {
+      setPendingSubmit(true);
+      try {
+        await (mintRef.current || startKey());
+      } catch (err) {
+        setPendingSubmit(false);
+        return;
+      }
+      setPendingSubmit(false);
     }
     await onSave({ name: final, description: intro.trim(), punkId: punk, avatarDataUrl: upload });
     setStep(2);
@@ -3584,7 +3654,7 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity 
     },
     txt
   )));
-  return /* @__PURE__ */ React.createElement("div", { className: "ob-root" }, /* @__PURE__ */ React.createElement("div", { className: "ob-left", style: { width: 560, flexShrink: 0, boxSizing: "border-box", padding: "44px 44px 32px", borderRight: `1px solid ${OB.hair}`, display: "flex", flexDirection: "column", gap: 28, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { width: 38, height: 3, borderRadius: 2, background: step >= n ? OB.accent : "#26262f" } }))), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint } }, W.step(step)), langToggle), step === 1 ? /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, W.h1), /* @__PURE__ */ React.createElement("p", { style: body }, W.b1), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.nameReq, req: true } }, W.name), /* @__PURE__ */ React.createElement(
+  return /* @__PURE__ */ React.createElement("div", { className: "ob-root" }, /* @__PURE__ */ React.createElement("div", { className: "ob-left", style: { width: 560, flexShrink: 0, boxSizing: "border-box", padding: "44px 44px 32px", borderRight: `1px solid ${OB.hair}`, display: "flex", flexDirection: "column", gap: 28, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), step === 1 && statusVisible && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { className: "ob-track" }, /* @__PURE__ */ React.createElement("div", { className: "ob-fill", style: { width: `${keyProgress}%` } })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: keyReady ? OB.online : OB.faint, whiteSpace: "nowrap", transition: "opacity .4s ease" } }, keyReady ? W.keyReady : `${W.keyBusy} \xB7 ${keyProgress}%`)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { width: 38, height: 3, borderRadius: 2, background: step >= n ? OB.accent : "#26262f" } }))), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint, whiteSpace: "nowrap" } }, W.step(step)), langToggle), step === 1 ? /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, keyBusy && !keyReady ? W.h1Busy : W.h1), /* @__PURE__ */ React.createElement("p", { style: body }, keyBusy && !keyReady ? W.b1Busy : W.b1), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.nameReq, req: true } }, W.name), /* @__PURE__ */ React.createElement(
     "input",
     {
       ref: nameRef,
@@ -3596,13 +3666,14 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity 
       onChange: (e) => {
         setName(e.target.value);
         setWarn(false);
+        startKey();
       },
       onKeyDown: (e) => {
         if (e.key === "Enter")
           advance();
       }
     }
-  ), warn && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: OB.accent } }, W.needName)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.intro), /* @__PURE__ */ React.createElement(
+  ), warn && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: OB.accent } }, W.needName), keyError && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: "#ff8a5c" } }, W.failed, " ", keyError), me.ephemeral && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: "#ffd35c" } }, W.ephemeral)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.intro), /* @__PURE__ */ React.createElement(
     "input",
     {
       className: "ob-in",
@@ -3666,13 +3737,13 @@ function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity 
   )))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 18, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(
     "button",
     {
-      className: "ob-btn",
-      style: { padding: "14px 28px", fontSize: 16 },
-      disabled: minting,
+      className: "ob-btn" + (pendingSubmit ? " ob-busy" : ""),
+      style: { padding: "14px 28px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 9 },
       onClick: () => step === 1 ? advance() : finish()
     },
-    minting ? W.creating : step === 1 ? W.cont : W.open
-  ), /* @__PURE__ */ React.createElement(
+    pendingSubmit && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
+    pendingSubmit ? W.keyBusy : step === 1 ? W.cont : W.open
+  ), step === 1 && pendingSubmit ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: OB.faint } }, W.helpBusy) : /* @__PURE__ */ React.createElement(
     "button",
     {
       className: "ob-mut",
@@ -5213,7 +5284,10 @@ function DkApp() {
         data.refresh();
         return r;
       }),
-      onCreateIdentity: () => dkApi.createIdentity().then(data.refresh),
+      onCreateIdentity: () => dkApi.createIdentity().then((r) => {
+        data.refresh();
+        return r;
+      }),
       onClose: () => {
         setWelcome(false);
         setWelcomeDone(true);

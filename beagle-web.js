@@ -16623,6 +16623,15 @@
       return dbPromise;
     dbPromise = new Promise((resolve2, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const timer = setTimeout(
+        () => reject(new Error("IndexedDB open did not settle in 10s")),
+        1e4
+      );
+      const finish = (fn, v) => {
+        clearTimeout(timer);
+        fn(v);
+      };
+      req.onblocked = () => finish(reject, new Error("IndexedDB open blocked by another tab"));
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains(KV))
@@ -16634,17 +16643,40 @@
           s.createIndex("peer_ts", ["peer", "ts"]);
         }
       };
-      req.onsuccess = () => resolve2(req.result);
-      req.onerror = () => reject(req.error);
+      req.onsuccess = () => finish(resolve2, req.result);
+      req.onerror = () => finish(reject, req.error || new Error("IndexedDB unavailable"));
+    }).catch((err) => {
+      dbPromise = null;
+      throw err;
     });
     return dbPromise;
   }
+  var TX_TIMEOUT_MS = 1e4;
   function tx(db, store, mode, fn) {
     return new Promise((resolve2, reject) => {
-      const t = db.transaction(store, mode);
-      const req = fn(t.objectStore(store));
-      t.onerror = () => reject(t.error);
-      t.oncomplete = () => resolve2(req && req.result);
+      let done = false;
+      const settle = (fn2, v) => {
+        if (!done) {
+          done = true;
+          clearTimeout(timer);
+          fn2(v);
+        }
+      };
+      const timer = setTimeout(
+        () => settle(reject, new Error(`IndexedDB ${mode} on '${store}' did not settle in ${TX_TIMEOUT_MS}ms`)),
+        TX_TIMEOUT_MS
+      );
+      let t, req;
+      try {
+        t = db.transaction(store, mode);
+        req = fn(t.objectStore(store));
+      } catch (err) {
+        settle(reject, err);
+        return;
+      }
+      t.onerror = () => settle(reject, t.error || new Error("IndexedDB transaction failed"));
+      t.onabort = () => settle(reject, t.error || new Error("IndexedDB transaction aborted (storage blocked or full?)"));
+      t.oncomplete = () => settle(resolve2, req && req.result);
     });
   }
   async function kvGet(key2) {
@@ -17716,12 +17748,13 @@
           const identity = getIdentity();
           const me = meFrom({ identity: identity ?? {}, online: false, transport: "tcp-relay" }, profile, false, await ensNames());
           me.hasIdentity = !!identity;
+          me.ephemeral = !!identity?.ephemeral;
           return p === "/api/state" ? json({ me, friends: [], pending: [] }) : json({ me, peers: [], requests: [], exits: [], activeExit: null });
         }
         case "POST /api/create-identity": {
           try {
             const id = await createIdentity2();
-            return json({ ok: true, data: { userId: id.userid, carrier: id.address } });
+            return json({ ok: true, data: { userId: id.userid, carrier: id.address, ephemeral: !!id.ephemeral } });
           } catch (err) {
             return json({ ok: false, error: String(err?.message || err) }, 500);
           }
@@ -18085,9 +18118,15 @@
         if (this.identity)
           return this.identity;
         const kp = createIdentity();
-        await kvPut(IDENTITY_KEY, exportIdentity(kp));
+        let ephemeral = false;
+        try {
+          await kvPut(IDENTITY_KEY, exportIdentity(kp));
+        } catch (err) {
+          ephemeral = true;
+          this.events.push({ type: "identity-not-persisted", error: String(err?.message || err) });
+        }
         this.keyPair = kp;
-        this.identity = describeIdentity(kp);
+        this.identity = { ...describeIdentity(kp), ephemeral };
         startBackend(kp);
         return this.identity;
       };
