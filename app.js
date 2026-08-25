@@ -3896,13 +3896,13 @@ function dkBrowser() {
 }
 const DK_BROWSER_T = {
   en: {
-    edge: "Edge blocks this page from reaching the relay, so friend requests never arrive and messages stay queued. Chrome or Firefox works \u2014 or try im.beagle.chat, which serves the relay from its own origin.",
+    edge: "Edge is less tested than Chrome and Firefox. If messages stay queued or friend requests do not arrive, reload once first \u2014 an old cached build is the usual cause \u2014 then try Chrome or Firefox.",
     safari: "Safari support is incomplete. If the app misbehaves, Chrome or Firefox works.",
     other: "This browser is untested. Beagle Web is developed against Chrome and Firefox.",
     dismiss: "dismiss"
   },
   zh: {
-    edge: "Edge \u4F1A\u62E6\u4F4F\u8FD9\u4E2A\u9875\u9762\u8FDE\u63A5\u4E2D\u7EE7\uFF0C\u6240\u4EE5\u597D\u53CB\u8BF7\u6C42\u53D1\u4E0D\u51FA\u4E5F\u6536\u4E0D\u5230\uFF0C\u6D88\u606F\u4F1A\u4E00\u76F4\u6392\u961F\u3002\u8BF7\u7528 Chrome \u6216 Firefox \u2014\u2014 \u6216\u8005\u8BD5\u8BD5 im.beagle.chat\uFF0C\u5B83\u7684\u4E2D\u7EE7\u5C31\u5728\u540C\u4E00\u4E2A\u57DF\u540D\u4E0B\u3002",
+    edge: "Edge \u7684\u6D4B\u8BD5\u4E0D\u5982 Chrome \u548C Firefox \u5145\u5206\u3002\u5982\u679C\u6D88\u606F\u4E00\u76F4\u6392\u961F\u6216\u6536\u4E0D\u5230\u597D\u53CB\u8BF7\u6C42\uFF0C\u5148\u5237\u65B0\u4E00\u6B21 \u2014\u2014 \u901A\u5E38\u662F\u7F13\u5B58\u4E86\u65E7\u7248\u672C \u2014\u2014 \u518D\u4E0D\u884C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
     safari: "Safari \u7684\u652F\u6301\u8FD8\u4E0D\u5B8C\u6574\u3002\u5982\u679C\u51FA\u73B0\u5F02\u5E38\uFF0C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
     other: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u6D4B\u8BD5\u8FC7\u3002Beagle \u7F51\u9875\u7248\u662F\u9488\u5BF9 Chrome \u548C Firefox \u5F00\u53D1\u7684\u3002",
     dismiss: "\u77E5\u9053\u4E86"
@@ -3930,10 +3930,10 @@ function DkBrowserNotice({ lang }) {
     alignItems: "center",
     gap: 12,
     padding: "9px 16px",
-    background: kind === "edge" ? "color-mix(in oklab, #ff8a5c, transparent 86%)" : "var(--chip)",
+    background: "var(--chip)",
     borderBottom: "1px solid var(--line)",
     flexShrink: 0
-  } }, /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 15, stroke: 2, color: kind === "edge" ? "#ff8a5c" : "var(--faint)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 } }, msg), /* @__PURE__ */ React.createElement(
+  } }, /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 15, stroke: 2, color: "var(--faint)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 } }, msg), /* @__PURE__ */ React.createElement(
     "button",
     {
       onClick: () => {
