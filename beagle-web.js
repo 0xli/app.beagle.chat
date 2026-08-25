@@ -17564,6 +17564,7 @@
       onboarded: !!profile?.onboarded,
       // What the running peer advertises, straight from the SDK.
       advertised: diag?.advertised ?? null,
+      hasIdentity: !!id.userid,
       avatarUrl: mine?.avatarUrl ?? null,
       ens: mine?.ens ?? "",
       handle: "",
@@ -17651,7 +17652,7 @@
       lastTime: shortClock(lm?.ts)
     };
   }
-  function createEarlyRouter(identity, profile, persist) {
+  function createEarlyRouter({ getIdentity, profile, persist, createIdentity: createIdentity2 }) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
       const url = new URL(path, location.origin);
@@ -17672,8 +17673,18 @@
           return json({ ok: true, kind: "browser", hasVirtualLan: false, state: "starting", switchable: false, releaseSecondsLeft: 0, command: "" });
         case "GET /api/desktop":
         case "GET /api/state": {
-          const me = meFrom({ identity, online: false, transport: "tcp-relay" }, profile, false, await ensNames());
+          const identity = getIdentity();
+          const me = meFrom({ identity: identity ?? {}, online: false, transport: "tcp-relay" }, profile, false, await ensNames());
+          me.hasIdentity = !!identity;
           return p === "/api/state" ? json({ me, friends: [], pending: [] }) : json({ me, peers: [], requests: [], exits: [], activeExit: null });
+        }
+        case "POST /api/create-identity": {
+          try {
+            const id = await createIdentity2();
+            return json({ ok: true, data: { userId: id.userid, carrier: id.address } });
+          } catch (err) {
+            return json({ ok: false, error: String(err?.message || err) }, 500);
+          }
         }
         case "POST /api/set-profile": {
           let body = {};
@@ -17859,6 +17870,10 @@
           return json(await call("friend-remove", { userid: body.userid }));
         case "POST /api/friend-alias":
           return json(await call("friend-set-alias", { userid: body.userid, alias: body.alias }));
+        case "POST /api/create-identity": {
+          const d = await call("diag");
+          return json({ ok: true, data: { userId: d.data?.identity?.userid ?? "", carrier: d.data?.identity?.address ?? "" } });
+        }
         case "POST /api/set-profile":
           return json(await call("set-profile", {
             name: body.name,
@@ -17968,26 +17983,23 @@
   }
   fetchExpressNodes().then((nodes) => nodes.forEach((n) => relayHosts.add(n.host))).catch(() => {
   });
-  async function loadOrCreateIdentity() {
+  async function loadIdentity() {
     const stored = await kvGet(IDENTITY_KEY);
-    if (stored) {
-      try {
-        return { keyPair: importIdentity(stored), fresh: false };
-      } catch (err) {
-        console.warn("stored identity unreadable; minting a new one:", err.message);
-      }
+    if (!stored)
+      return null;
+    try {
+      return importIdentity(stored);
+    } catch (err) {
+      console.warn("stored identity unreadable; a new one will be minted:", err.message);
+      return null;
     }
-    const keyPair = createIdentity();
-    await kvPut(IDENTITY_KEY, exportIdentity(keyPair));
-    return { keyPair, fresh: true };
   }
   var app = {
     events: [],
     async boot() {
-      const { keyPair, fresh } = await loadOrCreateIdentity();
+      const keyPair = await loadIdentity();
       this.keyPair = keyPair;
-      this.identity = describeIdentity(keyPair);
-      this.identity.fresh = fresh;
+      this.identity = keyPair ? describeIdentity(keyPair) : null;
       this.persistence = null;
       requestPersistence().then((r) => {
         this.persistence = r;
@@ -18005,14 +18017,8 @@
       const profile = await kvGet(PROFILE_KEY2) || { name: "", description: "" };
       this.profile = profile;
       let full = null;
-      const early = createEarlyRouter(this.identity, profile, (p) => kvPut(PROFILE_KEY2, p));
-      resolveReady((path, init) => (full || early)(path, init));
-      try {
-        performance.mark("beagle:api-ready");
-      } catch {
-      }
-      createBackendC({
-        keyPair,
+      const startBackend = (kp) => createBackendC({
+        keyPair: kp,
         profile,
         // one shared record — see createEarlyRouter
         onEvent: (e) => {
@@ -18032,6 +18038,29 @@
       }).catch((err) => {
         this.events.push({ type: "backend-failed", error: String(err?.message || err) });
       });
+      this.mintIdentity = async () => {
+        if (this.identity)
+          return this.identity;
+        const kp = createIdentity();
+        await kvPut(IDENTITY_KEY, exportIdentity(kp));
+        this.keyPair = kp;
+        this.identity = describeIdentity(kp);
+        startBackend(kp);
+        return this.identity;
+      };
+      const early = createEarlyRouter({
+        getIdentity: () => this.identity,
+        profile,
+        persist: (p) => kvPut(PROFILE_KEY2, p),
+        createIdentity: () => this.mintIdentity()
+      });
+      resolveReady((path, init) => (full || early)(path, init));
+      try {
+        performance.mark("beagle:api-ready");
+      } catch {
+      }
+      if (keyPair)
+        startBackend(keyPair);
       return this.status();
     },
     status() {
