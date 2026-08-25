@@ -16738,6 +16738,14 @@
     }
     return byPeer;
   }
+  async function queuedOutgoing(peer) {
+    try {
+      const all = await historyFor(peer, 1e3);
+      return (all || []).filter((m) => m.dir === "out" && !m.file && (m.status === "queued" || m.status === "sending"));
+    } catch {
+      return [];
+    }
+  }
   async function usedFileNames() {
     let all;
     try {
@@ -17023,8 +17031,31 @@
     peer.onText((msg) => {
       void recordMessage(msg.pubkey, "in", msg.text, "online");
     });
+    const sendChains = /* @__PURE__ */ new Map();
+    const flushOutbox = async (uid) => {
+      for (const m of await queuedOutgoing(uid)) {
+        try {
+          await peer.sendText(uid, m.text);
+          await updateMessage(m.id, { status: "sent" });
+          onEvent?.({ type: "message-sent", userid: uid, id: m.id });
+        } catch (err) {
+          await updateMessage(m.id, { status: "queued" });
+          break;
+        }
+      }
+    };
     peer.onFriendConnection((ev) => {
       onEvent?.({ type: "friend-connection", userid: ev.pubkey, status: ev.status });
+      if (ev.status !== "connected")
+        return;
+      void flushOutbox(ev.pubkey).catch(() => {
+      }).then(async () => {
+        if ((await queuedOutgoing(ev.pubkey)).length === 0)
+          return;
+        await new Promise((r) => setTimeout(r, 4e3));
+        await flushOutbox(ev.pubkey).catch(() => {
+        });
+      });
     });
     peer.onFriendInfo((ev) => {
       onEvent?.({ type: "friend-info", userid: ev.pubkey, name: ev.name });
@@ -17355,17 +17386,27 @@
           if (!req.userid || typeof req.text !== "string")
             return fail("chat-send requires userid and text");
           const msg = await recordMessage(req.userid, "out", req.text, "online", null, "sending");
-          void peer.sendText(req.userid, req.text).then(() => updateMessage(msg.id, { status: "sent" })).catch((err) => {
-            void updateMessage(msg.id, { status: "failed", error: String(err?.message || err) });
-            onEvent?.({ type: "message-failed", userid: req.userid, error: String(err?.message || err) });
+          const prev = sendChains.get(req.userid) ?? Promise.resolve();
+          const job = prev.then(async () => {
+            await flushOutbox(req.userid).catch(() => {
+            });
+            try {
+              await peer.sendText(req.userid, req.text);
+              await updateMessage(msg.id, { status: "sent" });
+            } catch (err) {
+              await updateMessage(msg.id, { status: "queued", error: String(err?.message || err) });
+              onEvent?.({ type: "message-queued", userid: req.userid, error: String(err?.message || err) });
+            }
           });
+          sendChains.set(req.userid, job.catch(() => {
+          }));
           return ok({ via: "online", ts: msg.ts, id: msg.id, status: "sending" });
         }
         case "chat-retry": {
           if (req.id == null || !req.userid || typeof req.text !== "string")
             return fail("chat-retry requires id, userid and text");
           await updateMessage(req.id, { status: "sending", error: null });
-          void peer.sendText(req.userid, req.text).then(() => updateMessage(req.id, { status: "sent" })).catch((err) => updateMessage(req.id, { status: "failed", error: String(err?.message || err) }));
+          void peer.sendText(req.userid, req.text).then(() => updateMessage(req.id, { status: "sent" })).catch((err) => updateMessage(req.id, { status: "queued", error: String(err?.message || err) }));
           return ok({ id: req.id, status: "sending" });
         }
         case "chat-history":
