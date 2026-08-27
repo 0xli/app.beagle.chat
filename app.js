@@ -4981,7 +4981,8 @@ ${peer.address}`
         onTakeover: () => window.BeagleWeb.takeover().then((st) => {
           data.refresh();
           return st;
-        })
+        }),
+        onLocate: () => window.BeagleWeb.locate()
       }
     ), !data.locked && welcome && /* @__PURE__ */ React.createElement(
       DkWelcome,
@@ -5578,24 +5579,36 @@ ${peer.address}`
   }
   var OB_LOCK_T = {
     en: {
-      title: "Beagle is open in another tab.",
-      body: "One identity can only run in one place at a time \u2014 two would fight over the same connection. Close the other tab, or take over here.",
+      title: "Beagle is already open in another tab.",
+      body: "One identity can only run in one place at a time \u2014 two would fight over the same connection. The other tab is already connected, so going back to it is usually what you want.",
+      go: "Go to that tab",
+      going: "asking\u2026",
+      // Honest about the limit: no API lets one tab put another in front. We can
+      // ask; whether the browser obliges is the browser's business.
+      asked: "Asked the other tab to come forward. If nothing happened, your browser does not allow it \u2014 look for the other Beagle tab, or take over here.",
+      gone: "No other tab answered. It may have just closed \u2014 try taking over.",
       cta: "Use here instead",
       busy: "taking over\u2026",
       failed: "The other tab did not hand over. Close it and try again."
     },
     zh: {
       title: "Beagle \u5DF2\u7ECF\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u6253\u5F00\u4E86\u3002",
-      body: "\u540C\u4E00\u4E2A\u8EAB\u4EFD\u4E00\u6B21\u53EA\u80FD\u5728\u4E00\u4E2A\u5730\u65B9\u8FD0\u884C\uFF0C\u4E24\u4E2A\u4F1A\u62A2\u540C\u4E00\u6761\u8FDE\u63A5\u3002\u53EF\u4EE5\u5173\u6389\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\uFF0C\u6216\u8005\u628A\u5B83\u63A5\u7BA1\u5230\u8FD9\u91CC\u3002",
+      body: "\u540C\u4E00\u4E2A\u8EAB\u4EFD\u4E00\u6B21\u53EA\u80FD\u5728\u4E00\u4E2A\u5730\u65B9\u8FD0\u884C\uFF0C\u4E24\u4E2A\u4F1A\u62A2\u540C\u4E00\u6761\u8FDE\u63A5\u3002\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u5DF2\u7ECF\u8FDE\u4E0A\u4E86\uFF0C\u56DE\u5230\u90A3\u8FB9\u901A\u5E38\u624D\u662F\u4F60\u60F3\u8981\u7684\u3002",
+      go: "\u53BB\u90A3\u4E2A\u6807\u7B7E\u9875",
+      going: "\u6B63\u5728\u547C\u53EB\u2026",
+      asked: "\u5DF2\u7ECF\u53EB\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u51FA\u6765\u4E86\u3002\u5982\u679C\u6CA1\u53CD\u5E94\uFF0C\u8BF4\u660E\u6D4F\u89C8\u5668\u4E0D\u5141\u8BB8 \u2014\u2014 \u8BF7\u624B\u52A8\u627E\u5230\u90A3\u4E2A Beagle \u6807\u7B7E\u9875\uFF0C\u6216\u8005\u5728\u8FD9\u91CC\u63A5\u7BA1\u3002",
+      gone: "\u6CA1\u6709\u6807\u7B7E\u9875\u5E94\u7B54\uFF0C\u53EF\u80FD\u521A\u521A\u88AB\u5173\u6389\u4E86 \u2014\u2014 \u76F4\u63A5\u63A5\u7BA1\u8BD5\u8BD5\u3002",
       cta: "\u5C31\u7528\u8FD9\u4E2A\u6807\u7B7E\u9875",
       busy: "\u6B63\u5728\u63A5\u7BA1\u2026",
       failed: "\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u6CA1\u6709\u4EA4\u51FA\u63A7\u5236\u6743\u3002\u8BF7\u5148\u5173\u6389\u5B83\u518D\u8BD5\u3002"
     }
   };
-  function DkLockedOut2({ lang, onTakeover }) {
+  function DkLockedOut2({ lang, onTakeover, onLocate }) {
     const W = OB_LOCK_T[lang === "zh" ? "zh" : "en"];
     const [busy, setBusy] = React.useState(false);
     const [failed, setFailed] = React.useState(false);
+    const [finding, setFinding] = React.useState(false);
+    const [found, setFound] = React.useState(null);
     React.useEffect(() => {
       obInstallCss();
     }, []);
@@ -5612,19 +5625,46 @@ ${peer.address}`
         setBusy(false);
       }
     };
+    const go = async () => {
+      setFinding(true);
+      setFound(null);
+      try {
+        const r = onLocate ? await onLocate() : null;
+        setFound(!!(r && r.acknowledged));
+      } catch (e) {
+        setFound(false);
+      } finally {
+        setFinding(false);
+      }
+    };
     return /* @__PURE__ */ React.createElement("div", { className: "ob-root", style: {
       alignItems: "center",
       justifyContent: "center",
       padding: 40,
       background: `radial-gradient(600px 400px at 50% 20%, #16132a 0%, ${OB.bg} 70%)`
-    } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 460, display: "flex", flexDirection: "column", gap: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 30, lineHeight: 1.15, letterSpacing: "-0.02em", fontWeight: 600, color: OB.text, margin: 0 } }, W.title), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 15, lineHeight: 1.6, color: OB.muted, margin: 0 } }, W.body), failed && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ff8a5c" } }, W.failed), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 460, display: "flex", flexDirection: "column", gap: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 30, lineHeight: 1.15, letterSpacing: "-0.02em", fontWeight: 600, color: OB.text, margin: 0 } }, W.title), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 15, lineHeight: 1.6, color: OB.muted, margin: 0 } }, W.body), found === true && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted } }, W.asked), found === false && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ff8a5c" } }, W.gone), failed && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ff8a5c" } }, W.failed), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(
       "button",
       {
-        className: "ob-btn" + (busy ? " ob-busy" : ""),
+        className: "ob-btn" + (finding ? " ob-busy" : ""),
         style: { padding: "14px 28px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 9 },
+        onClick: finding ? void 0 : go
+      },
+      finding && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
+      finding ? W.going : W.go
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        style: {
+          padding: "13px 20px",
+          fontSize: 15,
+          background: "none",
+          border: "none",
+          color: OB.muted,
+          cursor: busy ? "default" : "pointer",
+          textDecoration: "underline"
+        },
         onClick: busy ? void 0 : take
       },
-      busy && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
       busy ? W.busy : W.cta
     ))));
   }

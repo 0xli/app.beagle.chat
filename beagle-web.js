@@ -16940,6 +16940,9 @@ ${nonce}`);
           onAcquired?.();
           return { held: true, unenforced: true, reason, via: "unenforced" };
         },
+        async locate() {
+          return { asked: false, acknowledged: false, reason };
+        },
         release() {
         }
       };
@@ -16951,6 +16954,13 @@ ${nonce}`);
       if (ev.data?.type === "request-release" && held) {
         release2("handover");
         bc.postMessage({ type: "released" });
+      }
+      if (ev.data?.type === "focus-request" && held) {
+        try {
+          window.focus();
+        } catch {
+        }
+        bc.postMessage({ type: "focused" });
       }
     };
     function hold(lock, resolve2) {
@@ -17004,6 +17014,23 @@ ${nonce}`);
       const result = await acquire({ steal: !clean2 });
       return { ...result, via: clean2 ? "handover" : "steal" };
     }
+    async function locate() {
+      const answered = new Promise((resolve2) => {
+        const onMsg = (ev) => {
+          if (ev.data?.type === "focused") {
+            bc.removeEventListener("message", onMsg);
+            resolve2(true);
+          }
+        };
+        bc.addEventListener("message", onMsg);
+        setTimeout(() => {
+          bc.removeEventListener("message", onMsg);
+          resolve2(false);
+        }, 1200);
+      });
+      bc.postMessage({ type: "focus-request" });
+      return { asked: true, acknowledged: await answered };
+    }
     return {
       supported: true,
       get held() {
@@ -17011,6 +17038,7 @@ ${nonce}`);
       },
       acquire,
       takeover,
+      locate,
       release: release2
     };
   }
@@ -18617,6 +18645,11 @@ ${nonce}`);
       if (this.lockState.held)
         this.bringUp?.();
       return this.lockState;
+    },
+    /** Ask the tab that owns the identity to come forward, instead of taking it.
+     *  Usually the better answer: the other tab is already connected. */
+    async locate() {
+      return this.lock.locate ? this.lock.locate() : { asked: false, acknowledged: false };
     },
     /**
      * Prove the browser can complete a real Tox TCP-relay handshake through the

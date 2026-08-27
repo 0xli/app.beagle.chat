@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in with Beagle</title>
+<style>
+  :root{--bg:#0c0d11;--panel:#14161d;--line:#262a35;--text:#e7e9ef;--faint:#8b91a3;
+        --accent:#7c5cff;--bad:#e5604d;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;
+       display:flex;align-items:center;justify-content:center;padding:18px}
+  .card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);
+        border-radius:14px;padding:22px 20px}
+  .brand{font-weight:600;letter-spacing:.2px;color:var(--accent);font-size:13px;display:flex;align-items:center;gap:7px}
+  .brand .d{width:11px;height:11px;background:var(--accent);border-radius:3px}
+  h1{font-size:18px;margin:14px 0 6px}
+  .sub{color:var(--faint);margin:0 0 16px}
+  .origin{color:var(--text);font-weight:600;word-break:break-all}
+  .id{background:#0e1016;border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:14px}
+  .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--faint);margin-bottom:4px}
+  .who{font-size:13.5px;font-weight:600;margin-bottom:3px}
+  .userid{font-family:var(--mono);font-size:12.5px;color:var(--text);word-break:break-all}
+  .err{background:rgba(229,96,77,.12);border:1px solid rgba(229,96,77,.4);color:#ffb4a8;
+       border-radius:9px;padding:9px 11px;font-size:12.5px;margin-bottom:13px}
+  .row{display:flex;gap:10px;margin-top:4px}
+  .btn{flex:1;border:0;border-radius:9px;padding:11px;font-size:14px;font-weight:600;cursor:pointer}
+  .ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .ghost:hover{border-color:#3a4050}
+  .solid{background:var(--accent);color:#fff}
+  .solid:disabled{opacity:.45;cursor:not-allowed}
+  a.open{display:block;text-align:center;color:var(--accent);font-size:13px;margin-bottom:13px}
+  /* display:block beats the UA stylesheet's [hidden]{display:none}, so the
+     link showed even when there WAS an identity. Specificity, not logic. */
+  [hidden]{display:none !important}
+  .note{color:var(--faint);font-size:11.5px;margin:15px 0 0;line-height:1.45}
+</style></head>
+<body>
+  <div class="card">
+    <div class="brand"><span class="d"></span>Beagle</div>
+    <h1>Sign in</h1>
+    <p class="sub"><span id="origin" class="origin">…</span> wants to sign you in with your Beagle identity.</p>
+    <div class="id">
+      <div class="lbl">Your identity</div>
+      <div id="who" class="who" hidden></div>
+      <div id="userid" class="userid">loading…</div>
+    </div>
+    <div id="err" class="err" hidden></div>
+    <a id="open" class="open" href="/" target="_blank" rel="noopener" hidden>Open Beagle →</a>
+    <div class="row">
+      <button id="deny" class="btn ghost">Deny</button>
+      <button id="approve" class="btn solid" disabled>Approve</button>
+    </div>
+    <p class="note">Approving sends the site a signature bound to that site, proving you control this identity. Your private key never leaves this browser, and this page never touches your messages.</p>
+  </div>
+<!-- Absolute, not relative: the URL is /connect with no trailing slash, so a
+     relative src resolves against / and 404s. Nothing reports that — the page
+     just sits at "loading…". -->
+<script src="/connect/connect.js?v=d2ef2f0974"></script>
+</body></html>
