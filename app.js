@@ -1,5 +1,5 @@
 (() => {
-  // src/ui/icons.jsx
+  // node_modules/@decentnetwork/beagle-ui/dist/beagle-ui.js
   var ICON_PATHS = {
     // ---- tab bar (the four must feel like one set) ----
     users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -87,8 +87,6 @@
     );
   }
   Object.assign(window, { Icon, ICON_PATHS });
-
-  // src/ui/rtc-signaling.jsx
   var DK_FALLBACK_ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "turn:tokyo.fi.chat:3478", username: "allcom", credential: "allcompass" },
@@ -319,8 +317,325 @@
     };
   }
   Object.assign(window, { dkRtcSignalBus, makeDaemonSignaling });
-
-  // src/ui/chat.jsx
+  var H = {};
+  var hostNeedsWelcome = false;
+  var hostPrefersRtcFile = false;
+  var hostHasKeyBackup = false;
+  function setUiHost(host2) {
+    H = host2 || {};
+    hostNeedsWelcome = !!H.hostNeedsWelcome;
+    hostPrefersRtcFile = !!H.hostPrefersRtcFile;
+    hostHasKeyBackup = !!H.hostHasKeyBackup;
+  }
+  function fileUrl(name) {
+    return H.fileUrl ? H.fileUrl(name) : "/api/file-download?name=" + encodeURIComponent(name);
+  }
+  function fileDownloadUrl(name) {
+    return H.fileDownloadUrl ? H.fileDownloadUrl(name) : fileUrl(name) + "&dl=1";
+  }
+  async function prefetchThreadFiles(messages) {
+    if (H.prefetchThreadFiles)
+      await H.prefetchThreadFiles(messages);
+  }
+  function DkWelcome(props) {
+    return H.DkWelcome ? /* @__PURE__ */ React.createElement(H.DkWelcome, { ...props }) : null;
+  }
+  function DkLockedOut(props) {
+    return H.DkLockedOut ? /* @__PURE__ */ React.createElement(H.DkLockedOut, { ...props }) : null;
+  }
+  function DkBrowserNotice(props) {
+    return H.DkBrowserNotice ? /* @__PURE__ */ React.createElement(H.DkBrowserNotice, { ...props }) : null;
+  }
+  function dkHash(s) {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function dkRng(a) {
+    return function() {
+      a |= 0;
+      a = a + 1831565813 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function dkIdenticon(seed) {
+    const rnd = dkRng(dkHash(seed || "x"));
+    const hue = Math.floor(rnd() * 360);
+    const grid = [];
+    for (let y = 0; y < 5; y++) {
+      const row = [];
+      for (let x = 0; x < 3; x++)
+        row.push(rnd() > 0.5);
+      grid.push([row[0], row[1], row[2], row[1], row[0]]);
+    }
+    return { cells: grid, hue };
+  }
+  function dkClock(ts) {
+    if (!ts)
+      return "";
+    const d = new Date(ts);
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  function dkFileSize(n) {
+    if (!n || n < 0)
+      return "0 B";
+    if (n < 1024)
+      return n + " B";
+    if (n < 1024 * 1024)
+      return (n / 1024).toFixed(1) + " KB";
+    if (n < 1024 * 1024 * 1024)
+      return (n / (1024 * 1024)).toFixed(1) + " MB";
+    return (n / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+  }
+  function dkSpeed(kbps) {
+    if (kbps == null || !(kbps >= 0))
+      return "";
+    return kbps >= 1024 ? (kbps / 1024).toFixed(2) + " MB/s" : Math.round(kbps) + " KB/s";
+  }
+  function dkPct(p) {
+    return p == null ? "\u2026" : (p >= 100 ? "100" : p.toFixed(2)) + "%";
+  }
+  var dkFileUrl = fileUrl;
+  var dkFileDownloadUrl = fileDownloadUrl;
+  function dkFileMediaKind(name) {
+    const ext = (String(name || "").split(".").pop() || "").toLowerCase();
+    if (["png", "jpg", "jpeg", "gif", "webp", "svg", "heic", "bmp"].includes(ext))
+      return "image";
+    if (["mp4", "mov", "webm", "m4v", "mkv", "avi"].includes(ext))
+      return "video";
+    if (["mp3", "m4a", "aac", "wav", "ogg", "flac", "opus"].includes(ext))
+      return "audio";
+    return "file";
+  }
+  function dkDayLabel(ts) {
+    if (!ts)
+      return "Today";
+    const d = new Date(ts), now = /* @__PURE__ */ new Date();
+    if (d.toDateString() === now.toDateString())
+      return "Today";
+    const y = new Date(now.getTime() - 864e5);
+    if (d.toDateString() === y.toDateString())
+      return "Yesterday";
+    return d.toLocaleDateString();
+  }
+  async function dkGet(path) {
+    const r = await fetch(path, { headers: { "cache-control": "no-cache" } });
+    return r.json();
+  }
+  async function dkPost(path, body) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15e3);
+    try {
+      const r = await fetch(path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body || {}),
+        signal: ctrl.signal
+      });
+      try {
+        return await r.json();
+      } catch (e) {
+        return { ok: r.ok };
+      }
+    } catch (e) {
+      return { ok: false, error: e && e.name === "AbortError" ? "timed out" : e && e.message || "network error" };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  function dkCopy(text) {
+    const s = text == null ? "" : String(text);
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(s).then(() => true).catch(() => dkCopyLegacy(s));
+    }
+    return Promise.resolve(dkCopyLegacy(s));
+  }
+  function dkCopyLegacy(s) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = s;
+      ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:-1000px;left:-1000px;opacity:0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, s.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+  var dkApi = {
+    send: (userid, text) => dkPost("/api/chat-send", { userid, text }),
+    retry: (id, userid, text) => dkPost("/api/chat-retry", { id, userid, text }),
+    logLocal: (userid, dir, text) => dkPost("/api/chat-log-local", { userid, dir, text }),
+    add: (address) => dkPost("/api/add", { address }),
+    accept: (userid) => dkPost("/api/accept", { userid }),
+    reject: (userid) => dkPost("/api/reject", { userid }),
+    remove: (userid) => dkPost("/api/friend-remove", { userid }),
+    alias: (userid, alias) => dkPost("/api/friend-alias", { userid, alias }),
+    markRead: (userid) => dkPost("/api/chat-mark-read", { userid }),
+    delFiles: (userid, ids) => dkPost("/api/file-delete", { userid, ids }),
+    // Reveal a received file in the OS file manager (localhost-only on the daemon side).
+    revealFile: (name) => dkPost("/api/file-reveal", { name }),
+    cancelSend: (userid, ids) => dkPost("/api/file-cancel", { userid, ids }),
+    retrySend: (userid, ids) => dkPost("/api/file-retry", { userid, ids }),
+    setProfile: (name, description) => dkPost("/api/set-profile", { name, description }),
+    // Used by the browser's welcome flow, which also picks an avatar and marks
+    // first run done. Harmless where there is no welcome flow: nothing calls it.
+    setProfileFull: (p) => dkPost("/api/set-profile", p),
+    // Mint the keypair — the browser mints one in the tab; a desktop peer reads
+    // a keyfile and never calls this.
+    createIdentity: () => dkPost("/api/create-identity", {}),
+    saveWebrtcFile: async (userid, name, blob) => {
+      try {
+        const r = await fetch(
+          "/api/webrtc-file-save?userid=" + encodeURIComponent(userid) + "&name=" + encodeURIComponent(name),
+          { method: "POST", body: blob }
+        );
+        const txt = await r.text();
+        try {
+          return JSON.parse(txt);
+        } catch {
+          return { ok: false, error: (txt || "HTTP " + r.status).slice(0, 120) };
+        }
+      } catch (e) {
+        return { ok: false, error: String(e) };
+      }
+    },
+    sendFile: async (userid, file) => {
+      try {
+        const r = await fetch(
+          "/api/file-send?userid=" + encodeURIComponent(userid) + "&name=" + encodeURIComponent(file.name),
+          { method: "POST", body: file }
+        );
+        const txt = await r.text();
+        try {
+          return JSON.parse(txt);
+        } catch {
+          if (r.status === 404)
+            return { ok: false, error: "file upload not supported \u2014 update & restart `agentnet ui`" };
+          return { ok: false, error: (txt || "HTTP " + r.status).slice(0, 120) };
+        }
+      } catch (e) {
+        return { ok: false, error: String(e) };
+      }
+    }
+  };
+  var DK_ME_FALLBACK = {
+    name: "\u2026",
+    handle: "@decentnetwork/peer",
+    userId: "",
+    carrier: "",
+    netKey: "",
+    ip: "",
+    online: false,
+    lanVer: "",
+    peerVer: "",
+    channel: "@next",
+    wire: "163"
+  };
+  function useDaemonData() {
+    const [snap, setSnap] = React.useState({
+      me: DK_ME_FALLBACK,
+      peers: [],
+      requests: [],
+      exits: [],
+      activeExit: null,
+      loaded: false,
+      locked: false
+    });
+    const [threads, setThreads] = React.useState({});
+    const refreshRef = React.useRef(null);
+    const refresh = React.useCallback(async () => {
+      var _a;
+      try {
+        const d = await dkGet("/api/desktop");
+        if (d && d.locked) {
+          setSnap((s) => ({ ...s, locked: true, loaded: true }));
+          return;
+        }
+        if (d && d.starting) {
+          setTimeout(() => {
+            refreshRef.current && refreshRef.current();
+          }, 300);
+          return;
+        }
+        setSnap({
+          locked: false,
+          me: d.me || DK_ME_FALLBACK,
+          peers: d.peers || [],
+          requests: d.requests || [],
+          exits: d.exits || [],
+          activeExit: (_a = d.activeExit) != null ? _a : null,
+          loaded: true
+        });
+      } catch (e) {
+      }
+    }, []);
+    React.useEffect(() => {
+      refreshRef.current = refresh;
+      refresh();
+      const t = setInterval(refresh, 2500);
+      return () => clearInterval(t);
+    }, [refresh]);
+    const loadThread = React.useCallback(async (peerId) => {
+      if (!peerId)
+        return;
+      try {
+        const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId));
+        const arr = d.chats && d.chats[peerId] || [];
+        await prefetchThreadFiles(arr);
+        const msgs = arr.map((m) => ({
+          id: m.id,
+          from: m.dir === "out" ? "me" : "them",
+          time: dkClock(m.ts),
+          text: m.text,
+          file: m.file ? {
+            name: m.file.name,
+            size: dkFileSize(m.file.size),
+            dir: m.dir,
+            media: dkFileMediaKind(m.file.name),
+            status: m.file.status,
+            pct: m.file.status === "sending" && m.file.size ? Math.min(100, (m.file.sent || 0) / m.file.size * 100) : void 0,
+            kbps: m.file.kbps
+          } : void 0,
+          // Pass the real state through. Collapsing everything that was not
+          // 'queued' to 'read' meant a message still in flight — or one that
+          // never went out at all — rendered as delivered.
+          status: m.dir === "out" ? m.status === "queued" || m.status === "sending" || m.status === "failed" ? m.status : "read" : void 0,
+          error: m.error,
+          // Delivery path: "online" = live session, "offline" = express relay.
+          // Incoming messages carry this; the bubble colors them differently.
+          via: m.via,
+          // Brief 30: a validated component form, already whitelisted host-side.
+          // Passed through untouched — the renderer treats every string as text,
+          // never markup.
+          components: m.components
+        }));
+        const withDay = msgs.length ? [{ day: dkDayLabel(arr[0].ts) }].concat(msgs) : [];
+        setThreads((t) => Object.assign({}, t, { [peerId]: withDay }));
+      } catch (e) {
+      }
+    }, []);
+    return Object.assign({}, snap, { threads, refresh, loadThread });
+  }
+  Object.assign(window, {
+    dkHash,
+    dkIdenticon,
+    dkClock,
+    dkDayLabel,
+    dkApi,
+    useDaemonData,
+    DK_ME_FALLBACK,
+    dkCopy
+  });
   function RequestsBlock({ T, requests, onAct }) {
     const [acted, setActed] = React.useState({});
     const [failed, setFailed] = React.useState({});
@@ -1950,8 +2265,6 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
   }
   Object.assign(window, { ChatTab });
-
-  // src/ui/profile.jsx
   function CopyBtn({ value, copiedText = "Copied", copyFailedText = "Copy failed", copyTitle = "Copy" }) {
     const [status, setStatus] = React.useState(null);
     const timer = React.useRef(null);
@@ -2046,6 +2359,21 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: 440, maxWidth: "92vw", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: 22, display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: "var(--text)" } }, T.editProfile), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: lbl }, "display name"), /* @__PURE__ */ React.createElement("input", { value: name, onChange: (e) => setName(e.target.value), onKeyDown: onKey, autoFocus: true, maxLength: 48, style: field })), /* @__PURE__ */ React.createElement("label", { style: { display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: lbl }, "status message"), /* @__PURE__ */ React.createElement("input", { value: desc, onChange: (e) => setDesc(e.target.value), onKeyDown: onKey, maxLength: 120, placeholder: "optional \u2014 a short bio friends will see", style: field })), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, "Your userid (the unique identity) can't change \u2014 only the display name + status."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 2 } }, /* @__PURE__ */ React.createElement(Btn, { size: "sm", onClick: onClose }, T.cancel || "cancel"), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", onClick: save }, T.save || "save"))));
   }
   var dkPunkCache = /* @__PURE__ */ new Map();
+  var dkPunkInflight = /* @__PURE__ */ new Map();
+  function dkPunkLookup(id) {
+    if (dkPunkCache.has(id))
+      return Promise.resolve(dkPunkCache.get(id));
+    let pending = dkPunkInflight.get(id);
+    if (!pending) {
+      pending = fetch(`/api/punk/${id}`).then((r) => r.json()).then((d) => d && d.ok && d.punk && d.punk.image ? d.punk : null).catch(() => null).then((punk) => {
+        dkPunkCache.set(id, punk);
+        dkPunkInflight.delete(id);
+        return punk;
+      });
+      dkPunkInflight.set(id, pending);
+    }
+    return pending;
+  }
   function DkPunkAvatar({ id, size, radius, fallbackSeed }) {
     const [img, setImg] = React.useState(() => (dkPunkCache.get(id) || {}).image || null);
     React.useEffect(() => {
@@ -2055,13 +2383,9 @@ ${peer.address}`
         return void 0;
       }
       setImg(null);
-      fetch(`/api/punk/${id}`).then((r) => r.json()).then((d) => {
-        const punk = d && d.ok && d.punk && d.punk.image ? d.punk : null;
-        dkPunkCache.set(id, punk);
+      dkPunkLookup(id).then((punk) => {
         if (!dead && punk)
           setImg(punk.image);
-      }).catch(() => {
-        dkPunkCache.set(id, null);
       });
       return () => {
         dead = true;
@@ -2623,1001 +2947,6 @@ ${peer.address}`
     } }));
   }
   Object.assign(window, { ProfileTab, DkPunkAvatar, DkEnsAvatar, DkPublicProfile });
-
-  // src/ui/onboarding.jsx
-  var OB = {
-    bg: "#0b0b0f",
-    elev: "#0e0e13",
-    field: "#121218",
-    subtle: "#15151b",
-    sec: "#1a1a22",
-    hair: "#1b1b22",
-    border: "#23232c",
-    bfield: "#2a2a35",
-    dashed: "#33333f",
-    text: "#f4f2fa",
-    text2: "#c9c6d6",
-    muted: "#8d8b9a",
-    faint: "#6f6d7d",
-    faint2: "#5d5b6a",
-    ph: "#55535f",
-    accent: "#7c5cff",
-    online: "#4ad1a5",
-    ui: "'IBM Plex Sans','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,sans-serif",
-    mono: "'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace"
-  };
-  var OB_CSS = `
-.ob-root{position:fixed;inset:0;z-index:200;display:flex;background:${OB.bg};
-  color:${OB.text};font-family:${OB.ui};overflow:hidden}
-.ob-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-.ob-body::-webkit-scrollbar{width:8px}
-.ob-body::-webkit-scrollbar-thumb{background:${OB.border};border-radius:8px}
-.ob-in{width:100%;background:${OB.field};border:1px solid ${OB.bfield};border-radius:10px;
-  color:${OB.text};font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .12s,background .12s}
-.ob-in::placeholder{color:${OB.ph}}
-.ob-in:focus{border-color:${OB.accent};background:#15131f}
-.ob-btn{border:none;cursor:pointer;font-family:inherit;font-weight:600;
-  background:${OB.accent};color:${OB.onAccent || "#0b0b0f"};border-radius:10px;transition:background .12s}
-.ob-btn:hover{background:#9179ff}
-.ob-btn[disabled]{opacity:.55;cursor:default}
-.ob-sec{background:${OB.sec};border:1px solid ${OB.bfield};color:${OB.text2};
-  border-radius:9px;cursor:pointer;font-family:inherit;transition:border-color .12s,color .12s}
-.ob-sec:hover{border-color:${OB.accent};color:#fff}
-.ob-mut{background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
-  color:${OB.faint};transition:color .12s}
-.ob-mut:hover{color:#a8a5b6}
-.ob-link{background:none;border:none;padding:0 0 2px;cursor:pointer;font-family:inherit;
-  color:#9b83ff;border-bottom:1px solid #3a3060;transition:color .12s}
-.ob-link:hover{color:#b8a6ff}
-.ob-tile{padding:0;border:1px solid ${OB.border};border-radius:9px;cursor:pointer;
-  background:${OB.subtle};overflow:hidden;transition:outline-color .1s}
-.ob-tile:hover{border-color:${OB.accent}}
-.ob-tile[data-sel="1"]{outline:2px solid ${OB.accent};outline-offset:2px}
-.ob-shuffle{border:1px dashed ${OB.dashed};border-radius:9px;background:none;color:#7e7c8c;
-  cursor:pointer;font-family:inherit;transition:border-color .12s,color .12s}
-.ob-shuffle:hover{border-color:${OB.accent};color:#b8a6ff}
-.ob-dot{width:6px;height:6px;border-radius:999px;background:${OB.online};
-  animation:obpulse 2.4s ease-in-out infinite}
-@keyframes obpulse{0%,100%{opacity:0}50%{opacity:1}}
-.ob-busydot{width:8px;height:8px;border-radius:999px;background:${OB.muted};
-  animation:obbusy 1.1s ease-in-out infinite;flex-shrink:0}
-@keyframes obbusy{0%,100%{opacity:.25}50%{opacity:1}}
-.ob-track{width:120px;height:3px;border-radius:2px;background:${OB.border};overflow:hidden}
-.ob-fill{height:100%;background:${OB.accent};border-radius:2px;transition:width .35s linear}
-.ob-btn.ob-busy{background:${OB.sec};color:${OB.muted};cursor:default}
-.ob-btn.ob-busy:hover{background:${OB.sec}}
-@media (prefers-reduced-motion:reduce){
-  .ob-busydot,.ob-dot{animation:none;opacity:1}
-  .ob-fill{transition:none}
-}
-@media (max-width:900px){
-  .ob-root{flex-direction:column}
-  .ob-left{width:100%!important;border-right:none!important}
-  .ob-right{display:none!important}
-}`;
-  function obInstallCss() {
-    if (document.getElementById("ob-css"))
-      return;
-    const el = document.createElement("style");
-    el.id = "ob-css";
-    el.textContent = OB_CSS;
-    document.head.appendChild(el);
-  }
-  var OB_RARE = ["alien", "zombie", "ape"];
-  async function obPunks(type, limit) {
-    try {
-      const d = await (await fetch(`/api/punk-list?type=${type}&limit=${limit}`)).json();
-      return d && d.ok && d.list || [];
-    } catch (e) {
-      return [];
-    }
-  }
-  async function dkPunkBatch(round) {
-    const rare = OB_RARE[round % OB_RARE.length];
-    const maleHeavy = round % 2 === 0;
-    const [m, f, r] = await Promise.all([
-      obPunks("male", maleHeavy ? 3 : 2),
-      obPunks("female", maleHeavy ? 2 : 3),
-      obPunks(rare, 1)
-    ]);
-    const all = m.concat(f, r);
-    const k = round % (all.length || 1);
-    return all.slice(k).concat(all.slice(0, k));
-  }
-  var OB_ADJ = ["quiet", "bright", "swift", "amber", "violet", "copper", "lunar", "north", "ember", "still"];
-  var OB_NOUN = ["otter", "falcon", "cedar", "harbor", "willow", "quartz", "meridian", "sable", "juniper", "wren"];
-  function obRandomName() {
-    const p = (a) => a[Math.floor(Math.random() * a.length)];
-    const cap = (s) => s[0].toUpperCase() + s.slice(1);
-    return `${cap(p(OB_ADJ))} ${cap(p(OB_NOUN))}`;
-  }
-  var OB_T = {
-    en: {
-      step: (n) => `${n} of 2`,
-      listedTitle: "Let people on this bridge see you",
-      listedNote: "You appear in Here, so people with no friends yet can find you. Turn it off any time in Profile.",
-      h1: "Tell people who you are.",
-      b1: "Your key is generated right here in this tab, the moment you start typing \u2014 it is never sent anywhere. There is no account to create; a name is all anyone needs to recognise you.",
-      name: "YOUR NAME",
-      nameReq: "required",
-      namePh: "Wei Li",
-      intro: "ONE LINE ABOUT YOU",
-      optional: "optional",
-      introPh: "Building decentralised things in San Francisco",
-      face: "A FACE",
-      shuffle: "shuffle",
-      upload: "upload",
-      cont: "Continue",
-      skip: "Skip \u2014 use a random name",
-      h2: "Now add one person.",
-      b2: "Beagle stays quiet until you do. Send them your link, or let them scan it \u2014 it reaches them wherever they run Beagle.",
-      yourLink: "YOUR LINK",
-      copyLink: "Copy link",
-      copied: "Copied",
-      share: "Share",
-      worksOn: "Works for a friend on:",
-      tab: "a browser tab",
-      alreadyHere: "Or say hello to someone already here:",
-      add: "add",
-      requested: "requested",
-      open: "Open Beagle",
-      later: "I'll add someone later",
-      req: "FRIEND REQUEST",
-      fallName: "Your name",
-      fallIntro: "wants to connect",
-      addrSoon: "your address \xB7 created when you continue",
-      accept: "Accept",
-      ignore: "Ignore",
-      cap1: "This is what a friend sees when your request lands on their phone.",
-      cap2: "They accept once. After that you are reachable from any of your devices.",
-      needName: "A name is required \u2014 without one your request is just a key.",
-      // 2a status vocabulary
-      keyBusy: "creating your key",
-      keyReady: "key ready",
-      h1Busy: "Pick a name while we set up your key.",
-      b1Busy: "No email, no password, no server \u2014 the key is being generated in this tab and stays on this device. It will be done before you finish typing.",
-      helpBusy: "Keep typing \u2014 this finishes on its own.",
-      ephemeral: "This browser will not let Beagle save anything, so this identity lasts until you close the tab. Private browsing, or a wedged storage layer \u2014 quitting and reopening the browser usually clears it.",
-      failed: "Could not create the key here:"
-    },
-    zh: {
-      step: (n) => `\u7B2C ${n} \u6B65 / \u5171 2 \u6B65`,
-      listedTitle: "\u8BA9\u8FD9\u4E2A bridge \u4E0A\u7684\u4EBA\u770B\u5230\u4F60",
-      listedNote: "\u4F60\u4F1A\u51FA\u73B0\u5728\u300C\u5728\u573A\u300D\u91CC\uFF0C\u8FD8\u6CA1\u6709\u597D\u53CB\u7684\u4EBA\u5C31\u80FD\u627E\u5230\u4F60\u3002\u968F\u65F6\u53EF\u4EE5\u5728\u300C\u6211\u300D\u91CC\u5173\u6389\u3002",
-      h1: "\u5148\u8BA9\u522B\u4EBA\u8BA4\u51FA\u4F60\u3002",
-      b1: "\u4F60\u7684\u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210 \u2014\u2014 \u4ECE\u4F60\u5F00\u59CB\u8F93\u5165\u7684\u90A3\u4E00\u523B\u8D77\uFF0C\u800C\u4E14\u4E0D\u4F1A\u53D1\u9001\u5230\u4EFB\u4F55\u5730\u65B9\u3002\u6CA1\u6709\u8D26\u53F7\u8981\u6CE8\u518C\uFF0C\u522B\u4EBA\u53EA\u9700\u8981\u4E00\u4E2A\u540D\u5B57\u5C31\u80FD\u8BA4\u51FA\u4F60\u3002",
-      name: "\u4F60\u7684\u540D\u5B57",
-      nameReq: "\u5FC5\u586B",
-      namePh: "\u674E\u4F1F",
-      intro: "\u4E00\u53E5\u81EA\u6211\u4ECB\u7ECD",
-      optional: "\u9009\u586B",
-      introPh: "\u5728\u65E7\u91D1\u5C71\u505A\u53BB\u4E2D\u5FC3\u5316\u7684\u4E1C\u897F",
-      face: "\u5934\u50CF",
-      shuffle: "\u6362\u4E00\u6279",
-      upload: "\u4E0A\u4F20",
-      cont: "\u7EE7\u7EED",
-      skip: "\u8DF3\u8FC7\uFF0C\u968F\u673A\u53D6\u4E2A\u540D\u5B57",
-      h2: "\u73B0\u5728\u52A0\u4E00\u4E2A\u4EBA\u3002",
-      b2: "\u5728\u6B64\u4E4B\u524D Beagle \u4F1A\u4E00\u76F4\u5B89\u9759\u3002\u628A\u94FE\u63A5\u53D1\u7ED9\u5BF9\u65B9\uFF0C\u6216\u8005\u8BA9\u5BF9\u65B9\u626B\u7801 \u2014\u2014 \u4ED6\u5728\u54EA\u53F0\u8BBE\u5907\u4E0A\u7528 Beagle \u90FD\u6536\u5F97\u5230\u3002",
-      yourLink: "\u4F60\u7684\u94FE\u63A5",
-      copyLink: "\u590D\u5236\u94FE\u63A5",
-      copied: "\u5DF2\u590D\u5236",
-      share: "\u5206\u4EAB",
-      worksOn: "\u5BF9\u65B9\u53EF\u4EE5\u5728\u8FD9\u4E9B\u8BBE\u5907\u4E0A\uFF1A",
-      tab: "\u6D4F\u89C8\u5668\u6807\u7B7E\u9875",
-      alreadyHere: "\u6216\u8005\uFF0C\u5148\u8DDF\u5DF2\u7ECF\u5728\u8FD9\u91CC\u7684\u4EBA\u6253\u4E2A\u62DB\u547C\uFF1A",
-      add: "\u6DFB\u52A0",
-      requested: "\u5DF2\u53D1\u9001",
-      open: "\u6253\u5F00 Beagle",
-      later: "\u4EE5\u540E\u518D\u52A0\u8054\u7CFB\u4EBA",
-      req: "\u597D\u53CB\u8BF7\u6C42",
-      fallName: "\u4F60\u7684\u540D\u5B57",
-      fallIntro: "\u8BF7\u6C42\u6DFB\u52A0\u4F60\u4E3A\u597D\u53CB",
-      addrSoon: '\u4F60\u7684\u5730\u5740 \xB7 \u70B9\u51FB"\u7EE7\u7EED"\u540E\u751F\u6210',
-      accept: "\u63A5\u53D7",
-      ignore: "\u5FFD\u7565",
-      cap1: "\u8FD9\u5C31\u662F\u5BF9\u65B9\u5728\u624B\u673A\u4E0A\u6536\u5230\u4F60\u7684\u8BF7\u6C42\u65F6\u770B\u5230\u7684\u6837\u5B50\u3002",
-      cap2: "\u5BF9\u65B9\u53EA\u9700\u63A5\u53D7\u4E00\u6B21\uFF0C\u4E4B\u540E\u4F60\u5728\u4EFB\u4F55\u8BBE\u5907\u4E0A\u90FD\u80FD\u88AB\u627E\u5230\u3002",
-      needName: "\u540D\u5B57\u662F\u5FC5\u586B\u7684 \u2014\u2014 \u6CA1\u6709\u540D\u5B57\uFF0C\u4F60\u7684\u8BF7\u6C42\u5C31\u53EA\u662F\u4E00\u4E32\u5BC6\u94A5\u3002",
-      keyBusy: "\u6B63\u5728\u751F\u6210\u5BC6\u94A5",
-      keyReady: "\u5BC6\u94A5\u5DF2\u5C31\u7EEA",
-      h1Busy: "\u5148\u53D6\u4E2A\u540D\u5B57\uFF0C\u5BC6\u94A5\u8FD9\u8FB9\u540C\u65F6\u5728\u751F\u6210\u3002",
-      b1Busy: "\u4E0D\u7528\u90AE\u7BB1\u3001\u4E0D\u7528\u5BC6\u7801\u3001\u4E0D\u7528\u670D\u52A1\u5668 \u2014\u2014 \u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210\uFF0C\u53EA\u7559\u5728\u8FD9\u53F0\u8BBE\u5907\u4E0A\u3002\u4F60\u540D\u5B57\u8FD8\u6CA1\u6253\u5B8C\u5B83\u5C31\u597D\u4E86\u3002",
-      helpBusy: "\u7EE7\u7EED\u8F93\u5165\u5C31\u597D\uFF0C\u8FD9\u4E2A\u4F1A\u81EA\u5DF1\u5B8C\u6210\u3002",
-      ephemeral: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u4E0D\u8BA9 Beagle \u4FDD\u5B58\u4EFB\u4F55\u6570\u636E\uFF0C\u6240\u4EE5\u8FD9\u4E2A\u8EAB\u4EFD\u53EA\u5728\u672C\u6807\u7B7E\u9875\u6709\u6548\uFF0C\u5173\u6389\u5C31\u6CA1\u4E86\u3002\u901A\u5E38\u662F\u9690\u79C1\u6A21\u5F0F\uFF0C\u6216\u8005\u6D4F\u89C8\u5668\u7684\u5B58\u50A8\u5361\u4F4F\u4E86 \u2014\u2014 \u9000\u51FA\u5E76\u91CD\u5F00\u6D4F\u89C8\u5668\u4E00\u822C\u80FD\u6062\u590D\u3002",
-      failed: "\u65E0\u6CD5\u5728\u8FD9\u91CC\u751F\u6210\u5BC6\u94A5\uFF1A"
-    }
-  };
-  var OB_PLATFORMS = ["iPhone", "Android", "macOS", "Windows", "Linux"];
-  var DK_FIRST_CONTACTS = [
-    {
-      ens: "help.beagles.eth",
-      name: "Beagle Chat Help",
-      userid: "FhbohSLrj5UjdyFKCEYNeEWAPq3QD9hRg6hsso5ipag2",
-      address: "ZJxuWL9SDqdvunnCSMLUd5jyGCaBV44G6THYaQS7ZaZAz1wmt4nz"
-    },
-    {
-      ens: "air.beagles.eth",
-      name: "air-wli",
-      userid: "6dAPAT1RT4YqpHREKhyGDqroaRYr5WaaHW6PNUEb4dAM",
-      address: "DMtGmaH17YMWACJk8ByX9B8WSMX5WvWdLF7v2YmRErAC2Z5xz1X8"
-    }
-  ];
-  function ObLabel({ children, note }) {
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, letterSpacing: ".12em", color: OB.muted } }, children), note && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: note.req ? OB.accent : OB.faint2 } }, note.text));
-  }
-  function ObFace({ url, punk, seed, size, radius }) {
-    if (url)
-      return /* @__PURE__ */ React.createElement("img", { src: url, alt: "", width: size, height: size, style: { width: size, height: size, borderRadius: radius, objectFit: "cover", display: "block", background: OB.subtle } });
-    if (punk != null)
-      return /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punk, size, radius, fallbackSeed: seed || "beagle" });
-    if (seed)
-      return /* @__PURE__ */ React.createElement(DkIdenticon, { seed, size, radius });
-    return /* @__PURE__ */ React.createElement("div", { style: { width: size, height: size, borderRadius: radius, background: OB.subtle, border: `1px solid ${OB.bfield}`, display: "flex", alignItems: "center", justifyContent: "center", color: OB.faint2 } }, /* @__PURE__ */ React.createElement(Icon, { name: "userRound", size: Math.round(size * 0.44), stroke: 1.6 }));
-  }
-  function ObQr({ value, px = 132 }) {
-    const qr = React.useMemo(() => {
-      if (typeof qrcode === "undefined" || !value)
-        return null;
-      try {
-        const q = qrcode(0, "M");
-        q.addData(value);
-        q.make();
-        return q;
-      } catch (e) {
-        return null;
-      }
-    }, [value]);
-    const count = qr ? qr.getModuleCount() : 0;
-    const quiet = 2;
-    const total = count + quiet * 2;
-    return /* @__PURE__ */ React.createElement("div", { style: { width: px, height: px, background: "#f4f2fa", borderRadius: 10, padding: 10, boxSizing: "border-box", flexShrink: 0 } }, qr ? /* @__PURE__ */ React.createElement("svg", { width: "100%", height: "100%", viewBox: `0 0 ${total} ${total}`, shapeRendering: "crispEdges", style: { display: "block" } }, /* @__PURE__ */ React.createElement("rect", { width: total, height: total, fill: "#f4f2fa" }), Array.from({ length: count }).map((_, r) => Array.from({ length: count }).map(
-      (__, c) => qr.isDark(r, c) ? /* @__PURE__ */ React.createElement("rect", { key: `${r}-${c}`, x: c + quiet, y: r + quiet, width: 1.04, height: 1.04, fill: "#0b0b0f" }) : null
-    ))) : null);
-  }
-  function DkWelcome({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity }) {
-    var _a;
-    const W = OB_T[lang === "zh" ? "zh" : "en"];
-    const [step, setStep] = React.useState(1);
-    const [name, setName] = React.useState(me.name || "");
-    const [listed, setListed] = React.useState(me.listed !== false);
-    const [intro, setIntro] = React.useState(me.description || "");
-    const [punk, setPunk] = React.useState((_a = me.punkId) != null ? _a : null);
-    const [upload, setUpload] = React.useState(me.avatarDataUrl || null);
-    const [round, setRound] = React.useState(0);
-    const [tiles, setTiles] = React.useState([]);
-    const [warn, setWarn] = React.useState(false);
-    const [keyProgress, setKeyProgress] = React.useState(me.hasIdentity ? 100 : 0);
-    const [keyBusy, setKeyBusy] = React.useState(false);
-    const [keyError, setKeyError] = React.useState(null);
-    const [pendingSubmit, setPendingSubmit] = React.useState(false);
-    const mintRef = React.useRef(null);
-    const [copied, setCopied] = React.useState(false);
-    const [sent, setSent] = React.useState({});
-    const nameRef = React.useRef(null);
-    const fileRef = React.useRef(null);
-    const hasKey = !!me.hasIdentity && !!me.carrier;
-    React.useEffect(() => {
-      obInstallCss();
-      try {
-        performance.mark("beagle:welcome");
-      } catch (e) {
-      }
-    }, []);
-    const startKey = React.useCallback(() => {
-      if (mintRef.current || me.hasIdentity || !onCreateIdentity)
-        return;
-      setKeyBusy(true);
-      setKeyError(null);
-      let p = 0;
-      const tick = setInterval(() => {
-        p = Math.min(90, p + (90 - p) * 0.18 + 3);
-        setKeyProgress(Math.round(p));
-      }, 120);
-      mintRef.current = Promise.resolve(onCreateIdentity()).then((r) => {
-        if (r && r.ok === false)
-          throw new Error(r.error || "key creation failed");
-        setKeyProgress(100);
-      }).catch((err) => {
-        setKeyError(String((err == null ? void 0 : err.message) || err));
-        mintRef.current = null;
-        setKeyProgress(0);
-        throw err;
-      }).finally(() => {
-        clearInterval(tick);
-        setKeyBusy(false);
-      });
-      mintRef.current.catch(() => {
-      });
-      return mintRef.current;
-    }, [me.hasIdentity, onCreateIdentity]);
-    const keyReady = keyProgress >= 100 || !!me.hasIdentity;
-    const [statusVisible, setStatusVisible] = React.useState(false);
-    React.useEffect(() => {
-      if (keyBusy) {
-        setStatusVisible(true);
-        return;
-      }
-      if (!keyReady || !statusVisible)
-        return;
-      const t = setTimeout(() => setStatusVisible(false), 2500);
-      return () => clearTimeout(t);
-    }, [keyBusy, keyReady, statusVisible]);
-    React.useEffect(() => {
-      let dead = false;
-      dkPunkBatch(round).then((b) => {
-        if (!dead)
-          setTiles(b);
-      });
-      return () => {
-        dead = true;
-      };
-    }, [round]);
-    React.useEffect(() => {
-      if (step === 1 && nameRef.current)
-        nameRef.current.focus();
-    }, [step]);
-    const link = hasKey ? `${location.origin}${location.pathname}#/chat?address=${me.carrier}` : "";
-    const commit = (extra) => onSave({ name: name.trim(), description: intro.trim(), punkId: punk, avatarDataUrl: upload, listed, ...extra });
-    const advance = async (nm) => {
-      const final = (nm || name).trim();
-      if (!final) {
-        setWarn(true);
-        if (nameRef.current)
-          nameRef.current.focus();
-        return;
-      }
-      if (nm)
-        setName(nm);
-      if (!hasKey) {
-        setPendingSubmit(true);
-        try {
-          await (mintRef.current || startKey());
-        } catch (err) {
-          setPendingSubmit(false);
-          return;
-        }
-        setPendingSubmit(false);
-      }
-      await onSave({ name: final, description: intro.trim(), punkId: punk, avatarDataUrl: upload, listed });
-      setStep(2);
-    };
-    const finish = () => {
-      commit({ onboarded: true });
-      onClose();
-    };
-    const copyLink = () => {
-      try {
-        navigator.clipboard.writeText(link);
-      } catch (e) {
-      }
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2e3);
-    };
-    const share = () => {
-      if (navigator.share)
-        navigator.share({ title: "Beagle", text: name || "Beagle", url: link }).catch(() => {
-        });
-      else
-        copyLink();
-    };
-    const onUpload = (e) => {
-      const f = e.target.files && e.target.files[0];
-      e.target.value = "";
-      if (!f)
-        return;
-      const img = new Image();
-      const url = URL.createObjectURL(f);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        try {
-          const S = 256;
-          const c = document.createElement("canvas");
-          c.width = S;
-          c.height = S;
-          const ctx = c.getContext("2d");
-          const side = Math.min(img.width, img.height);
-          ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
-          let d = null;
-          for (const q of [0.9, 0.75, 0.55, 0.4]) {
-            d = c.toDataURL("image/webp", q);
-            if (!d.startsWith("data:image/webp"))
-              d = c.toDataURL("image/jpeg", q);
-            if (d.length < 13e4)
-              break;
-          }
-          setUpload(d);
-          setPunk(null);
-        } catch (err) {
-        }
-      };
-      img.onerror = () => URL.revokeObjectURL(url);
-      img.src = url;
-    };
-    const input = { padding: "14px 16px", fontSize: 18 };
-    const inputSm = { padding: "13px 16px", fontSize: 15 };
-    const body = { fontSize: 15, lineHeight: 1.6, color: OB.muted, margin: 0 };
-    const h = { fontSize: 36, lineHeight: 1.14, letterSpacing: "-0.02em", fontWeight: 600, color: OB.text, margin: 0 };
-    const langToggle = /* @__PURE__ */ React.createElement("div", { role: "radiogroup", style: { display: "flex", gap: 2, background: OB.field, border: `1px solid ${OB.border}`, borderRadius: 8, padding: 3 } }, [["en", "EN"], ["zh", "\u4E2D\u6587"]].map(([v, txt]) => /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        key: v,
-        role: "radio",
-        "aria-checked": lang === v,
-        onClick: () => onLang && onLang(v),
-        style: {
-          border: "none",
-          cursor: "pointer",
-          borderRadius: 6,
-          padding: "4px 9px",
-          fontSize: 11,
-          fontFamily: v === "en" ? OB.mono : OB.ui,
-          background: lang === v ? OB.accent : "transparent",
-          color: lang === v ? OB.bg : "#8d8b9a"
-        }
-      },
-      txt
-    )));
-    return /* @__PURE__ */ React.createElement("div", { className: "ob-root" }, /* @__PURE__ */ React.createElement("div", { className: "ob-left", style: { width: 560, flexShrink: 0, boxSizing: "border-box", padding: "44px 44px 32px", borderRight: `1px solid ${OB.hair}`, display: "flex", flexDirection: "column", gap: 28, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), step === 1 && statusVisible && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { className: "ob-track" }, /* @__PURE__ */ React.createElement("div", { className: "ob-fill", style: { width: `${keyProgress}%` } })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: keyReady ? OB.online : OB.faint, whiteSpace: "nowrap", transition: "opacity .4s ease" } }, keyReady ? W.keyReady : `${W.keyBusy} \xB7 ${keyProgress}%`)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { width: 38, height: 3, borderRadius: 2, background: step >= n ? OB.accent : "#26262f" } }))), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint, whiteSpace: "nowrap" } }, W.step(step)), langToggle), step === 1 ? /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, keyBusy && !keyReady ? W.h1Busy : W.h1), /* @__PURE__ */ React.createElement("p", { style: body }, keyBusy && !keyReady ? W.b1Busy : W.b1), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.nameReq, req: true } }, W.name), /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        ref: nameRef,
-        className: "ob-in",
-        style: input,
-        value: name,
-        placeholder: W.namePh,
-        maxLength: 32,
-        onChange: (e) => {
-          setName(e.target.value);
-          setWarn(false);
-          startKey();
-        },
-        onKeyDown: (e) => {
-          if (e.key === "Enter")
-            advance();
-        }
-      }
-    ), warn && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: OB.accent } }, W.needName), keyError && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: "#ff8a5c" } }, W.failed, " ", keyError), me.ephemeral && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: "#ffd35c" } }, W.ephemeral)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.intro), /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        className: "ob-in",
-        style: inputSm,
-        value: intro,
-        placeholder: W.introPh,
-        maxLength: 80,
-        onChange: (e) => setIntro(e.target.value),
-        onKeyDown: (e) => {
-          if (e.key === "Enter")
-            advance();
-        }
-      }
-    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.face), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, flexWrap: "wrap" } }, tiles.map((p) => /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        key: p.id,
-        className: "ob-tile",
-        "data-sel": !upload && punk === p.id ? "1" : "0",
-        title: `#${p.id} \xB7 ${p.type}`,
-        "aria-label": `punk ${p.id}, ${p.type}`,
-        onClick: () => {
-          setPunk(p.id);
-          setUpload(null);
-        },
-        style: { width: 40, height: 40 }
-      },
-      /* @__PURE__ */ React.createElement("img", { src: p.image, alt: "", style: { width: "100%", height: "100%", display: "block", imageRendering: "pixelated" } })
-    )), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "ob-shuffle",
-        title: W.shuffle,
-        "aria-label": W.shuffle,
-        onClick: () => setRound((r) => r + 1),
-        style: { width: 40, height: 40, fontSize: 15 }
-      },
-      "\u21BB"
-    ), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "ob-shuffle",
-        title: W.upload,
-        "aria-label": W.upload,
-        onClick: () => fileRef.current && fileRef.current.click(),
-        style: { width: 40, height: 40, display: "inline-flex", alignItems: "center", justifyContent: "center" }
-      },
-      /* @__PURE__ */ React.createElement(Icon, { name: "image", size: 16, stroke: 1.8 })
-    ), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUpload, style: { display: "none" } })))) : /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 24 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, W.h2), /* @__PURE__ */ React.createElement("p", { style: body }, W.b2), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 18, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement(ObQr, { value: link }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement(ObLabel, null, W.yourLink), /* @__PURE__ */ React.createElement("div", { className: "ob-in", style: { padding: "11px 13px", fontFamily: OB.mono, fontSize: 13, color: OB.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, link), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, marginTop: 9 } }, /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: copyLink }, copied ? W.copied : W.copyLink), /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: share }, W.share)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.worksOn), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 7, flexWrap: "wrap" } }, OB_PLATFORMS.concat([W.tab]).map((p) => /* @__PURE__ */ React.createElement("span", { key: p, style: { fontFamily: OB.mono, fontSize: 12, color: "#a8a5b6", background: OB.subtle, border: `1px solid ${OB.border}`, padding: "6px 11px", borderRadius: 6 } }, p)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.alreadyHere), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, DK_FIRST_CONTACTS.map((c) => /* @__PURE__ */ React.createElement("div", { key: c.ens, style: { display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 9, border: `1px solid ${OB.border}`, background: OB.field } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: c.userid, size: 30, radius: 8, fallbackSeed: c.userid }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: OB.text } }, c.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 10.5, color: OB.faint } }, c.ens)), sent[c.ens] ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.online } }, W.requested) : /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "ob-sec",
-        style: { padding: "6px 12px", fontSize: 12 },
-        onClick: () => {
-          setSent((s) => Object.assign({}, s, { [c.ens]: true }));
-          if (onAdd)
-            onAdd(c.address);
-        }
-      },
-      W.add
-    )))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 18, flexShrink: 0 } }, step === 2 && /* @__PURE__ */ React.createElement("label", { style: {
-      display: "flex",
-      alignItems: "flex-start",
-      gap: 10,
-      cursor: "pointer",
-      width: "100%",
-      maxWidth: 420,
-      marginBottom: 4
-    } }, /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        type: "checkbox",
-        checked: listed,
-        onChange: (e) => setListed(e.target.checked),
-        style: { marginTop: 2, width: 16, height: 16, accentColor: OB.accent, cursor: "pointer", flexShrink: 0 }
-      }
-    ), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: OB.faint, lineHeight: 1.55 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#f4f3f8" } }, W.listedTitle), /* @__PURE__ */ React.createElement("br", null), W.listedNote)), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "ob-btn" + (pendingSubmit ? " ob-busy" : ""),
-        style: { padding: "14px 28px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 9 },
-        onClick: () => step === 1 ? advance() : finish()
-      },
-      pendingSubmit && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
-      pendingSubmit ? W.keyBusy : step === 1 ? W.cont : W.open
-    ), step === 1 && pendingSubmit ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: OB.faint } }, W.helpBusy) : /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "ob-mut",
-        style: { fontSize: 14 },
-        onClick: () => step === 1 ? advance(obRandomName()) : finish()
-      },
-      step === 1 ? W.skip : W.later
-    ))), /* @__PURE__ */ React.createElement("div", { className: "ob-right", style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40, background: "radial-gradient(600px 400px at 60% 20%, #16132a 0%, #0a0a0e 70%)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 300, boxSizing: "border-box", background: OB.field, border: "1px solid #262630", borderRadius: 20, padding: 22, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 28px 60px rgba(0,0,0,.55)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 10, letterSpacing: ".14em", color: OB.accent } }, W.req), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement(ObFace, { url: upload, punk, seed: me.userId, size: 52, radius: 12 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: OB.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, name.trim() || W.fallName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, intro.trim() || W.fallIntro))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint, background: OB.elev, borderRadius: 8, padding: "9px 11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hasKey ? me.carrier : W.addrSoon), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.accent, color: OB.bg, fontSize: 13, fontWeight: 600 } }, W.accept), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.sec, color: "#a8a5b6", fontSize: 13 } }, W.ignore))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.faint, textAlign: "center", maxWidth: 300, lineHeight: 1.55 } }, step === 1 ? W.cap1 : W.cap2)));
-  }
-  var OB_LOCK_T = {
-    en: {
-      title: "Beagle is open in another tab.",
-      body: "One identity can only run in one place at a time \u2014 two would fight over the same connection. Close the other tab, or take over here.",
-      cta: "Use here instead",
-      busy: "taking over\u2026",
-      failed: "The other tab did not hand over. Close it and try again."
-    },
-    zh: {
-      title: "Beagle \u5DF2\u7ECF\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u6253\u5F00\u4E86\u3002",
-      body: "\u540C\u4E00\u4E2A\u8EAB\u4EFD\u4E00\u6B21\u53EA\u80FD\u5728\u4E00\u4E2A\u5730\u65B9\u8FD0\u884C\uFF0C\u4E24\u4E2A\u4F1A\u62A2\u540C\u4E00\u6761\u8FDE\u63A5\u3002\u53EF\u4EE5\u5173\u6389\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\uFF0C\u6216\u8005\u628A\u5B83\u63A5\u7BA1\u5230\u8FD9\u91CC\u3002",
-      cta: "\u5C31\u7528\u8FD9\u4E2A\u6807\u7B7E\u9875",
-      busy: "\u6B63\u5728\u63A5\u7BA1\u2026",
-      failed: "\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u6CA1\u6709\u4EA4\u51FA\u63A7\u5236\u6743\u3002\u8BF7\u5148\u5173\u6389\u5B83\u518D\u8BD5\u3002"
-    }
-  };
-  function DkLockedOut({ lang, onTakeover }) {
-    const W = OB_LOCK_T[lang === "zh" ? "zh" : "en"];
-    const [busy, setBusy] = React.useState(false);
-    const [failed, setFailed] = React.useState(false);
-    React.useEffect(() => {
-      obInstallCss();
-    }, []);
-    const take = async () => {
-      setBusy(true);
-      setFailed(false);
-      try {
-        const st = await onTakeover();
-        if (!st || !st.held)
-          setFailed(true);
-      } catch (e) {
-        setFailed(true);
-      } finally {
-        setBusy(false);
-      }
-    };
-    return /* @__PURE__ */ React.createElement("div", { className: "ob-root", style: {
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 40,
-      background: `radial-gradient(600px 400px at 50% 20%, #16132a 0%, ${OB.bg} 70%)`
-    } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 460, display: "flex", flexDirection: "column", gap: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 30, lineHeight: 1.15, letterSpacing: "-0.02em", fontWeight: 600, color: OB.text, margin: 0 } }, W.title), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 15, lineHeight: 1.6, color: OB.muted, margin: 0 } }, W.body), failed && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ff8a5c" } }, W.failed), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        className: "ob-btn" + (busy ? " ob-busy" : ""),
-        style: { padding: "14px 28px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 9 },
-        onClick: busy ? void 0 : take
-      },
-      busy && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
-      busy ? W.busy : W.cta
-    ))));
-  }
-  function dkBrowser() {
-    const ua = navigator.userAgent || "";
-    if (/Edg\//.test(ua))
-      return "chrome";
-    if (/Firefox\//.test(ua))
-      return "firefox";
-    if (/OPR\//.test(ua))
-      return "opera";
-    if (/Chrome\//.test(ua))
-      return "chrome";
-    if (/Safari\//.test(ua))
-      return "safari";
-    return "other";
-  }
-  var DK_BROWSER_T = {
-    en: {
-      edge: "Edge is less tested than Chrome and Firefox. If messages stay queued or friend requests do not arrive, reload once first \u2014 an old cached build is the usual cause \u2014 then try Chrome or Firefox.",
-      safari: "Safari support is incomplete. If the app misbehaves, Chrome or Firefox works.",
-      other: "This browser is untested. Beagle Web is developed against Chrome and Firefox.",
-      dismiss: "dismiss"
-    },
-    zh: {
-      edge: "Edge \u7684\u6D4B\u8BD5\u4E0D\u5982 Chrome \u548C Firefox \u5145\u5206\u3002\u5982\u679C\u6D88\u606F\u4E00\u76F4\u6392\u961F\u6216\u6536\u4E0D\u5230\u597D\u53CB\u8BF7\u6C42\uFF0C\u5148\u5237\u65B0\u4E00\u6B21 \u2014\u2014 \u901A\u5E38\u662F\u7F13\u5B58\u4E86\u65E7\u7248\u672C \u2014\u2014 \u518D\u4E0D\u884C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
-      safari: "Safari \u7684\u652F\u6301\u8FD8\u4E0D\u5B8C\u6574\u3002\u5982\u679C\u51FA\u73B0\u5F02\u5E38\uFF0C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
-      other: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u6D4B\u8BD5\u8FC7\u3002Beagle \u7F51\u9875\u7248\u662F\u9488\u5BF9 Chrome \u548C Firefox \u5F00\u53D1\u7684\u3002",
-      dismiss: "\u77E5\u9053\u4E86"
-    }
-  };
-  function DkBrowserNotice({ lang }) {
-    const kind = React.useMemo(dkBrowser, []);
-    const W = DK_BROWSER_T[lang === "zh" ? "zh" : "en"];
-    const key = "dk-browser-notice-" + kind;
-    const [hidden, setHidden] = React.useState(() => {
-      try {
-        return localStorage.getItem(key) === "1";
-      } catch (e) {
-        return false;
-      }
-    });
-    React.useEffect(() => {
-      obInstallCss();
-    }, []);
-    if (kind === "chrome" || kind === "firefox" || hidden)
-      return null;
-    const msg = W[kind] || W.other;
-    return /* @__PURE__ */ React.createElement("div", { style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      padding: "9px 16px",
-      background: "var(--chip)",
-      borderBottom: "1px solid var(--line)",
-      flexShrink: 0
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 15, stroke: 2, color: "var(--faint)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 } }, msg), /* @__PURE__ */ React.createElement(
-      "button",
-      {
-        onClick: () => {
-          try {
-            localStorage.setItem(key, "1");
-          } catch (e) {
-          }
-          setHidden(true);
-        },
-        style: { background: "none", border: "none", cursor: "pointer", padding: "2px 6px", fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" }
-      },
-      W.dismiss
-    ));
-  }
-
-  // src/ui/ui-host.jsx
-  var dkBlobUrls = /* @__PURE__ */ new Map();
-  var DK_BLOB_MAX = 64 * 1024 * 1024;
-  function fileUrl(name) {
-    return dkBlobUrls.get(name) || "/api/file-download?name=" + encodeURIComponent(name);
-  }
-  function fileDownloadUrl(name) {
-    return dkBlobUrls.get(name) || fileUrl(name) + "&dl=1";
-  }
-  async function ensureBlob(name, size) {
-    if (!name || dkBlobUrls.has(name))
-      return;
-    if (size && size > DK_BLOB_MAX)
-      return;
-    try {
-      const r = await fetch("/api/file-download?name=" + encodeURIComponent(name));
-      if (!r.ok)
-        return;
-      const b = await r.blob();
-      if (b.size && !dkBlobUrls.has(name))
-        dkBlobUrls.set(name, URL.createObjectURL(b));
-    } catch (e) {
-    }
-  }
-  async function prefetchThreadFiles(messages) {
-    await Promise.all((messages || []).filter((m) => m.file && m.file.name && m.file.status !== "sending" && m.file.status !== "queued").map((m) => ensureBlob(m.file.name, m.file.size)));
-  }
-  var hostNeedsWelcome = true;
-  var hostPrefersRtcFile = true;
-  var hostHasKeyBackup = true;
-
-  // src/ui/data-ipc.jsx
-  function dkHash(s) {
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
-  function dkRng(a) {
-    return function() {
-      a |= 0;
-      a = a + 1831565813 | 0;
-      let t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
-  function dkIdenticon(seed) {
-    const rnd = dkRng(dkHash(seed || "x"));
-    const hue = Math.floor(rnd() * 360);
-    const grid = [];
-    for (let y = 0; y < 5; y++) {
-      const row = [];
-      for (let x = 0; x < 3; x++)
-        row.push(rnd() > 0.5);
-      grid.push([row[0], row[1], row[2], row[1], row[0]]);
-    }
-    return { cells: grid, hue };
-  }
-  function dkClock(ts) {
-    if (!ts)
-      return "";
-    const d = new Date(ts);
-    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-  }
-  function dkFileSize(n) {
-    if (!n || n < 0)
-      return "0 B";
-    if (n < 1024)
-      return n + " B";
-    if (n < 1024 * 1024)
-      return (n / 1024).toFixed(1) + " KB";
-    if (n < 1024 * 1024 * 1024)
-      return (n / (1024 * 1024)).toFixed(1) + " MB";
-    return (n / (1024 * 1024 * 1024)).toFixed(2) + " GB";
-  }
-  function dkSpeed(kbps) {
-    if (kbps == null || !(kbps >= 0))
-      return "";
-    return kbps >= 1024 ? (kbps / 1024).toFixed(2) + " MB/s" : Math.round(kbps) + " KB/s";
-  }
-  function dkPct(p) {
-    return p == null ? "\u2026" : (p >= 100 ? "100" : p.toFixed(2)) + "%";
-  }
-  var dkFileUrl = fileUrl;
-  var dkFileDownloadUrl = fileDownloadUrl;
-  function dkFileMediaKind(name) {
-    const ext = (String(name || "").split(".").pop() || "").toLowerCase();
-    if (["png", "jpg", "jpeg", "gif", "webp", "svg", "heic", "bmp"].includes(ext))
-      return "image";
-    if (["mp4", "mov", "webm", "m4v", "mkv", "avi"].includes(ext))
-      return "video";
-    if (["mp3", "m4a", "aac", "wav", "ogg", "flac", "opus"].includes(ext))
-      return "audio";
-    return "file";
-  }
-  function dkDayLabel(ts) {
-    if (!ts)
-      return "Today";
-    const d = new Date(ts), now = /* @__PURE__ */ new Date();
-    if (d.toDateString() === now.toDateString())
-      return "Today";
-    const y = new Date(now.getTime() - 864e5);
-    if (d.toDateString() === y.toDateString())
-      return "Yesterday";
-    return d.toLocaleDateString();
-  }
-  async function dkGet(path) {
-    const r = await fetch(path, { headers: { "cache-control": "no-cache" } });
-    return r.json();
-  }
-  async function dkPost(path, body) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15e3);
-    try {
-      const r = await fetch(path, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body || {}),
-        signal: ctrl.signal
-      });
-      try {
-        return await r.json();
-      } catch (e) {
-        return { ok: r.ok };
-      }
-    } catch (e) {
-      return { ok: false, error: e && e.name === "AbortError" ? "timed out" : e && e.message || "network error" };
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-  function dkCopy(text) {
-    const s = text == null ? "" : String(text);
-    if (navigator.clipboard && window.isSecureContext) {
-      return navigator.clipboard.writeText(s).then(() => true).catch(() => dkCopyLegacy(s));
-    }
-    return Promise.resolve(dkCopyLegacy(s));
-  }
-  function dkCopyLegacy(s) {
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = s;
-      ta.setAttribute("readonly", "");
-      ta.style.cssText = "position:fixed;top:-1000px;left:-1000px;opacity:0";
-      document.body.appendChild(ta);
-      ta.select();
-      ta.setSelectionRange(0, s.length);
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return ok;
-    } catch (e) {
-      return false;
-    }
-  }
-  var dkApi = {
-    send: (userid, text) => dkPost("/api/chat-send", { userid, text }),
-    retry: (id, userid, text) => dkPost("/api/chat-retry", { id, userid, text }),
-    logLocal: (userid, dir, text) => dkPost("/api/chat-log-local", { userid, dir, text }),
-    add: (address) => dkPost("/api/add", { address }),
-    accept: (userid) => dkPost("/api/accept", { userid }),
-    reject: (userid) => dkPost("/api/reject", { userid }),
-    remove: (userid) => dkPost("/api/friend-remove", { userid }),
-    alias: (userid, alias) => dkPost("/api/friend-alias", { userid, alias }),
-    markRead: (userid) => dkPost("/api/chat-mark-read", { userid }),
-    delFiles: (userid, ids) => dkPost("/api/file-delete", { userid, ids }),
-    // Reveal a received file in the OS file manager (localhost-only on the daemon side).
-    revealFile: (name) => dkPost("/api/file-reveal", { name }),
-    cancelSend: (userid, ids) => dkPost("/api/file-cancel", { userid, ids }),
-    retrySend: (userid, ids) => dkPost("/api/file-retry", { userid, ids }),
-    setProfile: (name, description) => dkPost("/api/set-profile", { name, description }),
-    // Used by the browser's welcome flow, which also picks an avatar and marks
-    // first run done. Harmless where there is no welcome flow: nothing calls it.
-    setProfileFull: (p) => dkPost("/api/set-profile", p),
-    // Mint the keypair — the browser mints one in the tab; a desktop peer reads
-    // a keyfile and never calls this.
-    createIdentity: () => dkPost("/api/create-identity", {}),
-    saveWebrtcFile: async (userid, name, blob) => {
-      try {
-        const r = await fetch(
-          "/api/webrtc-file-save?userid=" + encodeURIComponent(userid) + "&name=" + encodeURIComponent(name),
-          { method: "POST", body: blob }
-        );
-        const txt = await r.text();
-        try {
-          return JSON.parse(txt);
-        } catch {
-          return { ok: false, error: (txt || "HTTP " + r.status).slice(0, 120) };
-        }
-      } catch (e) {
-        return { ok: false, error: String(e) };
-      }
-    },
-    sendFile: async (userid, file) => {
-      try {
-        const r = await fetch(
-          "/api/file-send?userid=" + encodeURIComponent(userid) + "&name=" + encodeURIComponent(file.name),
-          { method: "POST", body: file }
-        );
-        const txt = await r.text();
-        try {
-          return JSON.parse(txt);
-        } catch {
-          if (r.status === 404)
-            return { ok: false, error: "file upload not supported \u2014 update & restart `agentnet ui`" };
-          return { ok: false, error: (txt || "HTTP " + r.status).slice(0, 120) };
-        }
-      } catch (e) {
-        return { ok: false, error: String(e) };
-      }
-    }
-  };
-  var DK_ME_FALLBACK = {
-    name: "\u2026",
-    handle: "@decentnetwork/peer",
-    userId: "",
-    carrier: "",
-    netKey: "",
-    ip: "",
-    online: false,
-    lanVer: "",
-    peerVer: "",
-    channel: "@next",
-    wire: "163"
-  };
-  function useDaemonData() {
-    const [snap, setSnap] = React.useState({
-      me: DK_ME_FALLBACK,
-      peers: [],
-      requests: [],
-      exits: [],
-      activeExit: null,
-      loaded: false,
-      locked: false
-    });
-    const [threads, setThreads] = React.useState({});
-    const refreshRef = React.useRef(null);
-    const refresh = React.useCallback(async () => {
-      var _a;
-      try {
-        const d = await dkGet("/api/desktop");
-        if (d && d.locked) {
-          setSnap((s) => ({ ...s, locked: true, loaded: true }));
-          return;
-        }
-        if (d && d.starting) {
-          setTimeout(() => {
-            refreshRef.current && refreshRef.current();
-          }, 300);
-          return;
-        }
-        setSnap({
-          locked: false,
-          me: d.me || DK_ME_FALLBACK,
-          peers: d.peers || [],
-          requests: d.requests || [],
-          exits: d.exits || [],
-          activeExit: (_a = d.activeExit) != null ? _a : null,
-          loaded: true
-        });
-      } catch (e) {
-      }
-    }, []);
-    React.useEffect(() => {
-      refreshRef.current = refresh;
-      refresh();
-      const t = setInterval(refresh, 2500);
-      return () => clearInterval(t);
-    }, [refresh]);
-    const loadThread = React.useCallback(async (peerId) => {
-      if (!peerId)
-        return;
-      try {
-        const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId));
-        const arr = d.chats && d.chats[peerId] || [];
-        await prefetchThreadFiles(arr);
-        const msgs = arr.map((m) => ({
-          id: m.id,
-          from: m.dir === "out" ? "me" : "them",
-          time: dkClock(m.ts),
-          text: m.text,
-          file: m.file ? {
-            name: m.file.name,
-            size: dkFileSize(m.file.size),
-            dir: m.dir,
-            media: dkFileMediaKind(m.file.name),
-            status: m.file.status,
-            pct: m.file.status === "sending" && m.file.size ? Math.min(100, (m.file.sent || 0) / m.file.size * 100) : void 0,
-            kbps: m.file.kbps
-          } : void 0,
-          // Pass the real state through. Collapsing everything that was not
-          // 'queued' to 'read' meant a message still in flight — or one that
-          // never went out at all — rendered as delivered.
-          status: m.dir === "out" ? m.status === "queued" || m.status === "sending" || m.status === "failed" ? m.status : "read" : void 0,
-          error: m.error,
-          // Delivery path: "online" = live session, "offline" = express relay.
-          // Incoming messages carry this; the bubble colors them differently.
-          via: m.via,
-          // Brief 30: a validated component form, already whitelisted host-side.
-          // Passed through untouched — the renderer treats every string as text,
-          // never markup.
-          components: m.components
-        }));
-        const withDay = msgs.length ? [{ day: dkDayLabel(arr[0].ts) }].concat(msgs) : [];
-        setThreads((t) => Object.assign({}, t, { [peerId]: withDay }));
-      } catch (e) {
-      }
-    }, []);
-    return Object.assign({}, snap, { threads, refresh, loadThread });
-  }
-  Object.assign(window, {
-    dkHash,
-    dkIdenticon,
-    dkClock,
-    dkDayLabel,
-    dkApi,
-    useDaemonData,
-    DK_ME_FALLBACK,
-    dkCopy
-  });
-
-  // src/ui/ui.jsx
   function DkIdenticon({ seed, size = 30, radius = 7 }) {
     const { cells, hue } = dkIdenticon(seed);
     const cell = size / 5;
@@ -3792,8 +3121,6 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "0 2px", ...style } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)" } }, label), count != null && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, color: "var(--faint)" } }, count), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 1, background: "var(--line)" } }), trailing);
   }
   Object.assign(window, { DkIdenticon, DkBot, DkAvatar, DkImgAvatar, StatusDot, Mono, shortKey, RouteTag, Tag, Unread, Btn, Section });
-
-  // src/ui/call.jsx
   function useCallController(selfId, onCallLog) {
     const [incoming, setIncoming] = React.useState(null);
     const [active, setActive] = React.useState(null);
@@ -4193,8 +3520,6 @@ ${peer.address}`
     })() : /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22 } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center", justifyContent: "center" } }, !connected && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", width: 150, height: 150, borderRadius: 999, border: "2px solid var(--accent)", animation: "dkpulse 2s ease-out infinite" } }), /* @__PURE__ */ React.createElement(DkIdenticon, { seed: call.peerId, size: 108, radius: 26 })), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 22, fontWeight: 700, color: "var(--text)" } }, name), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--faint)" } }, stateLabel)), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 18 } }, controls)));
   }
   Object.assign(window, { useCallController, CallOverlay, IncomingCallModal });
-
-  // src/ui/discover.jsx
   function DkDirAvatar({ p, size }) {
     const [broken, setBroken] = React.useState(false);
     if (p.punkId != null && !(p.avatar && !broken)) {
@@ -4345,8 +3670,6 @@ ${peer.address}`
       }
     ));
   }
-
-  // src/ui/file-webrtc.jsx
   var DK_FILE_RTC_KIND = "file";
   var DK_FILE_RTC_CHUNK = 16 * 1024;
   var DK_FILE_RTC_OPEN_TIMEOUT_MS = 2e4;
@@ -4711,8 +4034,6 @@ ${peer.address}`
     }));
   }
   Object.assign(window, { useRtcFileController, RtcFileInbox });
-
-  // src/ui/network.jsx
   function StatTile({ label, value, sub, tone }) {
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, padding: "13px 15px", borderRadius: 10, background: "var(--panel)", border: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 10.5, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)" } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 21, fontWeight: 700, letterSpacing: -0.5, marginTop: 5, color: tone || "var(--text)" } }, value), sub && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", marginTop: 2 } }, sub));
   }
@@ -4850,8 +4171,6 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1040, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement(MyNode, { T, me, activeExit, peers, reqCount }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.peerRouting, count: peers.length }), /* @__PURE__ */ React.createElement(PeerTable, { T, peers, onOpenChat })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.exitNodes, trailing: /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { icon: "plus", size: "sm" }, T.addExit)) }), activeExit && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, background: "color-mix(in oklab, var(--warn), transparent 90%)", border: "1px solid color-mix(in oklab, var(--warn), transparent 70%)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 17, color: "var(--warn)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, T.egressVia), /* @__PURE__ */ React.createElement(Mono, { size: 13, copy: activeExit }, activeExit), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "unlink", size: "sm", onClick: () => onSetExit(null) }, T.stopRouting)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, exits.map((r) => /* @__PURE__ */ React.createElement(ExitCard, { key: r.region, T, region: r, activeExit, onSetExit }))))));
   }
   Object.assign(window, { NetworkTab });
-
-  // src/ui/settings-store.jsx
   var TWEAKS_STORAGE_KEY = "decentlan.tweaks";
   function useTweaks(defaults) {
     const [values, setValues] = React.useState(() => {
@@ -4880,8 +4199,6 @@ ${peer.address}`
     return [values, setTweak];
   }
   Object.assign(window, { useTweaks });
-
-  // src/ui/app.jsx
   function dkParseDeepLinkAddress() {
     try {
       const h = window.location.hash || "";
@@ -5699,14 +5016,735 @@ ${peer.address}`
     ));
   }
   Object.assign(window, { DkUpdateModal });
-  ReactDOM.createRoot(document.getElementById("root")).render(/* @__PURE__ */ React.createElement(DkApp, null));
-  (function dkClearBootSplash() {
-    const el = document.getElementById("boot");
-    if (el)
-      el.remove();
+  function mount(el) {
+    ReactDOM.createRoot(el).render(/* @__PURE__ */ React.createElement(DkApp, null));
+    const boot = document.getElementById("boot");
+    if (boot)
+      boot.remove();
     try {
       performance.mark("beagle:mounted");
     } catch (e) {
     }
-  })();
+  }
+
+  // src/ui/onboarding.jsx
+  var OB = {
+    bg: "#0b0b0f",
+    elev: "#0e0e13",
+    field: "#121218",
+    subtle: "#15151b",
+    sec: "#1a1a22",
+    hair: "#1b1b22",
+    border: "#23232c",
+    bfield: "#2a2a35",
+    dashed: "#33333f",
+    text: "#f4f2fa",
+    text2: "#c9c6d6",
+    muted: "#8d8b9a",
+    faint: "#6f6d7d",
+    faint2: "#5d5b6a",
+    ph: "#55535f",
+    accent: "#7c5cff",
+    online: "#4ad1a5",
+    ui: "'IBM Plex Sans','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,sans-serif",
+    mono: "'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace"
+  };
+  var OB_CSS = `
+.ob-root{position:fixed;inset:0;z-index:200;display:flex;background:${OB.bg};
+  color:${OB.text};font-family:${OB.ui};overflow:hidden}
+.ob-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.ob-body::-webkit-scrollbar{width:8px}
+.ob-body::-webkit-scrollbar-thumb{background:${OB.border};border-radius:8px}
+.ob-in{width:100%;background:${OB.field};border:1px solid ${OB.bfield};border-radius:10px;
+  color:${OB.text};font-family:inherit;outline:none;box-sizing:border-box;transition:border-color .12s,background .12s}
+.ob-in::placeholder{color:${OB.ph}}
+.ob-in:focus{border-color:${OB.accent};background:#15131f}
+.ob-btn{border:none;cursor:pointer;font-family:inherit;font-weight:600;
+  background:${OB.accent};color:${OB.onAccent || "#0b0b0f"};border-radius:10px;transition:background .12s}
+.ob-btn:hover{background:#9179ff}
+.ob-btn[disabled]{opacity:.55;cursor:default}
+.ob-sec{background:${OB.sec};border:1px solid ${OB.bfield};color:${OB.text2};
+  border-radius:9px;cursor:pointer;font-family:inherit;transition:border-color .12s,color .12s}
+.ob-sec:hover{border-color:${OB.accent};color:#fff}
+.ob-mut{background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+  color:${OB.faint};transition:color .12s}
+.ob-mut:hover{color:#a8a5b6}
+.ob-link{background:none;border:none;padding:0 0 2px;cursor:pointer;font-family:inherit;
+  color:#9b83ff;border-bottom:1px solid #3a3060;transition:color .12s}
+.ob-link:hover{color:#b8a6ff}
+.ob-tile{padding:0;border:1px solid ${OB.border};border-radius:9px;cursor:pointer;
+  background:${OB.subtle};overflow:hidden;transition:outline-color .1s}
+.ob-tile:hover{border-color:${OB.accent}}
+.ob-tile[data-sel="1"]{outline:2px solid ${OB.accent};outline-offset:2px}
+.ob-shuffle{border:1px dashed ${OB.dashed};border-radius:9px;background:none;color:#7e7c8c;
+  cursor:pointer;font-family:inherit;transition:border-color .12s,color .12s}
+.ob-shuffle:hover{border-color:${OB.accent};color:#b8a6ff}
+.ob-dot{width:6px;height:6px;border-radius:999px;background:${OB.online};
+  animation:obpulse 2.4s ease-in-out infinite}
+@keyframes obpulse{0%,100%{opacity:0}50%{opacity:1}}
+.ob-busydot{width:8px;height:8px;border-radius:999px;background:${OB.muted};
+  animation:obbusy 1.1s ease-in-out infinite;flex-shrink:0}
+@keyframes obbusy{0%,100%{opacity:.25}50%{opacity:1}}
+.ob-track{width:120px;height:3px;border-radius:2px;background:${OB.border};overflow:hidden}
+.ob-fill{height:100%;background:${OB.accent};border-radius:2px;transition:width .35s linear}
+.ob-btn.ob-busy{background:${OB.sec};color:${OB.muted};cursor:default}
+.ob-btn.ob-busy:hover{background:${OB.sec}}
+@media (prefers-reduced-motion:reduce){
+  .ob-busydot,.ob-dot{animation:none;opacity:1}
+  .ob-fill{transition:none}
+}
+@media (max-width:900px){
+  .ob-root{flex-direction:column}
+  .ob-left{width:100%!important;border-right:none!important}
+  .ob-right{display:none!important}
+}`;
+  function obInstallCss() {
+    if (document.getElementById("ob-css"))
+      return;
+    const el = document.createElement("style");
+    el.id = "ob-css";
+    el.textContent = OB_CSS;
+    document.head.appendChild(el);
+  }
+  var OB_RARE = ["alien", "zombie", "ape"];
+  async function obPunks(type, limit) {
+    try {
+      const d = await (await fetch(`/api/punk-list?type=${type}&limit=${limit}`)).json();
+      return d && d.ok && d.list || [];
+    } catch (e) {
+      return [];
+    }
+  }
+  async function dkPunkBatch(round) {
+    const rare = OB_RARE[round % OB_RARE.length];
+    const maleHeavy = round % 2 === 0;
+    const [m, f, r] = await Promise.all([
+      obPunks("male", maleHeavy ? 3 : 2),
+      obPunks("female", maleHeavy ? 2 : 3),
+      obPunks(rare, 1)
+    ]);
+    const all = m.concat(f, r);
+    const k = round % (all.length || 1);
+    return all.slice(k).concat(all.slice(0, k));
+  }
+  var OB_ADJ = ["quiet", "bright", "swift", "amber", "violet", "copper", "lunar", "north", "ember", "still"];
+  var OB_NOUN = ["otter", "falcon", "cedar", "harbor", "willow", "quartz", "meridian", "sable", "juniper", "wren"];
+  function obRandomName() {
+    const p = (a) => a[Math.floor(Math.random() * a.length)];
+    const cap = (s) => s[0].toUpperCase() + s.slice(1);
+    return `${cap(p(OB_ADJ))} ${cap(p(OB_NOUN))}`;
+  }
+  var OB_T = {
+    en: {
+      step: (n) => `${n} of 2`,
+      listedTitle: "Let people on this bridge see you",
+      listedNote: "You appear in Here, so people with no friends yet can find you. Turn it off any time in Profile.",
+      h1: "Tell people who you are.",
+      b1: "Your key is generated right here in this tab, the moment you start typing \u2014 it is never sent anywhere. There is no account to create; a name is all anyone needs to recognise you.",
+      name: "YOUR NAME",
+      nameReq: "required",
+      namePh: "Wei Li",
+      intro: "ONE LINE ABOUT YOU",
+      optional: "optional",
+      introPh: "Building decentralised things in San Francisco",
+      face: "A FACE",
+      shuffle: "shuffle",
+      upload: "upload",
+      cont: "Continue",
+      skip: "Skip \u2014 use a random name",
+      h2: "Now add one person.",
+      b2: "Beagle stays quiet until you do. Send them your link, or let them scan it \u2014 it reaches them wherever they run Beagle.",
+      yourLink: "YOUR LINK",
+      copyLink: "Copy link",
+      copied: "Copied",
+      share: "Share",
+      worksOn: "Works for a friend on:",
+      tab: "a browser tab",
+      alreadyHere: "Or say hello to someone already here:",
+      add: "add",
+      requested: "requested",
+      open: "Open Beagle",
+      later: "I'll add someone later",
+      req: "FRIEND REQUEST",
+      fallName: "Your name",
+      fallIntro: "wants to connect",
+      addrSoon: "your address \xB7 created when you continue",
+      accept: "Accept",
+      ignore: "Ignore",
+      cap1: "This is what a friend sees when your request lands on their phone.",
+      cap2: "They accept once. After that you are reachable from any of your devices.",
+      needName: "A name is required \u2014 without one your request is just a key.",
+      // 2a status vocabulary
+      keyBusy: "creating your key",
+      keyReady: "key ready",
+      h1Busy: "Pick a name while we set up your key.",
+      b1Busy: "No email, no password, no server \u2014 the key is being generated in this tab and stays on this device. It will be done before you finish typing.",
+      helpBusy: "Keep typing \u2014 this finishes on its own.",
+      ephemeral: "This browser will not let Beagle save anything, so this identity lasts until you close the tab. Private browsing, or a wedged storage layer \u2014 quitting and reopening the browser usually clears it.",
+      failed: "Could not create the key here:"
+    },
+    zh: {
+      step: (n) => `\u7B2C ${n} \u6B65 / \u5171 2 \u6B65`,
+      listedTitle: "\u8BA9\u8FD9\u4E2A bridge \u4E0A\u7684\u4EBA\u770B\u5230\u4F60",
+      listedNote: "\u4F60\u4F1A\u51FA\u73B0\u5728\u300C\u5728\u573A\u300D\u91CC\uFF0C\u8FD8\u6CA1\u6709\u597D\u53CB\u7684\u4EBA\u5C31\u80FD\u627E\u5230\u4F60\u3002\u968F\u65F6\u53EF\u4EE5\u5728\u300C\u6211\u300D\u91CC\u5173\u6389\u3002",
+      h1: "\u5148\u8BA9\u522B\u4EBA\u8BA4\u51FA\u4F60\u3002",
+      b1: "\u4F60\u7684\u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210 \u2014\u2014 \u4ECE\u4F60\u5F00\u59CB\u8F93\u5165\u7684\u90A3\u4E00\u523B\u8D77\uFF0C\u800C\u4E14\u4E0D\u4F1A\u53D1\u9001\u5230\u4EFB\u4F55\u5730\u65B9\u3002\u6CA1\u6709\u8D26\u53F7\u8981\u6CE8\u518C\uFF0C\u522B\u4EBA\u53EA\u9700\u8981\u4E00\u4E2A\u540D\u5B57\u5C31\u80FD\u8BA4\u51FA\u4F60\u3002",
+      name: "\u4F60\u7684\u540D\u5B57",
+      nameReq: "\u5FC5\u586B",
+      namePh: "\u674E\u4F1F",
+      intro: "\u4E00\u53E5\u81EA\u6211\u4ECB\u7ECD",
+      optional: "\u9009\u586B",
+      introPh: "\u5728\u65E7\u91D1\u5C71\u505A\u53BB\u4E2D\u5FC3\u5316\u7684\u4E1C\u897F",
+      face: "\u5934\u50CF",
+      shuffle: "\u6362\u4E00\u6279",
+      upload: "\u4E0A\u4F20",
+      cont: "\u7EE7\u7EED",
+      skip: "\u8DF3\u8FC7\uFF0C\u968F\u673A\u53D6\u4E2A\u540D\u5B57",
+      h2: "\u73B0\u5728\u52A0\u4E00\u4E2A\u4EBA\u3002",
+      b2: "\u5728\u6B64\u4E4B\u524D Beagle \u4F1A\u4E00\u76F4\u5B89\u9759\u3002\u628A\u94FE\u63A5\u53D1\u7ED9\u5BF9\u65B9\uFF0C\u6216\u8005\u8BA9\u5BF9\u65B9\u626B\u7801 \u2014\u2014 \u4ED6\u5728\u54EA\u53F0\u8BBE\u5907\u4E0A\u7528 Beagle \u90FD\u6536\u5F97\u5230\u3002",
+      yourLink: "\u4F60\u7684\u94FE\u63A5",
+      copyLink: "\u590D\u5236\u94FE\u63A5",
+      copied: "\u5DF2\u590D\u5236",
+      share: "\u5206\u4EAB",
+      worksOn: "\u5BF9\u65B9\u53EF\u4EE5\u5728\u8FD9\u4E9B\u8BBE\u5907\u4E0A\uFF1A",
+      tab: "\u6D4F\u89C8\u5668\u6807\u7B7E\u9875",
+      alreadyHere: "\u6216\u8005\uFF0C\u5148\u8DDF\u5DF2\u7ECF\u5728\u8FD9\u91CC\u7684\u4EBA\u6253\u4E2A\u62DB\u547C\uFF1A",
+      add: "\u6DFB\u52A0",
+      requested: "\u5DF2\u53D1\u9001",
+      open: "\u6253\u5F00 Beagle",
+      later: "\u4EE5\u540E\u518D\u52A0\u8054\u7CFB\u4EBA",
+      req: "\u597D\u53CB\u8BF7\u6C42",
+      fallName: "\u4F60\u7684\u540D\u5B57",
+      fallIntro: "\u8BF7\u6C42\u6DFB\u52A0\u4F60\u4E3A\u597D\u53CB",
+      addrSoon: '\u4F60\u7684\u5730\u5740 \xB7 \u70B9\u51FB"\u7EE7\u7EED"\u540E\u751F\u6210',
+      accept: "\u63A5\u53D7",
+      ignore: "\u5FFD\u7565",
+      cap1: "\u8FD9\u5C31\u662F\u5BF9\u65B9\u5728\u624B\u673A\u4E0A\u6536\u5230\u4F60\u7684\u8BF7\u6C42\u65F6\u770B\u5230\u7684\u6837\u5B50\u3002",
+      cap2: "\u5BF9\u65B9\u53EA\u9700\u63A5\u53D7\u4E00\u6B21\uFF0C\u4E4B\u540E\u4F60\u5728\u4EFB\u4F55\u8BBE\u5907\u4E0A\u90FD\u80FD\u88AB\u627E\u5230\u3002",
+      needName: "\u540D\u5B57\u662F\u5FC5\u586B\u7684 \u2014\u2014 \u6CA1\u6709\u540D\u5B57\uFF0C\u4F60\u7684\u8BF7\u6C42\u5C31\u53EA\u662F\u4E00\u4E32\u5BC6\u94A5\u3002",
+      keyBusy: "\u6B63\u5728\u751F\u6210\u5BC6\u94A5",
+      keyReady: "\u5BC6\u94A5\u5DF2\u5C31\u7EEA",
+      h1Busy: "\u5148\u53D6\u4E2A\u540D\u5B57\uFF0C\u5BC6\u94A5\u8FD9\u8FB9\u540C\u65F6\u5728\u751F\u6210\u3002",
+      b1Busy: "\u4E0D\u7528\u90AE\u7BB1\u3001\u4E0D\u7528\u5BC6\u7801\u3001\u4E0D\u7528\u670D\u52A1\u5668 \u2014\u2014 \u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210\uFF0C\u53EA\u7559\u5728\u8FD9\u53F0\u8BBE\u5907\u4E0A\u3002\u4F60\u540D\u5B57\u8FD8\u6CA1\u6253\u5B8C\u5B83\u5C31\u597D\u4E86\u3002",
+      helpBusy: "\u7EE7\u7EED\u8F93\u5165\u5C31\u597D\uFF0C\u8FD9\u4E2A\u4F1A\u81EA\u5DF1\u5B8C\u6210\u3002",
+      ephemeral: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u4E0D\u8BA9 Beagle \u4FDD\u5B58\u4EFB\u4F55\u6570\u636E\uFF0C\u6240\u4EE5\u8FD9\u4E2A\u8EAB\u4EFD\u53EA\u5728\u672C\u6807\u7B7E\u9875\u6709\u6548\uFF0C\u5173\u6389\u5C31\u6CA1\u4E86\u3002\u901A\u5E38\u662F\u9690\u79C1\u6A21\u5F0F\uFF0C\u6216\u8005\u6D4F\u89C8\u5668\u7684\u5B58\u50A8\u5361\u4F4F\u4E86 \u2014\u2014 \u9000\u51FA\u5E76\u91CD\u5F00\u6D4F\u89C8\u5668\u4E00\u822C\u80FD\u6062\u590D\u3002",
+      failed: "\u65E0\u6CD5\u5728\u8FD9\u91CC\u751F\u6210\u5BC6\u94A5\uFF1A"
+    }
+  };
+  var OB_PLATFORMS = ["iPhone", "Android", "macOS", "Windows", "Linux"];
+  var DK_FIRST_CONTACTS = [
+    {
+      ens: "help.beagles.eth",
+      name: "Beagle Chat Help",
+      userid: "FhbohSLrj5UjdyFKCEYNeEWAPq3QD9hRg6hsso5ipag2",
+      address: "ZJxuWL9SDqdvunnCSMLUd5jyGCaBV44G6THYaQS7ZaZAz1wmt4nz"
+    },
+    {
+      ens: "air.beagles.eth",
+      name: "air-wli",
+      userid: "6dAPAT1RT4YqpHREKhyGDqroaRYr5WaaHW6PNUEb4dAM",
+      address: "DMtGmaH17YMWACJk8ByX9B8WSMX5WvWdLF7v2YmRErAC2Z5xz1X8"
+    }
+  ];
+  function ObLabel({ children, note }) {
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, letterSpacing: ".12em", color: OB.muted } }, children), note && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: note.req ? OB.accent : OB.faint2 } }, note.text));
+  }
+  function ObFace({ url, punk, seed, size, radius }) {
+    if (url)
+      return /* @__PURE__ */ React.createElement("img", { src: url, alt: "", width: size, height: size, style: { width: size, height: size, borderRadius: radius, objectFit: "cover", display: "block", background: OB.subtle } });
+    if (punk != null)
+      return /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punk, size, radius, fallbackSeed: seed || "beagle" });
+    if (seed)
+      return /* @__PURE__ */ React.createElement(DkIdenticon, { seed, size, radius });
+    return /* @__PURE__ */ React.createElement("div", { style: { width: size, height: size, borderRadius: radius, background: OB.subtle, border: `1px solid ${OB.bfield}`, display: "flex", alignItems: "center", justifyContent: "center", color: OB.faint2 } }, /* @__PURE__ */ React.createElement(Icon, { name: "userRound", size: Math.round(size * 0.44), stroke: 1.6 }));
+  }
+  function ObQr({ value, px = 132 }) {
+    const qr = React.useMemo(() => {
+      if (typeof qrcode === "undefined" || !value)
+        return null;
+      try {
+        const q = qrcode(0, "M");
+        q.addData(value);
+        q.make();
+        return q;
+      } catch (e) {
+        return null;
+      }
+    }, [value]);
+    const count = qr ? qr.getModuleCount() : 0;
+    const quiet = 2;
+    const total = count + quiet * 2;
+    return /* @__PURE__ */ React.createElement("div", { style: { width: px, height: px, background: "#f4f2fa", borderRadius: 10, padding: 10, boxSizing: "border-box", flexShrink: 0 } }, qr ? /* @__PURE__ */ React.createElement("svg", { width: "100%", height: "100%", viewBox: `0 0 ${total} ${total}`, shapeRendering: "crispEdges", style: { display: "block" } }, /* @__PURE__ */ React.createElement("rect", { width: total, height: total, fill: "#f4f2fa" }), Array.from({ length: count }).map((_, r) => Array.from({ length: count }).map(
+      (__, c) => qr.isDark(r, c) ? /* @__PURE__ */ React.createElement("rect", { key: `${r}-${c}`, x: c + quiet, y: r + quiet, width: 1.04, height: 1.04, fill: "#0b0b0f" }) : null
+    ))) : null);
+  }
+  function DkWelcome2({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity }) {
+    var _a;
+    const W = OB_T[lang === "zh" ? "zh" : "en"];
+    const [step, setStep] = React.useState(1);
+    const [name, setName] = React.useState(me.name || "");
+    const [listed, setListed] = React.useState(me.listed !== false);
+    const [intro, setIntro] = React.useState(me.description || "");
+    const [punk, setPunk] = React.useState((_a = me.punkId) != null ? _a : null);
+    const [upload, setUpload] = React.useState(me.avatarDataUrl || null);
+    const [round, setRound] = React.useState(0);
+    const [tiles, setTiles] = React.useState([]);
+    const [warn, setWarn] = React.useState(false);
+    const [keyProgress, setKeyProgress] = React.useState(me.hasIdentity ? 100 : 0);
+    const [keyBusy, setKeyBusy] = React.useState(false);
+    const [keyError, setKeyError] = React.useState(null);
+    const [pendingSubmit, setPendingSubmit] = React.useState(false);
+    const mintRef = React.useRef(null);
+    const [copied, setCopied] = React.useState(false);
+    const [sent, setSent] = React.useState({});
+    const nameRef = React.useRef(null);
+    const fileRef = React.useRef(null);
+    const hasKey = !!me.hasIdentity && !!me.carrier;
+    React.useEffect(() => {
+      obInstallCss();
+      try {
+        performance.mark("beagle:welcome");
+      } catch (e) {
+      }
+    }, []);
+    const startKey = React.useCallback(() => {
+      if (mintRef.current || me.hasIdentity || !onCreateIdentity)
+        return;
+      setKeyBusy(true);
+      setKeyError(null);
+      let p = 0;
+      const tick = setInterval(() => {
+        p = Math.min(90, p + (90 - p) * 0.18 + 3);
+        setKeyProgress(Math.round(p));
+      }, 120);
+      mintRef.current = Promise.resolve(onCreateIdentity()).then((r) => {
+        if (r && r.ok === false)
+          throw new Error(r.error || "key creation failed");
+        setKeyProgress(100);
+      }).catch((err) => {
+        setKeyError(String((err == null ? void 0 : err.message) || err));
+        mintRef.current = null;
+        setKeyProgress(0);
+        throw err;
+      }).finally(() => {
+        clearInterval(tick);
+        setKeyBusy(false);
+      });
+      mintRef.current.catch(() => {
+      });
+      return mintRef.current;
+    }, [me.hasIdentity, onCreateIdentity]);
+    const keyReady = keyProgress >= 100 || !!me.hasIdentity;
+    const [statusVisible, setStatusVisible] = React.useState(false);
+    React.useEffect(() => {
+      if (keyBusy) {
+        setStatusVisible(true);
+        return;
+      }
+      if (!keyReady || !statusVisible)
+        return;
+      const t = setTimeout(() => setStatusVisible(false), 2500);
+      return () => clearTimeout(t);
+    }, [keyBusy, keyReady, statusVisible]);
+    React.useEffect(() => {
+      let dead = false;
+      dkPunkBatch(round).then((b) => {
+        if (!dead)
+          setTiles(b);
+      });
+      return () => {
+        dead = true;
+      };
+    }, [round]);
+    React.useEffect(() => {
+      if (step === 1 && nameRef.current)
+        nameRef.current.focus();
+    }, [step]);
+    const link = hasKey ? `${location.origin}${location.pathname}#/chat?address=${me.carrier}` : "";
+    const commit = (extra) => onSave({ name: name.trim(), description: intro.trim(), punkId: punk, avatarDataUrl: upload, listed, ...extra });
+    const advance = async (nm) => {
+      const final = (nm || name).trim();
+      if (!final) {
+        setWarn(true);
+        if (nameRef.current)
+          nameRef.current.focus();
+        return;
+      }
+      if (nm)
+        setName(nm);
+      if (!hasKey) {
+        setPendingSubmit(true);
+        try {
+          await (mintRef.current || startKey());
+        } catch (err) {
+          setPendingSubmit(false);
+          return;
+        }
+        setPendingSubmit(false);
+      }
+      await onSave({ name: final, description: intro.trim(), punkId: punk, avatarDataUrl: upload, listed });
+      setStep(2);
+    };
+    const finish = () => {
+      commit({ onboarded: true });
+      onClose();
+    };
+    const copyLink = () => {
+      try {
+        navigator.clipboard.writeText(link);
+      } catch (e) {
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2e3);
+    };
+    const share = () => {
+      if (navigator.share)
+        navigator.share({ title: "Beagle", text: name || "Beagle", url: link }).catch(() => {
+        });
+      else
+        copyLink();
+    };
+    const onUpload = (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!f)
+        return;
+      const img = new Image();
+      const url = URL.createObjectURL(f);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        try {
+          const S = 256;
+          const c = document.createElement("canvas");
+          c.width = S;
+          c.height = S;
+          const ctx = c.getContext("2d");
+          const side = Math.min(img.width, img.height);
+          ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+          let d = null;
+          for (const q of [0.9, 0.75, 0.55, 0.4]) {
+            d = c.toDataURL("image/webp", q);
+            if (!d.startsWith("data:image/webp"))
+              d = c.toDataURL("image/jpeg", q);
+            if (d.length < 13e4)
+              break;
+          }
+          setUpload(d);
+          setPunk(null);
+        } catch (err) {
+        }
+      };
+      img.onerror = () => URL.revokeObjectURL(url);
+      img.src = url;
+    };
+    const input = { padding: "14px 16px", fontSize: 18 };
+    const inputSm = { padding: "13px 16px", fontSize: 15 };
+    const body = { fontSize: 15, lineHeight: 1.6, color: OB.muted, margin: 0 };
+    const h = { fontSize: 36, lineHeight: 1.14, letterSpacing: "-0.02em", fontWeight: 600, color: OB.text, margin: 0 };
+    const langToggle = /* @__PURE__ */ React.createElement("div", { role: "radiogroup", style: { display: "flex", gap: 2, background: OB.field, border: `1px solid ${OB.border}`, borderRadius: 8, padding: 3 } }, [["en", "EN"], ["zh", "\u4E2D\u6587"]].map(([v, txt]) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: v,
+        role: "radio",
+        "aria-checked": lang === v,
+        onClick: () => onLang && onLang(v),
+        style: {
+          border: "none",
+          cursor: "pointer",
+          borderRadius: 6,
+          padding: "4px 9px",
+          fontSize: 11,
+          fontFamily: v === "en" ? OB.mono : OB.ui,
+          background: lang === v ? OB.accent : "transparent",
+          color: lang === v ? OB.bg : "#8d8b9a"
+        }
+      },
+      txt
+    )));
+    return /* @__PURE__ */ React.createElement("div", { className: "ob-root" }, /* @__PURE__ */ React.createElement("div", { className: "ob-left", style: { width: 560, flexShrink: 0, boxSizing: "border-box", padding: "44px 44px 32px", borderRight: `1px solid ${OB.hair}`, display: "flex", flexDirection: "column", gap: 28, minHeight: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), step === 1 && statusVisible && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, /* @__PURE__ */ React.createElement("div", { className: "ob-track" }, /* @__PURE__ */ React.createElement("div", { className: "ob-fill", style: { width: `${keyProgress}%` } })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: keyReady ? OB.online : OB.faint, whiteSpace: "nowrap", transition: "opacity .4s ease" } }, keyReady ? W.keyReady : `${W.keyBusy} \xB7 ${keyProgress}%`)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4 } }, [1, 2].map((n) => /* @__PURE__ */ React.createElement("span", { key: n, style: { width: 38, height: 3, borderRadius: 2, background: step >= n ? OB.accent : "#26262f" } }))), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint, whiteSpace: "nowrap" } }, W.step(step)), langToggle), step === 1 ? /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, keyBusy && !keyReady ? W.h1Busy : W.h1), /* @__PURE__ */ React.createElement("p", { style: body }, keyBusy && !keyReady ? W.b1Busy : W.b1), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.nameReq, req: true } }, W.name), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        ref: nameRef,
+        className: "ob-in",
+        style: input,
+        value: name,
+        placeholder: W.namePh,
+        maxLength: 32,
+        onChange: (e) => {
+          setName(e.target.value);
+          setWarn(false);
+          startKey();
+        },
+        onKeyDown: (e) => {
+          if (e.key === "Enter")
+            advance();
+        }
+      }
+    ), warn && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: OB.accent } }, W.needName), keyError && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: "#ff8a5c" } }, W.failed, " ", keyError), me.ephemeral && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: "#ffd35c" } }, W.ephemeral)), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.intro), /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        className: "ob-in",
+        style: inputSm,
+        value: intro,
+        placeholder: W.introPh,
+        maxLength: 80,
+        onChange: (e) => setIntro(e.target.value),
+        onKeyDown: (e) => {
+          if (e.key === "Enter")
+            advance();
+        }
+      }
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.face), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, flexWrap: "wrap" } }, tiles.map((p) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: p.id,
+        className: "ob-tile",
+        "data-sel": !upload && punk === p.id ? "1" : "0",
+        title: `#${p.id} \xB7 ${p.type}`,
+        "aria-label": `punk ${p.id}, ${p.type}`,
+        onClick: () => {
+          setPunk(p.id);
+          setUpload(null);
+        },
+        style: { width: 40, height: 40 }
+      },
+      /* @__PURE__ */ React.createElement("img", { src: p.image, alt: "", style: { width: "100%", height: "100%", display: "block", imageRendering: "pixelated" } })
+    )), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ob-shuffle",
+        title: W.shuffle,
+        "aria-label": W.shuffle,
+        onClick: () => setRound((r) => r + 1),
+        style: { width: 40, height: 40, fontSize: 15 }
+      },
+      "\u21BB"
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ob-shuffle",
+        title: W.upload,
+        "aria-label": W.upload,
+        onClick: () => fileRef.current && fileRef.current.click(),
+        style: { width: 40, height: 40, display: "inline-flex", alignItems: "center", justifyContent: "center" }
+      },
+      /* @__PURE__ */ React.createElement(Icon, { name: "image", size: 16, stroke: 1.8 })
+    ), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUpload, style: { display: "none" } })))) : /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 24 } }, /* @__PURE__ */ React.createElement("h1", { style: h }, W.h2), /* @__PURE__ */ React.createElement("p", { style: body }, W.b2), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 18, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement(ObQr, { value: link }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement(ObLabel, null, W.yourLink), /* @__PURE__ */ React.createElement("div", { className: "ob-in", style: { padding: "11px 13px", fontFamily: OB.mono, fontSize: 13, color: OB.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, link), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, marginTop: 9 } }, /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: copyLink }, copied ? W.copied : W.copyLink), /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: share }, W.share)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.worksOn), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 7, flexWrap: "wrap" } }, OB_PLATFORMS.concat([W.tab]).map((p) => /* @__PURE__ */ React.createElement("span", { key: p, style: { fontFamily: OB.mono, fontSize: 12, color: "#a8a5b6", background: OB.subtle, border: `1px solid ${OB.border}`, padding: "6px 11px", borderRadius: 6 } }, p)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.alreadyHere), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, DK_FIRST_CONTACTS.map((c) => /* @__PURE__ */ React.createElement("div", { key: c.ens, style: { display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 9, border: `1px solid ${OB.border}`, background: OB.field } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: c.userid, size: 30, radius: 8, fallbackSeed: c.userid }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: OB.text } }, c.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 10.5, color: OB.faint } }, c.ens)), sent[c.ens] ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.online } }, W.requested) : /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ob-sec",
+        style: { padding: "6px 12px", fontSize: 12 },
+        onClick: () => {
+          setSent((s) => Object.assign({}, s, { [c.ens]: true }));
+          if (onAdd)
+            onAdd(c.address);
+        }
+      },
+      W.add
+    )))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 18, flexShrink: 0 } }, step === 2 && /* @__PURE__ */ React.createElement("label", { style: {
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 10,
+      cursor: "pointer",
+      width: "100%",
+      maxWidth: 420,
+      marginBottom: 4
+    } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: listed,
+        onChange: (e) => setListed(e.target.checked),
+        style: { marginTop: 2, width: 16, height: 16, accentColor: OB.accent, cursor: "pointer", flexShrink: 0 }
+      }
+    ), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: OB.faint, lineHeight: 1.55 } }, /* @__PURE__ */ React.createElement("span", { style: { color: "#f4f3f8" } }, W.listedTitle), /* @__PURE__ */ React.createElement("br", null), W.listedNote)), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ob-btn" + (pendingSubmit ? " ob-busy" : ""),
+        style: { padding: "14px 28px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 9 },
+        onClick: () => step === 1 ? advance() : finish()
+      },
+      pendingSubmit && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
+      pendingSubmit ? W.keyBusy : step === 1 ? W.cont : W.open
+    ), step === 1 && pendingSubmit ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: OB.faint } }, W.helpBusy) : /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ob-mut",
+        style: { fontSize: 14 },
+        onClick: () => step === 1 ? advance(obRandomName()) : finish()
+      },
+      step === 1 ? W.skip : W.later
+    ))), /* @__PURE__ */ React.createElement("div", { className: "ob-right", style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40, background: "radial-gradient(600px 400px at 60% 20%, #16132a 0%, #0a0a0e 70%)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 300, boxSizing: "border-box", background: OB.field, border: "1px solid #262630", borderRadius: 20, padding: 22, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 28px 60px rgba(0,0,0,.55)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 10, letterSpacing: ".14em", color: OB.accent } }, W.req), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement(ObFace, { url: upload, punk, seed: me.userId, size: 52, radius: 12 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: OB.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, name.trim() || W.fallName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, intro.trim() || W.fallIntro))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint, background: OB.elev, borderRadius: 8, padding: "9px 11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hasKey ? me.carrier : W.addrSoon), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.accent, color: OB.bg, fontSize: 13, fontWeight: 600 } }, W.accept), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.sec, color: "#a8a5b6", fontSize: 13 } }, W.ignore))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.faint, textAlign: "center", maxWidth: 300, lineHeight: 1.55 } }, step === 1 ? W.cap1 : W.cap2)));
+  }
+  var OB_LOCK_T = {
+    en: {
+      title: "Beagle is open in another tab.",
+      body: "One identity can only run in one place at a time \u2014 two would fight over the same connection. Close the other tab, or take over here.",
+      cta: "Use here instead",
+      busy: "taking over\u2026",
+      failed: "The other tab did not hand over. Close it and try again."
+    },
+    zh: {
+      title: "Beagle \u5DF2\u7ECF\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u6253\u5F00\u4E86\u3002",
+      body: "\u540C\u4E00\u4E2A\u8EAB\u4EFD\u4E00\u6B21\u53EA\u80FD\u5728\u4E00\u4E2A\u5730\u65B9\u8FD0\u884C\uFF0C\u4E24\u4E2A\u4F1A\u62A2\u540C\u4E00\u6761\u8FDE\u63A5\u3002\u53EF\u4EE5\u5173\u6389\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\uFF0C\u6216\u8005\u628A\u5B83\u63A5\u7BA1\u5230\u8FD9\u91CC\u3002",
+      cta: "\u5C31\u7528\u8FD9\u4E2A\u6807\u7B7E\u9875",
+      busy: "\u6B63\u5728\u63A5\u7BA1\u2026",
+      failed: "\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u6CA1\u6709\u4EA4\u51FA\u63A7\u5236\u6743\u3002\u8BF7\u5148\u5173\u6389\u5B83\u518D\u8BD5\u3002"
+    }
+  };
+  function DkLockedOut2({ lang, onTakeover }) {
+    const W = OB_LOCK_T[lang === "zh" ? "zh" : "en"];
+    const [busy, setBusy] = React.useState(false);
+    const [failed, setFailed] = React.useState(false);
+    React.useEffect(() => {
+      obInstallCss();
+    }, []);
+    const take = async () => {
+      setBusy(true);
+      setFailed(false);
+      try {
+        const st = await onTakeover();
+        if (!st || !st.held)
+          setFailed(true);
+      } catch (e) {
+        setFailed(true);
+      } finally {
+        setBusy(false);
+      }
+    };
+    return /* @__PURE__ */ React.createElement("div", { className: "ob-root", style: {
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 40,
+      background: `radial-gradient(600px 400px at 50% 20%, #16132a 0%, ${OB.bg} 70%)`
+    } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 460, display: "flex", flexDirection: "column", gap: 20 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { width: 18, height: 18, borderRadius: 5, background: OB.accent, display: "block" } }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 13, color: "#a8a5b6" } }, "beagle")), /* @__PURE__ */ React.createElement("h1", { style: { fontSize: 30, lineHeight: 1.15, letterSpacing: "-0.02em", fontWeight: 600, color: OB.text, margin: 0 } }, W.title), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 15, lineHeight: 1.6, color: OB.muted, margin: 0 } }, W.body), failed && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: "#ff8a5c" } }, W.failed), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        className: "ob-btn" + (busy ? " ob-busy" : ""),
+        style: { padding: "14px 28px", fontSize: 16, display: "inline-flex", alignItems: "center", gap: 9 },
+        onClick: busy ? void 0 : take
+      },
+      busy && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
+      busy ? W.busy : W.cta
+    ))));
+  }
+  function dkBrowser() {
+    const ua = navigator.userAgent || "";
+    if (/Edg\//.test(ua))
+      return "chrome";
+    if (/Firefox\//.test(ua))
+      return "firefox";
+    if (/OPR\//.test(ua))
+      return "opera";
+    if (/Chrome\//.test(ua))
+      return "chrome";
+    if (/Safari\//.test(ua))
+      return "safari";
+    return "other";
+  }
+  var DK_BROWSER_T = {
+    en: {
+      edge: "Edge is less tested than Chrome and Firefox. If messages stay queued or friend requests do not arrive, reload once first \u2014 an old cached build is the usual cause \u2014 then try Chrome or Firefox.",
+      safari: "Safari support is incomplete. If the app misbehaves, Chrome or Firefox works.",
+      other: "This browser is untested. Beagle Web is developed against Chrome and Firefox.",
+      dismiss: "dismiss"
+    },
+    zh: {
+      edge: "Edge \u7684\u6D4B\u8BD5\u4E0D\u5982 Chrome \u548C Firefox \u5145\u5206\u3002\u5982\u679C\u6D88\u606F\u4E00\u76F4\u6392\u961F\u6216\u6536\u4E0D\u5230\u597D\u53CB\u8BF7\u6C42\uFF0C\u5148\u5237\u65B0\u4E00\u6B21 \u2014\u2014 \u901A\u5E38\u662F\u7F13\u5B58\u4E86\u65E7\u7248\u672C \u2014\u2014 \u518D\u4E0D\u884C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
+      safari: "Safari \u7684\u652F\u6301\u8FD8\u4E0D\u5B8C\u6574\u3002\u5982\u679C\u51FA\u73B0\u5F02\u5E38\uFF0C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
+      other: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u6D4B\u8BD5\u8FC7\u3002Beagle \u7F51\u9875\u7248\u662F\u9488\u5BF9 Chrome \u548C Firefox \u5F00\u53D1\u7684\u3002",
+      dismiss: "\u77E5\u9053\u4E86"
+    }
+  };
+  function DkBrowserNotice2({ lang }) {
+    const kind = React.useMemo(dkBrowser, []);
+    const W = DK_BROWSER_T[lang === "zh" ? "zh" : "en"];
+    const key = "dk-browser-notice-" + kind;
+    const [hidden, setHidden] = React.useState(() => {
+      try {
+        return localStorage.getItem(key) === "1";
+      } catch (e) {
+        return false;
+      }
+    });
+    React.useEffect(() => {
+      obInstallCss();
+    }, []);
+    if (kind === "chrome" || kind === "firefox" || hidden)
+      return null;
+    const msg = W[kind] || W.other;
+    return /* @__PURE__ */ React.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "9px 16px",
+      background: "var(--chip)",
+      borderBottom: "1px solid var(--line)",
+      flexShrink: 0
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 15, stroke: 2, color: "var(--faint)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 } }, msg), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => {
+          try {
+            localStorage.setItem(key, "1");
+          } catch (e) {
+          }
+          setHidden(true);
+        },
+        style: { background: "none", border: "none", cursor: "pointer", padding: "2px 6px", fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" }
+      },
+      W.dismiss
+    ));
+  }
+
+  // src/ui/ui-host.jsx
+  var dkBlobUrls = /* @__PURE__ */ new Map();
+  var DK_BLOB_MAX = 64 * 1024 * 1024;
+  function fileUrl2(name) {
+    return dkBlobUrls.get(name) || "/api/file-download?name=" + encodeURIComponent(name);
+  }
+  function fileDownloadUrl2(name) {
+    return dkBlobUrls.get(name) || fileUrl2(name) + "&dl=1";
+  }
+  async function ensureBlob(name, size) {
+    if (!name || dkBlobUrls.has(name))
+      return;
+    if (size && size > DK_BLOB_MAX)
+      return;
+    try {
+      const r = await fetch("/api/file-download?name=" + encodeURIComponent(name));
+      if (!r.ok)
+        return;
+      const b = await r.blob();
+      if (b.size && !dkBlobUrls.has(name))
+        dkBlobUrls.set(name, URL.createObjectURL(b));
+    } catch (e) {
+    }
+  }
+  async function prefetchThreadFiles2(messages) {
+    await Promise.all((messages || []).filter((m) => m.file && m.file.name && m.file.status !== "sending" && m.file.status !== "queued").map((m) => ensureBlob(m.file.name, m.file.size)));
+  }
+  var host = {
+    fileUrl: fileUrl2,
+    fileDownloadUrl: fileDownloadUrl2,
+    prefetchThreadFiles: prefetchThreadFiles2,
+    // A tab mints its key on first paint and a stranger can reload the page, so
+    // there is a first-run flow; several tabs can fight over one identity, so
+    // there is a takeover screen; and a browser is not where this app is at its
+    // best, so it says so once.
+    DkWelcome: DkWelcome2,
+    DkLockedOut: DkLockedOut2,
+    DkBrowserNotice: DkBrowserNotice2,
+    hostNeedsWelcome: true,
+    // No UDP here: Carrier filetransfer crawls over the TCP relay for anything
+    // but tiny files, so a DataChannel is the real path to another browser.
+    hostPrefersRtcFile: true,
+    // The key lives in IndexedDB and nothing can reissue it — clearing site data
+    // destroys the account, so the UI has to offer an export.
+    hostHasKeyBackup: true
+  };
+
+  // src/ui/entry.jsx
+  setUiHost(host);
+  mount(document.getElementById("root"));
 })();
