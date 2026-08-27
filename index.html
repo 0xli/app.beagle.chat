@@ -133,10 +133,10 @@
 <!-- chat form schema (bundled IIFE) — exposes window.ChatComponents. The only
      place the format is interpreted; the backend just carries the message. -->
 <script src="vendor/chat-components.js"></script>
-<!-- The whole desktop app, esbuild-transpiled from src/ui/desktop/*.jsx. -->
+<!-- The UI: @decentnetwork/beagle-ui plus this platform's host (src/ui/). -->
 <!-- backend C: identity, storage, tab lock, /api interception. Must precede app.js. -->
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="beagle-web.js?v=0fa377a9e5"></script>
+<script src="beagle-web.js?v=ac39400fbe"></script>
 <script src="app.js?v=0cd32055c7"></script>
 </body>
 </html>
