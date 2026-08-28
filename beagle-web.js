@@ -18458,6 +18458,7 @@ ${nonce}`);
   var IDENTITY_KEY = "identity";
   var PROFILE_KEY2 = "profile";
   var ACTION_CHANNEL = "beagle-web-actions";
+  var ACTION_BOOT_WAIT_MS = 25e3;
   var resolveReady;
   var ready = new Promise((r) => {
     resolveReady = r;
@@ -18674,12 +18675,22 @@ ${nonce}`);
         if (d?.type !== "add-friend" || !d.id)
           return;
         const done = (ok, error) => bc.postMessage({ type: "add-friend-result", id: d.id, ok, error });
+        const send = () => fetch("/api/add", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ address: String(d.address || ""), hello: String(d.hello || "") })
+        }).then((x) => x.json());
         try {
-          const r = await fetch("/api/add", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ address: String(d.address || ""), hello: String(d.hello || "") })
-          }).then((x) => x.json());
+          let r = await send();
+          const deadline = Date.now() + ACTION_BOOT_WAIT_MS;
+          while (r?.booting && Date.now() < deadline) {
+            await new Promise((f) => setTimeout(f, 1e3));
+            r = await send();
+          }
+          if (r?.booting) {
+            done(false, "Beagle is still connecting \u2014 try again in a moment.");
+            return;
+          }
           done(r?.ok !== false, r?.error);
         } catch (err) {
           done(false, String(err?.message || err));

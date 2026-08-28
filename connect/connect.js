@@ -4655,7 +4655,7 @@ ${nonce2}`);
   // src/connect.js
   var PUNKS_API = "https://api.beagle.chat/punksapi";
   var ACTION_CHANNEL = "beagle-web-actions";
-  var ACTION_TIMEOUT_MS = 8e3;
+  var ACTION_TIMEOUT_MS = 3e4;
   var $ = (id) => document.getElementById(id);
   var qs = new URLSearchParams(location.search);
   var origin = qs.get("origin") || "";
