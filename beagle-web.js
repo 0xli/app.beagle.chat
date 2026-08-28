@@ -16992,6 +16992,8 @@ ${ts}`);
         async locate() {
           return { asked: false, acknowledged: false, reason };
         },
+        waitForLock() {
+        },
         release() {
         }
       };
@@ -17081,12 +17083,29 @@ ${ts}`);
       bc.postMessage({ type: "focus-request" });
       return { asked: true, acknowledged: await answered };
     }
+    function waitForLock() {
+      navigator.locks.request(LOCK, (lock) => new Promise((done) => {
+        if (!lock) {
+          done();
+          return;
+        }
+        held = true;
+        releaseLock = done;
+        onAcquired?.();
+      })).catch((err) => {
+        if (err?.name === "AbortError") {
+          release2("stolen");
+          waitForLock();
+        }
+      });
+    }
     return {
       supported: true,
       get held() {
         return held;
       },
       acquire,
+      waitForLock,
       takeover,
       locate,
       release: release2
@@ -18642,10 +18661,19 @@ ${ts}`);
       }).catch(() => {
       });
       this.lock = createTabLock({
+        onAcquired: () => {
+          if (!this.readOnly)
+            return;
+          this.readOnly = false;
+          this.routers.early = null;
+          this.lockState = { held: true, via: "queued" };
+          this.bringUp?.();
+        },
         onLost: (r) => {
           this.routers = { early: null, full: null };
           this.lockState = { held: false, reason: r || "taken by another tab" };
           this.onLockLost?.(r);
+          this.serveReadOnly?.();
         }
       });
       this.routers = { early: null, full: null };
@@ -18805,12 +18833,14 @@ ${ts}`);
     serveReadOnly() {
       if (this.routers.early || this.routers.full)
         return;
+      this.readOnly = true;
       this.routers.early = createReadOnlyRouter({
         getIdentity: () => this.identity,
         profile: this.profile,
         storageOk: () => this.storageOk !== false,
         askOwner: (what) => this.askOwner(what)
       });
+      this.lock.waitForLock?.();
     },
     /** Ask the tab that owns the identity to come forward, instead of taking it.
      *  Usually the better answer: the other tab is already connected. */
