@@ -18457,6 +18457,7 @@ ${nonce}`);
   // src/web-entry.js
   var IDENTITY_KEY = "identity";
   var PROFILE_KEY2 = "profile";
+  var ACTION_CHANNEL = "beagle-web-actions";
   var resolveReady;
   var ready = new Promise((r) => {
     resolveReady = r;
@@ -18614,6 +18615,7 @@ ${nonce}`);
         });
         if (this.keyPair)
           profileLoaded.then(() => startBackend(this.keyPair));
+        this.serveActions();
       };
       if (this.lockState.held)
         this.bringUp();
@@ -18650,6 +18652,39 @@ ${nonce}`);
      *  Usually the better answer: the other tab is already connected. */
     async locate() {
       return this.lock.locate ? this.lock.locate() : { asked: false, acknowledged: false };
+    },
+    /** Answer requests from the /connect popup.
+     *
+     *  Sign-in is read-only, so the popup does it alone. Sending a friend
+     *  request is not: it needs a live peer, and a second peer on one identity
+     *  scrambles the first one's session state. So the popup asks, and the tab
+     *  that already owns the identity does the work.
+     *
+     *  This channel carries no authority. The popup got the user's consent on a
+     *  screen naming the requesting site; anything arriving here has already
+     *  been approved by a human, and everything it can ask for is something the
+     *  same person could do with two clicks in the UI. */
+    serveActions() {
+      if (this.actions || typeof BroadcastChannel === "undefined")
+        return;
+      const bc = new BroadcastChannel(ACTION_CHANNEL);
+      this.actions = bc;
+      bc.onmessage = async (ev) => {
+        const d = ev.data;
+        if (d?.type !== "add-friend" || !d.id)
+          return;
+        const done = (ok, error) => bc.postMessage({ type: "add-friend-result", id: d.id, ok, error });
+        try {
+          const r = await fetch("/api/add", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ address: String(d.address || ""), hello: String(d.hello || "") })
+          }).then((x) => x.json());
+          done(r?.ok !== false, r?.error);
+        } catch (err) {
+          done(false, String(err?.message || err));
+        }
+      };
     },
     /**
      * Prove the browser can complete a real Tox TCP-relay handshake through the

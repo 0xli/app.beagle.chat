@@ -37,10 +37,15 @@
 <body>
   <div class="card">
     <div class="brand"><span class="d"></span>Beagle</div>
-    <h1>Sign in</h1>
-    <p class="sub"><span id="origin" class="origin">…</span> wants to sign you in with your Beagle identity.</p>
+    <h1 id="headline">Sign in</h1>
+    <p class="sub"><span id="origin" class="origin">…</span><span id="leadTail"> wants to sign you in with your Beagle identity.</span></p>
+    <div id="targetRow" class="id" hidden>
+      <div class="lbl">Friend request to</div>
+      <div id="targetName" class="who" hidden></div>
+      <div id="targetAddr" class="userid"></div>
+    </div>
     <div class="id">
-      <div class="lbl">Your identity</div>
+      <div id="idLabel" class="lbl">Your identity</div>
       <div id="who" class="who" hidden></div>
       <div id="userid" class="userid">loading…</div>
     </div>
@@ -50,10 +55,10 @@
       <button id="deny" class="btn ghost">Deny</button>
       <button id="approve" class="btn solid" disabled>Approve</button>
     </div>
-    <p class="note">Approving sends the site a signature bound to that site, proving you control this identity. Your private key never leaves this browser, and this page never touches your messages.</p>
+    <p id="note" class="note">Approving sends the site a signature bound to that site, proving you control this identity. Your private key never leaves this browser, and this page never touches your messages.</p>
   </div>
 <!-- Absolute, not relative: the URL is /connect with no trailing slash, so a
      relative src resolves against / and 404s. Nothing reports that — the page
      just sits at "loading…". -->
-<script src="/connect/connect.js?v=d2ef2f0974"></script>
+<script src="/connect/connect.js?v=b8f3738da7"></script>
 </body></html>

@@ -19,9 +19,9 @@
   var __commonJS = (cb, mod) => function __require2() {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   };
-  var __export = (target, all) => {
+  var __export = (target2, all) => {
     for (var name in all)
-      __defProp(target, name, { get: all[name], enumerable: true });
+      __defProp(target2, name, { get: all[name], enumerable: true });
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
@@ -31,12 +31,12 @@
     }
     return to;
   };
-  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  var __toESM = (mod, isNodeMode, target2) => (target2 = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
     // If the importer is in node compatibility mode or this is not an ESM
     // file that has been converted to a CommonJS file using a Babel-
     // compatible transform (i.e. "__esModule" has not been set), then set
     // "default" to the CommonJS "module.exports" for node compatibility.
-    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target2, "default", { value: mod, enumerable: true }) : target2,
     mod
   ));
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
@@ -4654,10 +4654,15 @@ ${nonce2}`);
 
   // src/connect.js
   var PUNKS_API = "https://api.beagle.chat/punksapi";
+  var ACTION_CHANNEL = "beagle-web-actions";
+  var ACTION_TIMEOUT_MS = 8e3;
   var $ = (id) => document.getElementById(id);
   var qs = new URLSearchParams(location.search);
   var origin = qs.get("origin") || "";
   var nonce = qs.get("nonce") || "";
+  var action = qs.get("action") === "add" ? "add" : "signin";
+  var target = (qs.get("address") || "").trim();
+  var targetName = (qs.get("name") || "").trim();
   function fail(msg) {
     const el = $("err");
     el.textContent = msg;
@@ -4671,18 +4676,59 @@ ${nonce2}`);
       return false;
     }
   }
+  var B58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
   var ok = validOrigin(origin);
   if (!ok)
-    fail("This sign-in request has an invalid origin and was blocked.");
+    fail("This request has an invalid origin and was blocked.");
   else if (!nonce || nonce.length > 512) {
     ok = false;
-    fail("This sign-in request is missing a valid nonce.");
+    fail("This request is missing a valid nonce.");
+  } else if (action === "add" && !(target.length >= 50 && target.length <= 60 && B58.test(target))) {
+    ok = false;
+    fail("That does not look like a Beagle address, so nothing was sent.");
   }
   $("origin").textContent = origin || "(unknown site)";
+  if (action === "add") {
+    document.title = "Add a friend on Beagle";
+    $("headline").textContent = "Add a friend";
+    $("leadTail").textContent = " wants to send a friend request from your Beagle identity.";
+    $("targetRow").hidden = false;
+    $("targetName").textContent = targetName || "(no name given)";
+    $("targetName").hidden = !targetName;
+    $("targetAddr").textContent = target;
+    $("idLabel").textContent = "Sent as";
+    $("approve").textContent = "Send request";
+    $("note").textContent = "The other person sees your name and has to accept. Nothing is shared with the site \u2014 it only asked; your Beagle sent it.";
+  }
   function reply(data) {
-    if (window.opener && ok) {
-      window.opener.postMessage({ type: "decent-auth", nonce, ...data }, origin);
-    }
+    if (!window.opener || !ok)
+      return;
+    const type = action === "add" ? "beagle-action" : "decent-auth";
+    window.opener.postMessage({ type, nonce, ...action === "add" ? { action } : {}, ...data }, origin);
+  }
+  function askAppToAdd(address, hello) {
+    return new Promise((resolve) => {
+      let bc;
+      try {
+        bc = new BroadcastChannel(ACTION_CHANNEL);
+      } catch {
+        resolve({ ok: false, error: "no-app" });
+        return;
+      }
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const done = (r) => {
+        clearTimeout(timer);
+        bc.close();
+        resolve(r);
+      };
+      const timer = setTimeout(() => done({ ok: false, error: "no-app" }), ACTION_TIMEOUT_MS);
+      bc.onmessage = (ev) => {
+        const d = ev.data;
+        if (d?.type === "add-friend-result" && d.id === id)
+          done({ ok: !!d.ok, error: d.error });
+      };
+      bc.postMessage({ type: "add-friend", id, address, hello });
+    });
   }
   async function avatarFor(profile2) {
     if (profile2?.avatarDataUrl)
@@ -4728,15 +4774,33 @@ ${nonce2}`);
   $("approve").onclick = async () => {
     const btn = $("approve");
     btn.disabled = true;
+    if (action === "add") {
+      btn.textContent = "Sending\u2026";
+      const r = await askAppToAdd(target, targetName ? `Hi \u2014 we met on ${new URL(origin).host}.` : "");
+      if (r.ok) {
+        reply({ ok: true, address: target });
+        setTimeout(() => window.close(), 60);
+        return;
+      }
+      btn.disabled = false;
+      btn.textContent = "Send request";
+      if (r.error === "no-app") {
+        fail("Beagle is not open in this browser, so nothing was sent. Open it in another tab and try again.");
+        $("open").hidden = false;
+      } else {
+        fail("Could not send the request: " + (r.error || "unknown error"));
+      }
+      return;
+    }
     btn.textContent = "Signing\u2026";
     try {
-      const { userid } = describeIdentity(identity);
+      const { userid, address } = describeIdentity(identity);
       const sig = bytesToHex(signAuth(identity, origin, nonce));
       const avatar = await Promise.race([
         avatarFor(profile),
         new Promise((r) => setTimeout(() => r(null), 2500))
       ]);
-      reply({ userid, sig, name: profile?.name || "", avatar });
+      reply({ userid, address, sig, name: profile?.name || "", avatar });
       setTimeout(() => window.close(), 60);
     } catch (err) {
       btn.disabled = false;
