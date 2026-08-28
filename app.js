@@ -1,322 +1,5 @@
 (() => {
   // node_modules/@decentnetwork/beagle-ui/dist/beagle-ui.js
-  var ICON_PATHS = {
-    // ---- tab bar (the four must feel like one set) ----
-    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-    grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/>',
-    wallet: '<path d="M19 7V6a2 2 0 0 0-2-2H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h12a2 2 0 0 0 2-2v-1"/><path d="M3 7a3 3 0 0 0 3 3h13a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-3"/><circle cx="16.5" cy="14" r="1.15" fill="currentColor" stroke="none"/>',
-    userRound: '<circle cx="12" cy="8" r="4.5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
-    // ---- actions / chrome ----
-    search: '<circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/>',
-    plus: '<path d="M5 12h14M12 5v14"/>',
-    chevronRight: '<path d="m9 18 6-6-6-6"/>',
-    chevronLeft: '<path d="m15 18-6-6 6-6"/>',
-    info: '<circle cx="12" cy="12" r="9.5"/><path d="M12 16.5v-5M12 7.6h.01"/>',
-    more: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
-    x: '<path d="M18 6 6 18M6 6l12 12"/>',
-    check: '<path d="M20 6 9 17l-5-5"/>',
-    checkCheck: '<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.6 7.6L13 16"/>',
-    copy: '<rect x="9" y="9" width="12" height="12" rx="2.4"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/>',
-    // Three linked nodes — an address is for passing ON to someone else, so it
-    // must not wear the same glyph as the userid's plain copy.
-    share: '<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>',
-    refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 4v4.5h-4.5"/>',
-    clock: '<circle cx="12" cy="12" r="9.5"/><path d="M12 7.5V12l3 2"/>',
-    edit: '<path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>',
-    qr: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h.01M17 21h.01M21 17v4"/>',
-    // ---- app tiles ----
-    video: '<path d="m22 8.5-5.4 3.5 5.4 3.5V8.5Z"/><rect x="2" y="6" width="14.5" height="12" rx="3"/>',
-    monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
-    sparkles: '<path d="M12 3.5 13.6 9 19 10.5 13.6 12 12 17.5 10.4 12 5 10.5 10.4 9 12 3.5Z"/><path d="M19 3.5v3.2M20.6 5.1h-3.2"/><path d="M5 16v2.4M6.2 17.2H3.8"/>',
-    mic: '<rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v3.5"/>',
-    flask: '<path d="M9.5 3v6.2L4.8 17.4A2 2 0 0 0 6.5 20.5h11a2 2 0 0 0 1.7-3.1L14.5 9.2V3"/><path d="M8.5 3h7"/><path d="M7.3 15h9.4"/>',
-    headphones: '<path d="M3.5 14v-1.5a8.5 8.5 0 0 1 17 0V14"/><path d="M3.5 14.5a2.5 2.5 0 0 1 2.5-2.5h0a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h0a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M20.5 14.5a2.5 2.5 0 0 0-2.5-2.5h0a1.5 1.5 0 0 0-1.5 1.5v3.5a1.5 1.5 0 0 0 1.5 1.5h0a2.5 2.5 0 0 0 2.5-2.5Z"/>',
-    globe: '<circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19"/><path d="M12 2.5a14 14 0 0 1 0 19 14 14 0 0 1 0-19Z"/>',
-    store: '<path d="M4 9.5V19a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19V9.5"/><path d="M3 6.5 4.5 3.5h15L21 6.5a2.5 2.5 0 0 1-4.5 1.5 2.5 2.5 0 0 1-4.5 0 2.5 2.5 0 0 1-4.5 0A2.5 2.5 0 0 1 3 6.5Z"/>',
-    // ---- chat composer ----
-    camera: '<path d="M14.5 4.5h-5L7.2 7.2H4.5A2.5 2.5 0 0 0 2 9.7V18a2.5 2.5 0 0 0 2.5 2.5h15A2.5 2.5 0 0 0 22 18V9.7a2.5 2.5 0 0 0-2.5-2.5h-2.7L14.5 4.5Z"/><circle cx="12" cy="13.5" r="3.2"/>',
-    phone: '<path d="M16.5 21a2 2 0 0 0 2-2.2 1.9 1.9 0 0 0-.6-1.2l-2-1.7a2 2 0 0 0-2.4-.1l-.9.6a14 14 0 0 1-5-5l.6-.9a2 2 0 0 0-.1-2.4l-1.7-2a1.9 1.9 0 0 0-1.2-.6A2 2 0 0 0 3 5.5 16 16 0 0 0 16.5 21Z"/>',
-    bolt: '<path d="M13 2 4 13h7l-1 9 9-11h-7l1-9Z"/>',
-    arrowUp: '<path d="M12 20V5M6 11l6-6 6 6"/>',
-    send: '<path d="M21.5 4.5 10.5 13.5"/><path d="M21.5 4.5 14.8 21.5 11 13l-8.5-3.8 19-4.7Z"/>',
-    // ---- account ----
-    shield: '<path d="M12 21.5s7.5-3.8 7.5-9.5V5.5L12 2.8 4.5 5.5V12c0 5.7 7.5 9.5 7.5 9.5Z"/>',
-    download: '<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5"/><path d="M5 20.5h14"/>',
-    // Folder with a magnifier corner — "reveal / show in file manager".
-    folderOpen: '<path d="M3 7.5a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="2.4"/><path d="M13.9 14.9 15.5 16.5"/>',
-    migrate: '<path d="M8 4 4 8l4 4"/><path d="M4 8h13a3 3 0 0 1 3 3v1"/><path d="m16 20 4-4-4-4"/><path d="M20 16H7a3 3 0 0 1-3-3v-1"/>',
-    starCoin: '<circle cx="12" cy="12" r="9"/><path d="m12 7.2 1.4 2.9 3.2.4-2.3 2.2.6 3.1-2.9-1.5-2.9 1.5.6-3.1L8.4 10.5l3.2-.4L12 7.2Z" fill="currentColor" stroke="none"/>',
-    link: '<path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.3-2.3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.3 2.3a4 4 0 0 0 5.7 5.7l1-1"/>',
-    trendingUp: '<path d="M22 7.5 13.5 16l-4.5-4.5L2 18.5"/><path d="M16.5 7.5H22v5.5"/>',
-    bell: '<path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.5 8-2.5 8h17S18 15 18 8.5Z"/><path d="M13.7 20.5a2 2 0 0 1-3.4 0"/>',
-    bot: '<rect x="3.5" y="9" width="17" height="11" rx="3"/><path d="M12 4.5v4.5"/><circle cx="12" cy="3" r="1.4"/><path d="M8.5 14.5h.01M15.5 14.5h.01"/><path d="M2 13.5v3M22 13.5v3"/>',
-    scan: '<path d="M3 8V6a3 3 0 0 1 3-3h2"/><path d="M16 3h2a3 3 0 0 1 3 3v2"/><path d="M21 16v2a3 3 0 0 1-3 3h-2"/><path d="M8 21H6a3 3 0 0 1-3-3v-2"/><path d="M7 12h10"/>',
-    userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
-    at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.9 7.9"/>',
-    keyRound: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
-    alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
-    chevronDown: '<path d="m6 9 6 6 6-6"/>',
-    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
-    book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>',
-    trash: '<path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M18.5 6l-1 13.5a2 2 0 0 1-2 1.5h-7a2 2 0 0 1-2-1.5L5.5 6"/><path d="M10 10.5v6M14 10.5v6"/>',
-    arrowDown: '<path d="M12 4v15M6 13l6 6 6-6"/>',
-    shrink: '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="m14 10 7-7"/><path d="m3 21 7-7"/>',
-    maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
-    theater: '<rect x="2.5" y="6.5" width="19" height="11" rx="2"/>',
-    speaker: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 9a3 3 0 0 1 0 6"/><path d="M19 7a6 6 0 0 1 0 10"/>',
-    micFill: '<rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v3.5"/>'
-  };
-  function Icon({ name, size = 24, stroke = 1.75, color = "currentColor", fill = "none", style }) {
-    const d = ICON_PATHS[name];
-    if (!d)
-      return null;
-    return /* @__PURE__ */ React.createElement(
-      "svg",
-      {
-        width: size,
-        height: size,
-        viewBox: "0 0 24 24",
-        fill,
-        stroke: color,
-        strokeWidth: stroke,
-        strokeLinecap: "round",
-        strokeLinejoin: "round",
-        style: { display: "block", flexShrink: 0, ...style },
-        dangerouslySetInnerHTML: { __html: d }
-      }
-    );
-  }
-  Object.assign(window, { Icon, ICON_PATHS });
-  var DK_FALLBACK_ICE_SERVERS = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "turn:tokyo.fi.chat:3478", username: "allcom", credential: "allcompass" },
-    { urls: "turn:tokyo.fi.chat:3478?transport=tcp", username: "allcom", credential: "allcompass" }
-  ];
-  var DK_LIVE_ICE_SERVERS = [];
-  var _dkIcePromise = null;
-  var _dkIceWarmPromise = null;
-  function dkWarmCallIce(iceServers) {
-    if (_dkIceWarmPromise)
-      return _dkIceWarmPromise;
-    if (!window.RTCPeerConnection || !iceServers || !iceServers.length) {
-      _dkIceWarmPromise = Promise.resolve();
-      return _dkIceWarmPromise;
-    }
-    _dkIceWarmPromise = new Promise((resolve) => {
-      let pc;
-      let finished = false;
-      const done = (why) => {
-        if (finished)
-          return;
-        finished = true;
-        try {
-          if (pc)
-            pc.close();
-        } catch (e) {
-        }
-        console.log("[rtc] ICE warmup done (" + why + ")");
-        resolve();
-      };
-      try {
-        pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: "all" });
-        const timer = setTimeout(() => done("timeout"), 5e3);
-        pc.onicecandidate = (ev) => {
-          const c = ev.candidate && ev.candidate.candidate;
-          if (c && /typ relay/.test(c)) {
-            clearTimeout(timer);
-            done("relay");
-          }
-        };
-        pc.onicegatheringstatechange = () => {
-          if (pc.iceGatheringState === "complete") {
-            clearTimeout(timer);
-            done("gather-complete");
-          }
-        };
-        pc.createDataChannel("ice-warm");
-        pc.createOffer().then((o) => pc.setLocalDescription(o)).catch(() => done("offer-fail"));
-      } catch (e) {
-        done("error");
-      }
-    });
-    return _dkIceWarmPromise;
-  }
-  function dkLoadCallIceServers() {
-    if (_dkIcePromise)
-      return _dkIcePromise;
-    _dkIcePromise = (async () => {
-      try {
-        const r = await fetch("/api/call-ice-servers", { headers: { "cache-control": "no-cache" } });
-        const d = await r.json();
-        if (d && d.ok && Array.isArray(d.iceServers) && d.iceServers.length) {
-          DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...d.iceServers);
-          console.log("[rtc] Carrier bootstrap ICE servers:", DK_LIVE_ICE_SERVERS.map((s) => s.urls));
-          await dkWarmCallIce(DK_LIVE_ICE_SERVERS);
-          return DK_LIVE_ICE_SERVERS;
-        }
-        console.warn("[rtc] call-ice-servers unavailable:", d && d.error);
-      } catch (e) {
-        console.warn("[rtc] call-ice-servers fetch failed", e);
-      }
-      console.warn("[rtc] falling back to tokyo TURN \u2014 web\u2194Android online ICE may fail");
-      DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...DK_FALLBACK_ICE_SERVERS.map((s) => ({ ...s })));
-      await dkWarmCallIce(DK_LIVE_ICE_SERVERS);
-      return DK_LIVE_ICE_SERVERS;
-    })();
-    return _dkIcePromise;
-  }
-  function dkAwaitCallIceServers(ms) {
-    const budget = typeof ms === "number" ? ms : 1e4;
-    return Promise.race([
-      dkLoadCallIceServers(),
-      new Promise((resolve) => setTimeout(() => {
-        if (!DK_LIVE_ICE_SERVERS.length) {
-          DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...DK_FALLBACK_ICE_SERVERS.map((s) => ({ ...s })));
-          console.warn("[rtc] ICE wait timed out \u2014 using fallback");
-        }
-        resolve(DK_LIVE_ICE_SERVERS);
-      }, budget))
-    ]).then(() => DK_LIVE_ICE_SERVERS);
-  }
-  dkLoadCallIceServers();
-  function dkRtcParseEnvelope(data) {
-    const text = String(data || "").replace(/\0+$/u, "").trim();
-    if (!text)
-      return null;
-    try {
-      const obj = JSON.parse(text);
-      if (obj && obj.dkRtc === 1 && typeof obj.kind === "string")
-        return obj;
-    } catch (e) {
-    }
-    return null;
-  }
-  function dkRtcSignalBus() {
-    if (window.__dkRtcSignalBus)
-      return window.__dkRtcSignalBus;
-    const PW = window.PeerWebRTC;
-    const handlers = /* @__PURE__ */ new Map();
-    const pendingCalls = [];
-    const PENDING_CALL_CAP = 16;
-    let started = false;
-    let stopped = false;
-    function emit(kind, userid, payload) {
-      const set = handlers.get(kind);
-      if (!set || !set.size) {
-        if (kind === "call") {
-          pendingCalls.push({ userid, payload });
-          if (pendingCalls.length > PENDING_CALL_CAP)
-            pendingCalls.shift();
-        }
-        return;
-      }
-      for (const h of Array.from(set)) {
-        try {
-          h(userid, payload);
-        } catch (e) {
-          console.warn("[rtc] signal handler failed", e);
-        }
-      }
-    }
-    async function pollLoop() {
-      let cursor = null;
-      while (!stopped) {
-        let signals = [];
-        try {
-          const u = cursor == null ? "/api/call-poll" : "/api/call-poll?since=" + cursor;
-          const r = await fetch(u, { headers: { "cache-control": "no-cache" } });
-          const d = await r.json();
-          signals = d && d.signals || [];
-          if (d && typeof d.cursor === "number")
-            cursor = d.cursor;
-        } catch (e) {
-          await new Promise((res) => setTimeout(res, 1e3));
-          continue;
-        }
-        for (const s of signals) {
-          const env = dkRtcParseEnvelope(s.data);
-          if (env) {
-            emit(env.kind, s.userid, env);
-            continue;
-          }
-          if (PW) {
-            try {
-              emit("call", s.userid, PW.decodeSignal(s.data));
-            } catch (e) {
-            }
-          }
-        }
-      }
-    }
-    const bus = {
-      start() {
-        if (started)
-          return;
-        started = true;
-        stopped = false;
-        pollLoop();
-      },
-      on(kind, cb) {
-        if (!handlers.has(kind))
-          handlers.set(kind, /* @__PURE__ */ new Set());
-        handlers.get(kind).add(cb);
-        this.start();
-        if (kind === "call" && pendingCalls.length) {
-          const queued = pendingCalls.splice(0);
-          console.log("[rtc] flushing " + queued.length + " buffered call signal(s)");
-          for (const q of queued) {
-            try {
-              cb(q.userid, q.payload);
-            } catch (e) {
-              console.warn("[rtc] buffered call handler failed", e);
-            }
-          }
-        }
-        return () => {
-          var _a;
-          return (_a = handlers.get(kind)) == null ? void 0 : _a.delete(cb);
-        };
-      },
-      async send(userid, data) {
-        const body = JSON.stringify({ userid, data: typeof data === "string" ? data : JSON.stringify(data) });
-        const r = await fetch("/api/call-signal", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body
-        });
-        const d = await r.json().catch(() => ({ ok: r.ok }));
-        if (!d.ok)
-          throw new Error(d.error || "call-signal send failed");
-      },
-      stop() {
-        stopped = true;
-      }
-    };
-    window.__dkRtcSignalBus = bus;
-    return bus;
-  }
-  function makeDaemonSignaling() {
-    const PW = window.PeerWebRTC;
-    const bus = dkRtcSignalBus();
-    let off = null;
-    return {
-      async send(peerId, signal) {
-        await bus.send(peerId, PW.encodeSignal(signal));
-      },
-      onSignal(cb) {
-        if (off)
-          off();
-        off = bus.on("call", cb);
-      },
-      stop() {
-        if (off) {
-          off();
-          off = null;
-        }
-      }
-    };
-  }
-  Object.assign(window, { dkRtcSignalBus, makeDaemonSignaling });
   var H = {};
   var hostNeedsWelcome = false;
   var hostPrefersRtcFile = false;
@@ -636,6 +319,93 @@
     DK_ME_FALLBACK,
     dkCopy
   });
+  var ICON_PATHS = {
+    // ---- tab bar (the four must feel like one set) ----
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.6"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"/>',
+    wallet: '<path d="M19 7V6a2 2 0 0 0-2-2H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h12a2 2 0 0 0 2-2v-1"/><path d="M3 7a3 3 0 0 0 3 3h13a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-3"/><circle cx="16.5" cy="14" r="1.15" fill="currentColor" stroke="none"/>',
+    userRound: '<circle cx="12" cy="8" r="4.5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+    // ---- actions / chrome ----
+    search: '<circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/>',
+    plus: '<path d="M5 12h14M12 5v14"/>',
+    chevronRight: '<path d="m9 18 6-6-6-6"/>',
+    chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+    info: '<circle cx="12" cy="12" r="9.5"/><path d="M12 16.5v-5M12 7.6h.01"/>',
+    more: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    checkCheck: '<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.6 7.6L13 16"/>',
+    copy: '<rect x="9" y="9" width="12" height="12" rx="2.4"/><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/>',
+    // Three linked nodes — an address is for passing ON to someone else, so it
+    // must not wear the same glyph as the userid's plain copy.
+    share: '<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 4v4.5h-4.5"/>',
+    clock: '<circle cx="12" cy="12" r="9.5"/><path d="M12 7.5V12l3 2"/>',
+    edit: '<path d="M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>',
+    qr: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3M21 14v.01M14 21h.01M17 21h.01M21 17v4"/>',
+    // ---- app tiles ----
+    video: '<path d="m22 8.5-5.4 3.5 5.4 3.5V8.5Z"/><rect x="2" y="6" width="14.5" height="12" rx="3"/>',
+    monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+    sparkles: '<path d="M12 3.5 13.6 9 19 10.5 13.6 12 12 17.5 10.4 12 5 10.5 10.4 9 12 3.5Z"/><path d="M19 3.5v3.2M20.6 5.1h-3.2"/><path d="M5 16v2.4M6.2 17.2H3.8"/>',
+    mic: '<rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v3.5"/>',
+    flask: '<path d="M9.5 3v6.2L4.8 17.4A2 2 0 0 0 6.5 20.5h11a2 2 0 0 0 1.7-3.1L14.5 9.2V3"/><path d="M8.5 3h7"/><path d="M7.3 15h9.4"/>',
+    headphones: '<path d="M3.5 14v-1.5a8.5 8.5 0 0 1 17 0V14"/><path d="M3.5 14.5a2.5 2.5 0 0 1 2.5-2.5h0a1.5 1.5 0 0 1 1.5 1.5v3.5a1.5 1.5 0 0 1-1.5 1.5h0a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M20.5 14.5a2.5 2.5 0 0 0-2.5-2.5h0a1.5 1.5 0 0 0-1.5 1.5v3.5a1.5 1.5 0 0 0 1.5 1.5h0a2.5 2.5 0 0 0 2.5-2.5Z"/>',
+    globe: '<circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19"/><path d="M12 2.5a14 14 0 0 1 0 19 14 14 0 0 1 0-19Z"/>',
+    store: '<path d="M4 9.5V19a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19V9.5"/><path d="M3 6.5 4.5 3.5h15L21 6.5a2.5 2.5 0 0 1-4.5 1.5 2.5 2.5 0 0 1-4.5 0 2.5 2.5 0 0 1-4.5 0A2.5 2.5 0 0 1 3 6.5Z"/>',
+    // ---- chat composer ----
+    camera: '<path d="M14.5 4.5h-5L7.2 7.2H4.5A2.5 2.5 0 0 0 2 9.7V18a2.5 2.5 0 0 0 2.5 2.5h15A2.5 2.5 0 0 0 22 18V9.7a2.5 2.5 0 0 0-2.5-2.5h-2.7L14.5 4.5Z"/><circle cx="12" cy="13.5" r="3.2"/>',
+    phone: '<path d="M16.5 21a2 2 0 0 0 2-2.2 1.9 1.9 0 0 0-.6-1.2l-2-1.7a2 2 0 0 0-2.4-.1l-.9.6a14 14 0 0 1-5-5l.6-.9a2 2 0 0 0-.1-2.4l-1.7-2a1.9 1.9 0 0 0-1.2-.6A2 2 0 0 0 3 5.5 16 16 0 0 0 16.5 21Z"/>',
+    bolt: '<path d="M13 2 4 13h7l-1 9 9-11h-7l1-9Z"/>',
+    arrowUp: '<path d="M12 20V5M6 11l6-6 6 6"/>',
+    send: '<path d="M21.5 4.5 10.5 13.5"/><path d="M21.5 4.5 14.8 21.5 11 13l-8.5-3.8 19-4.7Z"/>',
+    // ---- account ----
+    shield: '<path d="M12 21.5s7.5-3.8 7.5-9.5V5.5L12 2.8 4.5 5.5V12c0 5.7 7.5 9.5 7.5 9.5Z"/>',
+    download: '<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5"/><path d="M5 20.5h14"/>',
+    // Folder with a magnifier corner — "reveal / show in file manager".
+    folderOpen: '<path d="M3 7.5a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="2.4"/><path d="M13.9 14.9 15.5 16.5"/>',
+    migrate: '<path d="M8 4 4 8l4 4"/><path d="M4 8h13a3 3 0 0 1 3 3v1"/><path d="m16 20 4-4-4-4"/><path d="M20 16H7a3 3 0 0 1-3-3v-1"/>',
+    starCoin: '<circle cx="12" cy="12" r="9"/><path d="m12 7.2 1.4 2.9 3.2.4-2.3 2.2.6 3.1-2.9-1.5-2.9 1.5.6-3.1L8.4 10.5l3.2-.4L12 7.2Z" fill="currentColor" stroke="none"/>',
+    link: '<path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.3-2.3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.3 2.3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    trendingUp: '<path d="M22 7.5 13.5 16l-4.5-4.5L2 18.5"/><path d="M16.5 7.5H22v5.5"/>',
+    bell: '<path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.5 8-2.5 8h17S18 15 18 8.5Z"/><path d="M13.7 20.5a2 2 0 0 1-3.4 0"/>',
+    bot: '<rect x="3.5" y="9" width="17" height="11" rx="3"/><path d="M12 4.5v4.5"/><circle cx="12" cy="3" r="1.4"/><path d="M8.5 14.5h.01M15.5 14.5h.01"/><path d="M2 13.5v3M22 13.5v3"/>',
+    scan: '<path d="M3 8V6a3 3 0 0 1 3-3h2"/><path d="M16 3h2a3 3 0 0 1 3 3v2"/><path d="M21 16v2a3 3 0 0 1-3 3h-2"/><path d="M8 21H6a3 3 0 0 1-3-3v-2"/><path d="M7 12h10"/>',
+    userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+    at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.9 7.9"/>',
+    keyRound: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+    alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
+    chevronDown: '<path d="m6 9 6 6 6-6"/>',
+    eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>',
+    trash: '<path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/><path d="M18.5 6l-1 13.5a2 2 0 0 1-2 1.5h-7a2 2 0 0 1-2-1.5L5.5 6"/><path d="M10 10.5v6M14 10.5v6"/>',
+    arrowDown: '<path d="M12 4v15M6 13l6 6 6-6"/>',
+    shrink: '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="m14 10 7-7"/><path d="m3 21 7-7"/>',
+    maximize: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+    theater: '<rect x="2.5" y="6.5" width="19" height="11" rx="2"/>',
+    speaker: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 9a3 3 0 0 1 0 6"/><path d="M19 7a6 6 0 0 1 0 10"/>',
+    micFill: '<rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v3.5"/>'
+  };
+  function Icon({ name, size = 24, stroke = 1.75, color = "currentColor", fill = "none", style }) {
+    const d = ICON_PATHS[name];
+    if (!d)
+      return null;
+    return /* @__PURE__ */ React.createElement(
+      "svg",
+      {
+        width: size,
+        height: size,
+        viewBox: "0 0 24 24",
+        fill,
+        stroke: color,
+        strokeWidth: stroke,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        style: { display: "block", flexShrink: 0, ...style },
+        dangerouslySetInnerHTML: { __html: d }
+      }
+    );
+  }
+  Object.assign(window, { Icon, ICON_PATHS });
   function RequestsBlock({ T, requests, onAct }) {
     const [acted, setActed] = React.useState({});
     const [failed, setFailed] = React.useState({});
@@ -3124,6 +2894,320 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "0 2px", ...style } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)" } }, label), count != null && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, color: "var(--faint)" } }, count), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 1, background: "var(--line)" } }), trailing);
   }
   Object.assign(window, { DkIdenticon, DkBot, DkAvatar, DkImgAvatar, StatusDot, Mono, shortKey, RouteTag, Tag, Unread, Btn, Section });
+  var APPS = [
+    {
+      id: "meet",
+      name: "Beagle Meet",
+      origin: "https://snoopy.fi.chat",
+      url: "https://snoopy.fi.chat",
+      blurb: { en: "Video calls and rooms \u2014 your Beagle identity is the login.", zh: "\u89C6\u9891\u4F1A\u8BAE\u548C\u623F\u95F4 \u2014\u2014 \u7528 Beagle \u8EAB\u4EFD\u76F4\u63A5\u767B\u5F55\u3002" },
+      icon: "video"
+    },
+    {
+      id: "interview",
+      name: "interview.network",
+      origin: "https://interview.network",
+      url: "https://interview.network",
+      blurb: { en: "Interviews, scheduled and held against a verified identity.", zh: "\u9762\u8BD5\u5B89\u6392\u4E0E\u8FDB\u884C\uFF0C\u8EAB\u4EFD\u53EF\u9A8C\u8BC1\u3002" },
+      icon: "users"
+    },
+    {
+      id: "readyplayer",
+      name: "readyplayer.network",
+      origin: "https://readyplayer.network",
+      url: "https://readyplayer.network",
+      blurb: { en: "Membership and the services that come with it.", zh: "\u4F1A\u5458\u4E0E\u914D\u5957\u670D\u52A1\u3002" },
+      icon: "starCoin"
+    },
+    {
+      id: "btc",
+      name: "btc.fi.chat",
+      origin: "https://btc.fi.chat",
+      url: "https://btc.fi.chat",
+      blurb: { en: "Trading desk and signals.", zh: "\u4EA4\u6613\u53F0\u4E0E\u4FE1\u53F7\u3002" },
+      icon: "trendingUp"
+    }
+  ];
+  function dkB64Url(obj) {
+    const json = JSON.stringify(obj);
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+    return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function AppsTab({ T, t }) {
+    const zh = t && t.lang === "zh";
+    const [busy, setBusy] = React.useState(null);
+    const [err, setErr] = React.useState(null);
+    const open = async (app) => {
+      setBusy(app.id);
+      setErr(null);
+      const win = window.open("", "_blank");
+      try {
+        const r = await dkPost("/api/launch-token", { origin: app.origin });
+        if (!r || r.ok === false)
+          throw new Error(r && r.error || "could not sign");
+        const { ok, ...assertion } = r;
+        const url = app.url + "#beagle=" + dkB64Url(assertion);
+        if (win)
+          win.location = url;
+        else
+          window.open(url, "_blank");
+      } catch (e) {
+        if (win)
+          win.close();
+        setErr(String(e && e.message || e));
+      } finally {
+        setBusy(null);
+      }
+    };
+    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)" } }, zh ? "\u5E94\u7528" : "Apps"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", marginTop: 6, lineHeight: 1.6 } }, zh ? "\u8FD9\u4E9B\u5E94\u7528\u63A5\u53D7 Beagle \u8EAB\u4EFD\u3002\u4ECE\u8FD9\u91CC\u6253\u5F00\u4E0D\u9700\u8981\u518D\u767B\u5F55\u4E00\u6B21 \u2014\u2014 \u4F1A\u5E26\u4E0A\u4E00\u4E2A\u4E24\u5206\u949F\u5185\u6709\u6548\u7684\u7B7E\u540D\u3002" : "These accept a Beagle identity. Opening one from here does not ask you to sign in again \u2014 it carries a signature that is good for two minutes.")), err && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: "#f85149" } }, err), APPS.map((app) => /* @__PURE__ */ React.createElement("div", { key: app.id, style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      padding: "14px 16px",
+      borderRadius: 12,
+      background: "var(--panel)",
+      border: "1px solid var(--line)"
+    } }, /* @__PURE__ */ React.createElement("div", { style: {
+      width: 38,
+      height: 38,
+      borderRadius: 10,
+      flexShrink: 0,
+      background: "var(--panel-2)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: app.icon, size: 19, color: "var(--accent)", stroke: 1.8 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 14, fontWeight: 600, color: "var(--text)" } }, app.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", marginTop: 2 } }, zh ? app.blurb.zh : app.blurb.en), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", marginTop: 3 } }, app.origin.replace(/^https?:\/\//, ""))), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", onClick: busy ? void 0 : () => open(app) }, busy === app.id ? zh ? "\u6253\u5F00\u4E2D\u2026" : "opening\u2026" : zh ? "\u6253\u5F00" : "Open")))));
+  }
+  var DK_FALLBACK_ICE_SERVERS = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "turn:tokyo.fi.chat:3478", username: "allcom", credential: "allcompass" },
+    { urls: "turn:tokyo.fi.chat:3478?transport=tcp", username: "allcom", credential: "allcompass" }
+  ];
+  var DK_LIVE_ICE_SERVERS = [];
+  var _dkIcePromise = null;
+  var _dkIceWarmPromise = null;
+  function dkWarmCallIce(iceServers) {
+    if (_dkIceWarmPromise)
+      return _dkIceWarmPromise;
+    if (!window.RTCPeerConnection || !iceServers || !iceServers.length) {
+      _dkIceWarmPromise = Promise.resolve();
+      return _dkIceWarmPromise;
+    }
+    _dkIceWarmPromise = new Promise((resolve) => {
+      let pc;
+      let finished = false;
+      const done = (why) => {
+        if (finished)
+          return;
+        finished = true;
+        try {
+          if (pc)
+            pc.close();
+        } catch (e) {
+        }
+        console.log("[rtc] ICE warmup done (" + why + ")");
+        resolve();
+      };
+      try {
+        pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: "all" });
+        const timer = setTimeout(() => done("timeout"), 5e3);
+        pc.onicecandidate = (ev) => {
+          const c = ev.candidate && ev.candidate.candidate;
+          if (c && /typ relay/.test(c)) {
+            clearTimeout(timer);
+            done("relay");
+          }
+        };
+        pc.onicegatheringstatechange = () => {
+          if (pc.iceGatheringState === "complete") {
+            clearTimeout(timer);
+            done("gather-complete");
+          }
+        };
+        pc.createDataChannel("ice-warm");
+        pc.createOffer().then((o) => pc.setLocalDescription(o)).catch(() => done("offer-fail"));
+      } catch (e) {
+        done("error");
+      }
+    });
+    return _dkIceWarmPromise;
+  }
+  function dkLoadCallIceServers() {
+    if (_dkIcePromise)
+      return _dkIcePromise;
+    _dkIcePromise = (async () => {
+      try {
+        const r = await fetch("/api/call-ice-servers", { headers: { "cache-control": "no-cache" } });
+        const d = await r.json();
+        if (d && d.ok && Array.isArray(d.iceServers) && d.iceServers.length) {
+          DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...d.iceServers);
+          console.log("[rtc] Carrier bootstrap ICE servers:", DK_LIVE_ICE_SERVERS.map((s) => s.urls));
+          await dkWarmCallIce(DK_LIVE_ICE_SERVERS);
+          return DK_LIVE_ICE_SERVERS;
+        }
+        console.warn("[rtc] call-ice-servers unavailable:", d && d.error);
+      } catch (e) {
+        console.warn("[rtc] call-ice-servers fetch failed", e);
+      }
+      console.warn("[rtc] falling back to tokyo TURN \u2014 web\u2194Android online ICE may fail");
+      DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...DK_FALLBACK_ICE_SERVERS.map((s) => ({ ...s })));
+      await dkWarmCallIce(DK_LIVE_ICE_SERVERS);
+      return DK_LIVE_ICE_SERVERS;
+    })();
+    return _dkIcePromise;
+  }
+  function dkAwaitCallIceServers(ms) {
+    const budget = typeof ms === "number" ? ms : 1e4;
+    return Promise.race([
+      dkLoadCallIceServers(),
+      new Promise((resolve) => setTimeout(() => {
+        if (!DK_LIVE_ICE_SERVERS.length) {
+          DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...DK_FALLBACK_ICE_SERVERS.map((s) => ({ ...s })));
+          console.warn("[rtc] ICE wait timed out \u2014 using fallback");
+        }
+        resolve(DK_LIVE_ICE_SERVERS);
+      }, budget))
+    ]).then(() => DK_LIVE_ICE_SERVERS);
+  }
+  dkLoadCallIceServers();
+  function dkRtcParseEnvelope(data) {
+    const text = String(data || "").replace(/\0+$/u, "").trim();
+    if (!text)
+      return null;
+    try {
+      const obj = JSON.parse(text);
+      if (obj && obj.dkRtc === 1 && typeof obj.kind === "string")
+        return obj;
+    } catch (e) {
+    }
+    return null;
+  }
+  function dkRtcSignalBus() {
+    if (window.__dkRtcSignalBus)
+      return window.__dkRtcSignalBus;
+    const PW = window.PeerWebRTC;
+    const handlers = /* @__PURE__ */ new Map();
+    const pendingCalls = [];
+    const PENDING_CALL_CAP = 16;
+    let started = false;
+    let stopped = false;
+    function emit(kind, userid, payload) {
+      const set = handlers.get(kind);
+      if (!set || !set.size) {
+        if (kind === "call") {
+          pendingCalls.push({ userid, payload });
+          if (pendingCalls.length > PENDING_CALL_CAP)
+            pendingCalls.shift();
+        }
+        return;
+      }
+      for (const h of Array.from(set)) {
+        try {
+          h(userid, payload);
+        } catch (e) {
+          console.warn("[rtc] signal handler failed", e);
+        }
+      }
+    }
+    async function pollLoop() {
+      let cursor = null;
+      while (!stopped) {
+        let signals = [];
+        try {
+          const u = cursor == null ? "/api/call-poll" : "/api/call-poll?since=" + cursor;
+          const r = await fetch(u, { headers: { "cache-control": "no-cache" } });
+          const d = await r.json();
+          signals = d && d.signals || [];
+          if (d && typeof d.cursor === "number")
+            cursor = d.cursor;
+        } catch (e) {
+          await new Promise((res) => setTimeout(res, 1e3));
+          continue;
+        }
+        for (const s of signals) {
+          const env = dkRtcParseEnvelope(s.data);
+          if (env) {
+            emit(env.kind, s.userid, env);
+            continue;
+          }
+          if (PW) {
+            try {
+              emit("call", s.userid, PW.decodeSignal(s.data));
+            } catch (e) {
+            }
+          }
+        }
+      }
+    }
+    const bus = {
+      start() {
+        if (started)
+          return;
+        started = true;
+        stopped = false;
+        pollLoop();
+      },
+      on(kind, cb) {
+        if (!handlers.has(kind))
+          handlers.set(kind, /* @__PURE__ */ new Set());
+        handlers.get(kind).add(cb);
+        this.start();
+        if (kind === "call" && pendingCalls.length) {
+          const queued = pendingCalls.splice(0);
+          console.log("[rtc] flushing " + queued.length + " buffered call signal(s)");
+          for (const q of queued) {
+            try {
+              cb(q.userid, q.payload);
+            } catch (e) {
+              console.warn("[rtc] buffered call handler failed", e);
+            }
+          }
+        }
+        return () => {
+          var _a;
+          return (_a = handlers.get(kind)) == null ? void 0 : _a.delete(cb);
+        };
+      },
+      async send(userid, data) {
+        const body = JSON.stringify({ userid, data: typeof data === "string" ? data : JSON.stringify(data) });
+        const r = await fetch("/api/call-signal", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body
+        });
+        const d = await r.json().catch(() => ({ ok: r.ok }));
+        if (!d.ok)
+          throw new Error(d.error || "call-signal send failed");
+      },
+      stop() {
+        stopped = true;
+      }
+    };
+    window.__dkRtcSignalBus = bus;
+    return bus;
+  }
+  function makeDaemonSignaling() {
+    const PW = window.PeerWebRTC;
+    const bus = dkRtcSignalBus();
+    let off = null;
+    return {
+      async send(peerId, signal) {
+        await bus.send(peerId, PW.encodeSignal(signal));
+      },
+      onSignal(cb) {
+        if (off)
+          off();
+        off = bus.on("call", cb);
+      },
+      stop() {
+        if (off) {
+          off();
+          off = null;
+        }
+      }
+    };
+  }
+  Object.assign(window, { dkRtcSignalBus, makeDaemonSignaling });
   function useCallController(selfId, onCallLog) {
     const [incoming, setIncoming] = React.useState(null);
     const [active, setActive] = React.useState(null);
@@ -4292,6 +4376,7 @@ ${peer.address}`
     en: {
       chat: "Chat",
       network: "Network",
+      apps: "Apps",
       profile: "Profile",
       recommended: "Discover",
       registered: "Names",
@@ -4469,6 +4554,7 @@ ${peer.address}`
     zh: {
       chat: "\u804A\u5929",
       network: "\u7F51\u7EDC",
+      apps: "\u5E94\u7528",
       profile: "\u6211\u7684",
       recommended: "\u63A8\u8350",
       registered: "\u540D\u5F55",
@@ -4975,9 +5061,10 @@ ${peer.address}`
       { id: "recommended", icon: "sparkles", label: T.recommended },
       { id: "registered", icon: "at", label: T.registered },
       { id: "network", icon: "network", label: T.network },
+      { id: "apps", icon: "grid", label: T.apps },
       { id: "profile", icon: "userRound", label: T.profile }
     ];
-    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", nav.find((n) => n.id === tab).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", nav.find((n) => n.id === tab).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
       DkLockedOut,
       {
         compact: true,

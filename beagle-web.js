@@ -16605,6 +16605,12 @@ ${origin}
 ${nonce}`);
     return signDetached(keyPair.secretKey, message);
   }
+  function signLaunch(keyPair, origin, ts) {
+    const message = new TextEncoder().encode(`decent-launch
+${origin}
+${ts}`);
+    return signDetached(keyPair.secretKey, message);
+  }
 
   // src/web-entry.js
   init_bytes();
@@ -17093,6 +17099,7 @@ ${nonce}`);
   init_peer();
   init_address();
   init_sign();
+  init_bytes();
 
   // src/express-client.js
   init_buffer_global();
@@ -17527,6 +17534,28 @@ ${nonce}`);
             })(),
             ephemeral: !!self2.ephemeral
           });
+        case "launch-token": {
+          const target = String(req.origin ?? "");
+          let ok2;
+          try {
+            const u = new URL(target);
+            ok2 = (u.protocol === "http:" || u.protocol === "https:") && u.origin === target;
+          } catch {
+            ok2 = false;
+          }
+          if (!ok2)
+            return fail("launch-token requires a valid origin");
+          const ts = Date.now();
+          return ok({
+            v: 1,
+            userid: self2.userid,
+            address: self2.address,
+            name: profile.name || "",
+            punkId: profile.punkId ?? null,
+            ts,
+            sig: bytesToHex2(signLaunch(keyPair, target, ts))
+          });
+        }
         case "sign": {
           if (typeof req.text !== "string")
             return fail("sign requires text");
@@ -18434,6 +18463,10 @@ ${nonce}`);
             }
           }
           return json(await call2("friend-request", { address, hello: body2.hello }));
+        }
+        case "POST /api/launch-token": {
+          const r = await call2("launch-token", { origin: body2.origin });
+          return r.ok ? json({ ok: true, ...r.data ?? {} }) : json({ ok: false, error: r.error });
         }
         case "POST /api/accept":
           return json(await call2("friends-accept", { userid: body2.userid }));
