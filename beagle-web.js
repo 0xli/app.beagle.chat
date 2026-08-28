@@ -16752,6 +16752,15 @@ ${nonce}`);
       }
     );
   }
+  async function listFriends() {
+    try {
+      const db = await openDB();
+      return await tx(db, FRIENDS, "readonly", (s) => s.getAll()) || [];
+    } catch {
+      storageWedged = true;
+      return [];
+    }
+  }
   async function appendMessage(msg) {
     if (!storageWedged) {
       try {
@@ -16925,6 +16934,40 @@ ${nonce}`);
   var LOCK = "beagle-peer";
   var CHANNEL = "beagle-web";
   var HANDOVER_TIMEOUT_MS = 3e3;
+  var FLASH_MS = 700;
+  var FLASH_TIMES = 10;
+  var flashing = null;
+  function flashTab() {
+    const icon = document.querySelector('link[rel~="icon"]');
+    if (flashing) {
+      clearInterval(flashing.timer);
+      flashing.restore();
+    }
+    const wasTitle = document.title;
+    const wasIcon = icon ? icon.getAttribute("href") : null;
+    const dot = "data:image/svg+xml," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#7c5cff"/></svg>'
+    );
+    const restore = () => {
+      document.title = wasTitle;
+      if (icon && wasIcon != null)
+        icon.setAttribute("href", wasIcon);
+      flashing = null;
+    };
+    let n = 0;
+    const tick = () => {
+      const on = n % 2 === 0;
+      document.title = on ? "\u{1F44B} Beagle is here" : wasTitle;
+      if (icon)
+        icon.setAttribute("href", on ? dot : wasIcon ?? "");
+      if (++n >= FLASH_TIMES) {
+        clearInterval(flashing.timer);
+        restore();
+      }
+    };
+    flashing = { timer: setInterval(tick, FLASH_MS), restore };
+    tick();
+  }
   function createTabLock({ onAcquired, onLost } = {}) {
     if (!navigator.locks) {
       const reason = "navigator.locks unavailable (needs a secure context) \u2014 single-tab ownership is not enforced here";
@@ -16960,6 +17003,7 @@ ${nonce}`);
           window.focus();
         } catch {
         }
+        flashTab();
         bc.postMessage({ type: "focused" });
       }
     };
@@ -18163,6 +18207,71 @@ ${nonce}`);
       }
     };
   }
+  function createReadOnlyRouter({ getIdentity, profile, storageOk, askOwner }) {
+    return async function route(path, init) {
+      const method = (init?.method || "GET").toUpperCase();
+      const url = new URL(path, location.origin);
+      const p = url.pathname;
+      if (UNSUPPORTED.has(p))
+        return json({ ok: false, unsupported: true, error: "not available in the browser client" });
+      const punkOne = /^\/api\/punk\/(\d{1,5})$/.exec(p);
+      if (method === "GET" && punkOne) {
+        try {
+          const punk = await punkById(punkOne[1]);
+          return punk ? json({ ok: true, punk }) : json({ ok: false, error: "no such punk" }, 404);
+        } catch (err) {
+          return json({ ok: false, error: String(err?.message || err) }, 502);
+        }
+      }
+      switch (`${method} ${p}`) {
+        case "GET /api/backend":
+          return json({ ok: true, kind: "browser", hasVirtualLan: false, state: "readonly", switchable: false, releaseSecondsLeft: 0, command: "" });
+        case "GET /api/desktop":
+        case "GET /api/state": {
+          const fromOwner = await askOwner?.("desktop");
+          const identity = getIdentity();
+          const ens = await ensNames();
+          const me = fromOwner?.me ? { ...fromOwner.me } : meFrom({ identity: identity ?? {}, online: false, transport: "tcp-relay" }, profile, false, ens);
+          me.hasIdentity = !!identity;
+          me.ephemeral = !!identity?.ephemeral || storageOk?.() === false;
+          me.readOnly = true;
+          const peers = fromOwner?.peers ?? [];
+          return p === "/api/state" ? json({ me, friends: peers, pending: [], readOnly: true, locked: true }) : json({ me, peers, requests: fromOwner?.requests ?? [], exits: [], activeExit: null, readOnly: true, locked: true });
+        }
+        case "GET /api/friends-list": {
+          const fromOwner = await askOwner?.("desktop");
+          if (fromOwner?.peers)
+            return json({ friends: fromOwner.peers });
+          const ens = await ensNames();
+          const stored = (await listFriends()).filter((f) => f.status !== "removed");
+          return json({ friends: stored.map((f) => peerFrom({ ...f, status: "offline" }, ens)) });
+        }
+        case "GET /api/chat-history": {
+          const peer = url.searchParams.get("peer") || void 0;
+          if (!peer)
+            return json({ chats: {} });
+          return json({ chats: { [peer]: await historyFor(peer, 500) } });
+        }
+        case "GET /api/punk-list": {
+          const type2 = (url.searchParams.get("type") || "any").toLowerCase().replace(/[^a-z]/g, "") || "any";
+          const limit = Math.min(60, Math.max(1, Number(url.searchParams.get("limit")) || 24));
+          try {
+            return json({ ok: true, list: await punkList({ type: type2, limit }) });
+          } catch (err) {
+            return json({ ok: false, error: String(err?.message || err) }, 502);
+          }
+        }
+        default:
+          if (method === "GET")
+            return json({ ok: true, readOnly: true, items: [], list: [] });
+          return json({
+            ok: false,
+            readOnly: true,
+            error: "Beagle is running in another tab \u2014 this one can read, but not send."
+          }, 409);
+      }
+    };
+  }
   function createApiRouter(backend, getProfile) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
@@ -18620,6 +18729,8 @@ ${nonce}`);
       };
       if (this.lockState.held)
         this.bringUp();
+      else
+        this.serveReadOnly();
       return this.status();
     },
     status() {
@@ -18645,9 +18756,28 @@ ${nonce}`);
      *  leave the tab just as dead as before. */
     async takeover() {
       this.lockState = await this.lock.takeover();
-      if (this.lockState.held)
+      if (this.lockState.held) {
+        this.routers.early = null;
         this.bringUp?.();
+      }
       return this.lockState;
+    },
+    /** A tab that does not own the identity still shows everything.
+     *
+     *  It used to render a full-screen block, which was wrong twice over: the
+     *  friends, the messages and the profile all live in IndexedDB and are
+     *  shared by every tab of this origin, so there was nothing to hide — and a
+     *  user who opened a second tab got a dead app instead of their data. Only
+     *  SENDING needs the single peer. So this tab reads, and refuses to write. */
+    serveReadOnly() {
+      if (this.routers.early || this.routers.full)
+        return;
+      this.routers.early = createReadOnlyRouter({
+        getIdentity: () => this.identity,
+        profile: this.profile,
+        storageOk: () => this.storageOk !== false,
+        askOwner: (what) => this.askOwner(what)
+      });
     },
     /** Ask the tab that owns the identity to come forward, instead of taking it.
      *  Usually the better answer: the other tab is already connected. */
@@ -18665,6 +18795,28 @@ ${nonce}`);
      *  screen naming the requesting site; anything arriving here has already
      *  been approved by a human, and everything it can ask for is something the
      *  same person could do with two clicks in the UI. */
+    /** Ask the tab holding the peer for something only a live peer knows.
+     *  Resolves null when nobody answers, and every caller must cope with that:
+     *  the owner can be reloading, or gone. */
+    askOwner(what, timeoutMs = 1200) {
+      if (typeof BroadcastChannel === "undefined")
+        return Promise.resolve(null);
+      return new Promise((resolve2) => {
+        const bc = new BroadcastChannel(ACTION_CHANNEL);
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const done = (v) => {
+          clearTimeout(timer);
+          bc.close();
+          resolve2(v);
+        };
+        const timer = setTimeout(() => done(null), timeoutMs);
+        bc.onmessage = (ev) => {
+          if (ev.data?.type === "state-result" && ev.data.id === id)
+            done(ev.data.data ?? null);
+        };
+        bc.postMessage({ type: "state-request", id, what });
+      });
+    },
     serveActions() {
       if (this.actions || typeof BroadcastChannel === "undefined")
         return;
@@ -18672,6 +18824,15 @@ ${nonce}`);
       this.actions = bc;
       bc.onmessage = async (ev) => {
         const d = ev.data;
+        if (d?.type === "state-request" && d.id) {
+          let data = null;
+          try {
+            data = await fetch("/api/desktop").then((x) => x.json());
+          } catch {
+          }
+          bc.postMessage({ type: "state-result", id: d.id, data });
+          return;
+        }
         if (d?.type !== "add-friend" || !d.id)
           return;
         const done = (ok, error) => bc.postMessage({ type: "add-friend-result", id: d.id, ok, error });

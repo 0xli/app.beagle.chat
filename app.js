@@ -4980,6 +4980,7 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", nav.find((n) => n.id === tab).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
       DkLockedOut,
       {
+        compact: true,
         lang: t.lang,
         onTakeover: () => window.BeagleWeb.takeover().then((st) => {
           data.refresh();
@@ -5584,11 +5585,12 @@ ${peer.address}`
     en: {
       title: "Beagle is already open in another tab.",
       body: "One identity can only run in one place at a time \u2014 two would fight over the same connection. The other tab is already connected, so going back to it is usually what you want.",
+      bar: "Read-only \u2014 Beagle is running in another tab. You can read here; sending happens there.",
       go: "Go to that tab",
       going: "asking\u2026",
       // Honest about the limit: no API lets one tab put another in front. We can
       // ask; whether the browser obliges is the browser's business.
-      asked: "Asked the other tab to come forward. If nothing happened, your browser does not allow it \u2014 look for the other Beagle tab, or take over here.",
+      asked: "The other tab is flashing \u{1F44B} Beagle is here in its title. Look along your tab strip for it, or take over here.",
       gone: "No other tab answered. It may have just closed \u2014 try taking over.",
       cta: "Use here instead",
       busy: "taking over\u2026",
@@ -5597,16 +5599,17 @@ ${peer.address}`
     zh: {
       title: "Beagle \u5DF2\u7ECF\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u6253\u5F00\u4E86\u3002",
       body: "\u540C\u4E00\u4E2A\u8EAB\u4EFD\u4E00\u6B21\u53EA\u80FD\u5728\u4E00\u4E2A\u5730\u65B9\u8FD0\u884C\uFF0C\u4E24\u4E2A\u4F1A\u62A2\u540C\u4E00\u6761\u8FDE\u63A5\u3002\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u5DF2\u7ECF\u8FDE\u4E0A\u4E86\uFF0C\u56DE\u5230\u90A3\u8FB9\u901A\u5E38\u624D\u662F\u4F60\u60F3\u8981\u7684\u3002",
+      bar: "\u53EA\u8BFB \u2014\u2014 Beagle \u6B63\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u8FD0\u884C\u3002\u8FD9\u91CC\u53EF\u4EE5\u770B\uFF0C\u53D1\u9001\u5728\u90A3\u8FB9\u3002",
       go: "\u53BB\u90A3\u4E2A\u6807\u7B7E\u9875",
       going: "\u6B63\u5728\u547C\u53EB\u2026",
-      asked: "\u5DF2\u7ECF\u53EB\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u51FA\u6765\u4E86\u3002\u5982\u679C\u6CA1\u53CD\u5E94\uFF0C\u8BF4\u660E\u6D4F\u89C8\u5668\u4E0D\u5141\u8BB8 \u2014\u2014 \u8BF7\u624B\u52A8\u627E\u5230\u90A3\u4E2A Beagle \u6807\u7B7E\u9875\uFF0C\u6216\u8005\u5728\u8FD9\u91CC\u63A5\u7BA1\u3002",
+      asked: "\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u7684\u6807\u9898\u6B63\u5728\u95EA \u{1F44B} Beagle is here\uFF0C\u5728\u6807\u7B7E\u680F\u91CC\u627E\u4E00\u4E0B\uFF0C\u6216\u8005\u5728\u8FD9\u91CC\u63A5\u7BA1\u3002",
       gone: "\u6CA1\u6709\u6807\u7B7E\u9875\u5E94\u7B54\uFF0C\u53EF\u80FD\u521A\u521A\u88AB\u5173\u6389\u4E86 \u2014\u2014 \u76F4\u63A5\u63A5\u7BA1\u8BD5\u8BD5\u3002",
       cta: "\u5C31\u7528\u8FD9\u4E2A\u6807\u7B7E\u9875",
       busy: "\u6B63\u5728\u63A5\u7BA1\u2026",
       failed: "\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u6CA1\u6709\u4EA4\u51FA\u63A7\u5236\u6743\u3002\u8BF7\u5148\u5173\u6389\u5B83\u518D\u8BD5\u3002"
     }
   };
-  function DkLockedOut2({ lang, onTakeover, onLocate }) {
+  function DkLockedOut2({ lang, onTakeover, onLocate, compact }) {
     const W = OB_LOCK_T[lang === "zh" ? "zh" : "en"];
     const [busy, setBusy] = React.useState(false);
     const [failed, setFailed] = React.useState(false);
@@ -5640,6 +5643,57 @@ ${peer.address}`
         setFinding(false);
       }
     };
+    if (compact) {
+      return /* @__PURE__ */ React.createElement("div", { style: {
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 80,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        flexWrap: "wrap",
+        padding: "8px 14px",
+        background: "#241f3d",
+        borderTop: "1px solid #3a3160",
+        fontFamily: OB.ui,
+        fontSize: 12.5,
+        color: "#d9d5ea"
+      } }, /* @__PURE__ */ React.createElement("span", { style: { width: 8, height: 8, borderRadius: 999, background: "#f0a05a", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 200 } }, found === true ? W.asked : found === false ? W.gone : failed ? W.failed : W.bar), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: finding ? void 0 : go,
+          style: {
+            padding: "5px 12px",
+            borderRadius: 7,
+            border: "1px solid #4a3f7a",
+            background: "transparent",
+            color: "#cfc8ee",
+            fontFamily: OB.ui,
+            fontSize: 12,
+            cursor: "pointer"
+          }
+        },
+        finding ? W.going : W.go
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          onClick: busy ? void 0 : take,
+          style: {
+            padding: "5px 12px",
+            borderRadius: 7,
+            border: "none",
+            background: OB.accent,
+            color: "#fff",
+            fontFamily: OB.ui,
+            fontSize: 12,
+            cursor: "pointer"
+          }
+        },
+        busy ? W.busy : W.cta
+      ));
+    }
     return /* @__PURE__ */ React.createElement("div", { className: "ob-root", style: {
       alignItems: "center",
       justifyContent: "center",

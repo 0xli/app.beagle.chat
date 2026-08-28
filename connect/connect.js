@@ -4656,6 +4656,8 @@ ${nonce2}`);
   var PUNKS_API = "https://api.beagle.chat/punksapi";
   var ACTION_CHANNEL = "beagle-web-actions";
   var ACTION_TIMEOUT_MS = 3e4;
+  var ACTION_PROBE_MS = 1500;
+  var APP_WINDOW = "beagle-app";
   var $ = (id) => document.getElementById(id);
   var qs = new URLSearchParams(location.search);
   var origin = qs.get("origin") || "";
@@ -4706,7 +4708,7 @@ ${nonce2}`);
     const type = action === "add" ? "beagle-action" : "decent-auth";
     window.opener.postMessage({ type, nonce, ...action === "add" ? { action } : {}, ...data }, origin);
   }
-  function askAppToAdd(address, hello) {
+  function askAppToAdd(address, hello, { timeoutMs = ACTION_TIMEOUT_MS } = {}) {
     return new Promise((resolve) => {
       let bc;
       try {
@@ -4721,7 +4723,7 @@ ${nonce2}`);
         bc.close();
         resolve(r);
       };
-      const timer = setTimeout(() => done({ ok: false, error: "no-app" }), ACTION_TIMEOUT_MS);
+      const timer = setTimeout(() => done({ ok: false, error: "no-app" }), timeoutMs);
       bc.onmessage = (ev) => {
         const d = ev.data;
         if (d?.type === "add-friend-result" && d.id === id)
@@ -4729,6 +4731,16 @@ ${nonce2}`);
       };
       bc.postMessage({ type: "add-friend", id, address, hello });
     });
+  }
+  async function sendAddFriend(address, hello, onOpeningApp) {
+    const quick = await askAppToAdd(address, hello, { timeoutMs: ACTION_PROBE_MS });
+    if (quick.ok || quick.error !== "no-app")
+      return quick;
+    onOpeningApp?.();
+    const win = window.open("/", APP_WINDOW);
+    if (!win)
+      return { ok: false, error: "popup-blocked" };
+    return askAppToAdd(address, hello);
   }
   async function avatarFor(profile2) {
     if (profile2?.avatarDataUrl)
@@ -4776,7 +4788,13 @@ ${nonce2}`);
     btn.disabled = true;
     if (action === "add") {
       btn.textContent = "Sending\u2026";
-      const r = await askAppToAdd(target, targetName ? `Hi \u2014 we met on ${new URL(origin).host}.` : "");
+      const r = await sendAddFriend(
+        target,
+        targetName ? `Hi \u2014 we met on ${new URL(origin).host}.` : "",
+        () => {
+          btn.textContent = "Opening Beagle\u2026";
+        }
+      );
       if (r.ok) {
         reply({ ok: true, address: target });
         setTimeout(() => window.close(), 60);
@@ -4784,8 +4802,11 @@ ${nonce2}`);
       }
       btn.disabled = false;
       btn.textContent = "Send request";
-      if (r.error === "no-app") {
-        fail("Beagle is not open in this browser, so nothing was sent. Open it in another tab and try again.");
+      if (r.error === "popup-blocked") {
+        fail("Your browser blocked Beagle from opening. Allow pop-ups for this site, or open Beagle in another tab, then try again.");
+        $("open").hidden = false;
+      } else if (r.error === "no-app") {
+        fail("Beagle did not come up in time, so nothing was sent. Try again in a moment.");
         $("open").hidden = false;
       } else {
         fail("Could not send the request: " + (r.error || "unknown error"));
