@@ -10836,6 +10836,14 @@
   __export(peer_exports, {
     Peer: () => Peer
   });
+  function parsePunkField(value) {
+    if (!value)
+      return void 0;
+    const n = Number(value.trim());
+    if (!Number.isInteger(n) || n < 0 || n > 9999)
+      return void 0;
+    return n;
+  }
   function decodeUtf8Best(payload) {
     if (payload.length === 0)
       return "";
@@ -13221,6 +13229,8 @@
             opts.nickname = info.name;
           if (info.description !== void 0)
             opts.statusMessage = info.description;
+          if (info.punkId !== void 0)
+            opts.punkId = info.punkId ?? void 0;
           __privateGet(this, _profileSentTo).clear();
           for (const timer of __privateGet(this, _profileRetryTimers).values())
             clearTimeout(timer);
@@ -13236,7 +13246,10 @@
           const opts = __privateGet(this, _opts3);
           return {
             name: opts.nickname ?? PEER_NICKNAME,
-            description: opts.statusMessage ?? PEER_STATUS_MESSAGE
+            description: opts.statusMessage ?? PEER_STATUS_MESSAGE,
+            // Reported so "what am I actually advertising" is answerable without
+            // reading a packet capture — the UI surfaces this as `me.advertised`.
+            punkId: opts.punkId
           };
         }
         /**
@@ -14555,12 +14568,14 @@
         if (kind === PACKET_ID_STATUSMESSAGE) {
           let userInfoName;
           let userInfoDescr;
+          let userInfoPunk;
           let clientMeta;
           try {
             const decoded = decodeCarrierPacket(inner);
             if (decoded.type === PACKET_TYPE_USERINFO) {
               userInfoName = decoded.name;
               userInfoDescr = decoded.descr;
+              userInfoPunk = parsePunkField(decoded.gender);
               if (decoded.protoVersion || decoded.platform || decoded.appVersion) {
                 clientMeta = {
                   protoVersion: decoded.protoVersion,
@@ -14576,15 +14591,17 @@
             const friend = __privateGet(this, _friends).get(friendId);
             const newName = userInfoName && userInfoName.length > 0 ? userInfoName : friend?.name;
             const newDescr = userInfoDescr ?? friend?.description;
+            const newPunk = userInfoPunk ?? friend?.punkId;
             const metaChanged = friend != null && clientMeta != null && (friend.protoVersion !== clientMeta.protoVersion || friend.platform !== clientMeta.platform || friend.osVersion !== clientMeta.osVersion || friend.appVersion !== clientMeta.appVersion);
-            if (friend && (friend.name !== newName || friend.description !== newDescr || metaChanged)) {
-              __privateGet(this, _friends).set(friendId, { ...friend, name: newName, description: newDescr, ...clientMeta ?? {} });
+            if (friend && (friend.name !== newName || friend.description !== newDescr || friend.punkId !== newPunk || metaChanged)) {
+              __privateGet(this, _friends).set(friendId, { ...friend, name: newName, description: newDescr, punkId: newPunk, ...clientMeta ?? {} });
               __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
               __privateGet(this, _events).emit("friendInfo", {
                 pubkey: friendId,
                 userid: friend.userid ?? friendId,
                 name: newName,
                 description: newDescr,
+                punkId: newPunk,
                 ...clientMeta ?? {}
               });
             }
@@ -15060,7 +15077,12 @@
                 protoVersion: AGENTNET_PROTO_VERSION,
                 platform: __privateGet(this, _opts3).platform ?? process.platform,
                 osVersion: __privateGet(this, _opts3).osVersion ?? `node-${process.versions?.node ?? ""}`,
-                appVersion: __privateGet(this, _opts3).appVersion ?? `peer-${PEER_PKG_VERSION}`
+                appVersion: __privateGet(this, _opts3).appVersion ?? `peer-${PEER_PKG_VERSION}`,
+                // The avatar, in the field Beagle uses for it (see punkId on
+                // FriendInfoEvent). OMITTED when we have none, never sent as "":
+                // an empty string would clear an avatar the friend already
+                // resolved. Without this, iOS shows us no picture at all.
+                ...__privateGet(this, _opts3).punkId != null ? { gender: String(__privateGet(this, _opts3).punkId) } : {}
               });
               await __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_STATUSMESSAGE, userInfo);
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `userinfo sent to ${friendId} (name="${nick}", descr="${descr}", proto=${AGENTNET_PROTO_VERSION}, platform=${__privateGet(this, _opts3).platform ?? process.platform})`);
@@ -17218,6 +17240,9 @@ ${ts}`);
       tcpOnlyBootstrap: true,
       nickname: profile.name || void 0,
       statusMessage: profile.description || void 0,
+      // Advertised at startup, not only when the profile is edited — otherwise
+      // a returning user's friends never see the avatar they picked last time.
+      punkId: profile.punkId ?? void 0,
       platform: "js",
       appVersion: "beagle-web",
       debugLabel: "browser"
@@ -17283,7 +17308,7 @@ ${ts}`);
     });
     peer.onFriendInfo((ev) => {
       confirm(ev.pubkey);
-      onEvent?.({ type: "friend-info", userid: ev.pubkey, name: ev.name });
+      onEvent?.({ type: "friend-info", userid: ev.pubkey, name: ev.name, punkId: ev.punkId ?? null });
     });
     const fileBytes = /* @__PURE__ */ new Map();
     const takenNames = /* @__PURE__ */ new Set();
@@ -17502,6 +17527,10 @@ ${ts}`);
         // cannot, and treats the offer as an incoming CALL.
         platform: f.platform || "",
         appVersion: f.appVersion || "",
+        // The avatar they advertised over Carrier, in the userinfo `gender`
+        // field. Peer-to-peer, so it works for a friend who never registered a
+        // beagles.eth name — which until now meant an identicon and nothing else.
+        punkId: f.punkId ?? null,
         unread: s?.unread ?? 0,
         lastMessage: s?.lastMessage ?? null
       };
@@ -17592,7 +17621,7 @@ ${ts}`);
             profile.onboarded = !!req.onboarded;
           await kvPut(PROFILE_KEY, profile);
           try {
-            peer.setUserInfo({ name: profile.name, description: profile.description });
+            peer.setUserInfo({ name: profile.name, description: profile.description, punkId: profile.punkId ?? null });
           } catch {
           }
           return ok(profile);
@@ -18142,7 +18171,10 @@ ${ts}`);
       platform: f.platform ?? "",
       appVersion: f.appVersion ?? "",
       avatarUrl: dir?.avatarUrl ?? null,
-      punkId: dir?.punkId ?? null,
+      // What they advertised over Carrier wins over the directory: it is what
+      // they are using on their device right now, it needs no gateway, and it
+      // is the only one a friend who never registered a name will ever have.
+      punkId: f.punkId ?? dir?.punkId ?? null,
       points: 0,
       agent: "",
       wire: "",
