@@ -4676,6 +4676,7 @@ ${nonce2}`);
 
   // src/connect.js
   var PUNKS_API = "https://api.beagle.chat/punksapi";
+  var ENS_GATEWAY = "https://ens-gateway.beaglechat.workers.dev";
   var ACTION_CHANNEL = "beagle-web-actions";
   var ACTION_TIMEOUT_MS = 3e4;
   var ACTION_PROBE_MS = 1500;
@@ -4764,12 +4765,29 @@ ${nonce2}`);
       return { ok: false, error: "popup-blocked" };
     return askAppToAdd(address, hello);
   }
-  async function avatarFor(profile2) {
+  async function ensAvatarFor(userid) {
+    if (!userid)
+      return null;
+    try {
+      const r = await fetch(`${ENS_GATEWAY}/getAddress/${encodeURIComponent(userid)}`);
+      if (!r.ok)
+        return null;
+      const rec = await r.json();
+      const t = rec?.texts ?? {};
+      if (t.avatar)
+        return t.avatar;
+      const punk = rec?.nft === "CryptoPunks" && typeof rec?.nftid === "number" && rec.nftid > 0 ? rec.nftid : null;
+      return punk != null ? punkUrls(punk)[0] : null;
+    } catch {
+      return null;
+    }
+  }
+  async function avatarFor(profile2, userid) {
     if (profile2?.avatarDataUrl)
       return profile2.avatarDataUrl;
     const id = profile2?.punkId;
     if (id == null)
-      return null;
+      return ensAvatarFor(userid);
     try {
       const r = await fetch(`${PUNKS_API}/api/punks/${encodeURIComponent(id)}`);
       if (!r.ok)
@@ -4788,7 +4806,7 @@ ${nonce2}`);
       `https://www.larvalabs.com/public/images/cryptopunks/punk${String(n).padStart(4, "0")}.png`
     ];
   }
-  function showAvatar(profile2) {
+  function showAvatar(profile2, userid) {
     const el = $("avatarImg");
     const urls = [];
     if (profile2?.avatarDataUrl)
@@ -4796,6 +4814,12 @@ ${nonce2}`);
     urls.push(...punkUrls(profile2?.punkId));
     if (!urls.length) {
       el.hidden = true;
+      ensAvatarFor(userid).then((u) => {
+        if (u) {
+          el.src = u;
+          el.hidden = false;
+        }
+      });
       return;
     }
     let i = 0;
@@ -4877,7 +4901,7 @@ ${nonce2}`);
         $("userid").textContent = userid;
         $("who").textContent = name;
         $("who").hidden = false;
-        showAvatar(profile);
+        showAvatar(profile, userid);
         if (ok)
           $("approve").disabled = false;
       } catch (err) {
@@ -4910,7 +4934,7 @@ ${nonce2}`);
       $("userid").textContent = userid;
       $("who").textContent = profile?.name || "";
       $("who").hidden = !profile?.name;
-      showAvatar(profile);
+      showAvatar(profile, userid);
       if (ok)
         $("approve").disabled = false;
     } catch (err) {
@@ -4956,7 +4980,7 @@ ${nonce2}`);
       const { userid, address } = describeIdentity(identity);
       const sig = bytesToHex(signAuth(identity, origin, nonce));
       const avatar = await Promise.race([
-        avatarFor(profile),
+        avatarFor(profile, userid),
         new Promise((r) => setTimeout(() => r(null), 2500))
       ]);
       reply({ userid, address, sig, name: profile?.name || "", avatar });
