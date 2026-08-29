@@ -4496,10 +4496,21 @@
 
   // src/identity.js
   var KEYFILE_FORMAT = "decent-peer-tox-keypair-v1";
+  function createIdentity() {
+    const kp = import_tweetnacl3.default.box.keyPair();
+    return { publicKey: kp.publicKey, secretKey: kp.secretKey };
+  }
   function describeIdentity(keyPair, nospam = 0) {
     return {
       userid: carrierIdFromPublicKey(keyPair.publicKey),
       address: carrierAddressFromPublicKey(keyPair.publicKey, nospam)
+    };
+  }
+  function exportIdentity(keyPair) {
+    return {
+      format: KEYFILE_FORMAT,
+      publicKey: bytesToHex(keyPair.publicKey),
+      secretKey: bytesToHex(keyPair.secretKey)
     };
   }
   function importIdentity(parsed) {
@@ -4651,6 +4662,14 @@ ${nonce2}`);
       return fallback;
     }
   }
+  async function kvPut(key, value, { timeoutMs } = {}) {
+    return withStore(
+      async () => tx(await openDB(), KV, "readwrite", (s) => s.put(value, key), timeoutMs),
+      () => {
+        memKv.set(key, value);
+      }
+    );
+  }
 
   // src/connect.js
   var PUNKS_API = "https://api.beagle.chat/punksapi";
@@ -4759,12 +4778,58 @@ ${nonce2}`);
   }
   var identity = null;
   var profile = null;
+  function showFirstRun() {
+    const zh = (navigator.language || "").toLowerCase().startsWith("zh");
+    $("firstRun").hidden = false;
+    $("idCard").hidden = true;
+    $("approve").hidden = true;
+    $("firstRunHint").textContent = zh ? "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u8FD8\u6CA1\u6709 Beagle \u8EAB\u4EFD\u3002\u53D6\u4E2A\u540D\u5B57\u5C31\u80FD\u7EE7\u7EED \u2014\u2014 \u5BC6\u94A5\u5728\u672C\u673A\u751F\u6210,\u4E0D\u4E0A\u4F20\u3002" : "No Beagle identity in this browser yet. Pick a name to continue \u2014 the key is generated here and never leaves this device.";
+    const input = $("nameInput");
+    const go = $("createBtn");
+    go.textContent = zh ? "\u521B\u5EFA\u5E76\u7EE7\u7EED" : "Create and continue";
+    input.placeholder = zh ? "\u4F60\u7684\u540D\u5B57" : "Your name";
+    input.focus();
+    const submit = async () => {
+      const name = input.value.trim();
+      if (!name) {
+        input.focus();
+        return;
+      }
+      go.disabled = true;
+      go.textContent = zh ? "\u521B\u5EFA\u4E2D\u2026" : "Creating\u2026";
+      try {
+        const kp = createIdentity();
+        await kvPut("identity", exportIdentity(kp));
+        await kvPut("profile", { name, onboarded: true });
+        identity = kp;
+        profile = { name };
+        const { userid } = describeIdentity(kp);
+        $("firstRun").hidden = true;
+        $("idCard").hidden = false;
+        $("approve").hidden = false;
+        $("userid").textContent = userid;
+        $("who").textContent = name;
+        $("who").hidden = false;
+        if (ok)
+          $("approve").disabled = false;
+      } catch (err) {
+        go.disabled = false;
+        go.textContent = zh ? "\u521B\u5EFA\u5E76\u7EE7\u7EED" : "Create and continue";
+        fail((zh ? "\u65E0\u6CD5\u5728\u8FD9\u4E2A\u6D4F\u89C8\u5668\u91CC\u4FDD\u5B58\u8EAB\u4EFD:" : "Could not save an identity in this browser: ") + (err?.message || err));
+        $("open").hidden = false;
+      }
+    };
+    go.onclick = submit;
+    input.onkeydown = (e) => {
+      if (e.key === "Enter")
+        submit();
+    };
+  }
   (async function load() {
     try {
       const stored = await kvGetSafe("identity", null);
       if (!stored) {
-        fail("No Beagle identity in this browser yet. Open Beagle, set a name, then try again.");
-        $("open").hidden = false;
+        showFirstRun();
         return;
       }
       identity = importIdentity(stored);

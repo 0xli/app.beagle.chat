@@ -32,6 +32,10 @@
   /* display:block beats the UA stylesheet's [hidden]{display:none}, so the
      link showed even when there WAS an identity. Specificity, not logic. */
   [hidden]{display:none !important}
+  .namein{width:100%;box-sizing:border-box;background:#0e1016;border:1px solid var(--line);
+          border-radius:10px;padding:11px 12px;color:var(--text);font-size:14px;
+          font-family:inherit;outline:none}
+  .namein:focus{border-color:var(--accent)}
   .note{color:var(--faint);font-size:11.5px;margin:15px 0 0;line-height:1.45}
 </style></head>
 <body>
@@ -44,10 +48,15 @@
       <div id="targetName" class="who" hidden></div>
       <div id="targetAddr" class="userid"></div>
     </div>
-    <div class="id">
+    <div id="idCard" class="id">
       <div id="idLabel" class="lbl">Your identity</div>
       <div id="who" class="who" hidden></div>
       <div id="userid" class="userid">loading…</div>
+    </div>
+    <div id="firstRun" hidden>
+      <div id="firstRunHint" class="sub"></div>
+      <input id="nameInput" class="namein" maxlength="40" autocomplete="nickname" />
+      <button id="createBtn" class="btn solid" style="width:100%;margin-top:10px"></button>
     </div>
     <div id="err" class="err" hidden></div>
     <a id="open" class="open" href="/" target="_blank" rel="noopener" hidden>Open Beagle →</a>
@@ -60,5 +69,5 @@
 <!-- Absolute, not relative: the URL is /connect with no trailing slash, so a
      relative src resolves against / and 404s. Nothing reports that — the page
      just sits at "loading…". -->
-<script src="/connect/connect.js?v=66f657af9b"></script>
+<script src="/connect/connect.js?v=9cc0bbd6ef"></script>
 </body></html>
