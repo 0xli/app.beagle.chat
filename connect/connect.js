@@ -4773,11 +4773,41 @@ ${nonce2}`);
     try {
       const r = await fetch(`${PUNKS_API}/api/punks/${encodeURIComponent(id)}`);
       if (!r.ok)
-        return null;
-      return (await r.json())?.image || null;
+        return punkUrls(id)[0] || null;
+      return (await r.json())?.image || punkUrls(id)[0] || null;
     } catch {
-      return null;
+      return punkUrls(id)[0] || null;
     }
+  }
+  function punkUrls(punkId) {
+    const n = Number(punkId);
+    if (!Number.isInteger(n) || n < 0 || n > 9999)
+      return [];
+    return [
+      `https://www.larvalabs.com/cryptopunks/cryptopunk${n}.png`,
+      `https://www.larvalabs.com/public/images/cryptopunks/punk${String(n).padStart(4, "0")}.png`
+    ];
+  }
+  function showAvatar(profile2) {
+    const el = $("avatarImg");
+    const urls = [];
+    if (profile2?.avatarDataUrl)
+      urls.push(profile2.avatarDataUrl);
+    urls.push(...punkUrls(profile2?.punkId));
+    if (!urls.length) {
+      el.hidden = true;
+      return;
+    }
+    let i = 0;
+    el.onerror = () => {
+      i += 1;
+      if (i < urls.length)
+        el.src = urls[i];
+      else
+        el.hidden = true;
+    };
+    el.src = urls[0];
+    el.hidden = false;
   }
   var identity = null;
   var profile = null;
@@ -4795,6 +4825,29 @@ ${nonce2}`);
     $("firstRunHint").textContent = zh ? "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u8FD8\u6CA1\u6709 Beagle \u8EAB\u4EFD\u3002\u53D6\u4E2A\u540D\u5B57\u5C31\u80FD\u7EE7\u7EED \u2014\u2014 \u5BC6\u94A5\u5728\u672C\u673A\u751F\u6210,\u4E0D\u4E0A\u4F20\u3002" : "No Beagle identity in this browser yet. Pick a name to continue \u2014 the key is generated here and never leaves this device.";
     const input = $("nameInput");
     const go = $("createBtn");
+    let punkId = null;
+    const grid = $("punkGrid");
+    const draw = () => {
+      grid.innerHTML = "";
+      punkId = null;
+      for (let k = 0; k < 8; k++) {
+        const id = Math.floor(Math.random() * 1e4);
+        const img = document.createElement("img");
+        img.className = "punk";
+        img.src = punkUrls(id)[0];
+        img.title = `punk #${id}`;
+        img.onerror = () => img.remove();
+        img.onclick = () => {
+          punkId = id;
+          for (const other of grid.querySelectorAll("img"))
+            other.classList.remove("sel");
+          img.classList.add("sel");
+        };
+        grid.appendChild(img);
+      }
+    };
+    draw();
+    $("shuffleBtn").onclick = draw;
     go.textContent = zh ? "\u521B\u5EFA\u5E76\u7EE7\u7EED" : "Create and continue";
     input.placeholder = zh ? "\u4F60\u7684\u540D\u5B57" : "Your name";
     input.focus();
@@ -4809,14 +4862,14 @@ ${nonce2}`);
       try {
         const kp = createIdentity();
         await kvPut("identity", exportIdentity(kp));
-        await kvPut("profile", { name, onboarded: true });
+        await kvPut("profile", { name, punkId, onboarded: true });
         if (isStorageWedged()) {
           showNoStorage();
           $("firstRun").hidden = true;
           return;
         }
         identity = kp;
-        profile = { name };
+        profile = { name, punkId };
         const { userid } = describeIdentity(kp);
         $("firstRun").hidden = true;
         $("idCard").hidden = false;
@@ -4824,6 +4877,7 @@ ${nonce2}`);
         $("userid").textContent = userid;
         $("who").textContent = name;
         $("who").hidden = false;
+        showAvatar(profile);
         if (ok)
           $("approve").disabled = false;
       } catch (err) {
@@ -4856,6 +4910,7 @@ ${nonce2}`);
       $("userid").textContent = userid;
       $("who").textContent = profile?.name || "";
       $("who").hidden = !profile?.name;
+      showAvatar(profile);
       if (ok)
         $("approve").disabled = false;
     } catch (err) {
