@@ -4607,6 +4607,9 @@ ${nonce2}`);
       return false;
     }
   })();
+  function isStorageWedged() {
+    return storageWedged;
+  }
   var memKv = /* @__PURE__ */ new Map();
   async function withStore(op, fallback) {
     if (storageWedged)
@@ -4778,6 +4781,12 @@ ${nonce2}`);
   }
   var identity = null;
   var profile = null;
+  function showNoStorage() {
+    const zh = (navigator.language || "").toLowerCase().startsWith("zh");
+    fail(zh ? "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u4E3A\u672C\u7AD9\u4FDD\u5B58\u6570\u636E(Safari \u65E0\u75D5\u6216\u5DF2\u6E05\u9664\u7F51\u7AD9\u6570\u636E)\u3002\u5728\u8FD9\u91CC\u521B\u5EFA\u7684\u8EAB\u4EFD\u4F1A\u968F\u7A97\u53E3\u4E00\u8D77\u6D88\u5931,\u5DF2\u6709\u7684\u8EAB\u4EFD\u4E5F\u8BFB\u4E0D\u51FA\u6765 \u2014\u2014 \u6240\u4EE5\u8FD9\u91CC\u4E0D\u80FD\u7B7E\u540D\u3002\u8BF7\u6253\u5F00 Beagle \u5904\u7406,\u6216\u5B89\u88C5\u684C\u9762\u7248\u3002" : "This browser is not storing data for this site (Safari private mode, or site data cleared). An identity created here would vanish with this window, and an existing one cannot be read \u2014 so nothing can be signed. Open Beagle to sort it out, or install the desktop app.");
+    $("open").hidden = false;
+    $("approve").hidden = true;
+  }
   function showFirstRun() {
     const zh = (navigator.language || "").toLowerCase().startsWith("zh");
     $("firstRun").hidden = false;
@@ -4801,6 +4810,11 @@ ${nonce2}`);
         const kp = createIdentity();
         await kvPut("identity", exportIdentity(kp));
         await kvPut("profile", { name, onboarded: true });
+        if (isStorageWedged()) {
+          showNoStorage();
+          $("firstRun").hidden = true;
+          return;
+        }
         identity = kp;
         profile = { name };
         const { userid } = describeIdentity(kp);
@@ -4829,6 +4843,10 @@ ${nonce2}`);
     try {
       const stored = await kvGetSafe("identity", null);
       if (!stored) {
+        if (isStorageWedged()) {
+          showNoStorage();
+          return;
+        }
         showFirstRun();
         return;
       }
