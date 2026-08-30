@@ -8549,7 +8549,12 @@
           __privateAdd(this, _selfAddress, void 0);
           __privateAdd(this, _currNode, 0);
           __privateAdd(this, _callbacks, void 0);
+          // Own gate, and env-only until now — so in a browser this client was mute
+          // whatever the peer's debug setting was. That is why a stalled pull looked
+          // identical to a pull that never ran.
           __privateAdd(this, _debug, process.env.DECENT_DEBUG === "1");
+          if (opts.debug)
+            __privateSet(this, _debug, true);
           __privateSet(this, _selfKeyPair, opts.selfKeyPair);
           __privateSet(this, _selfUserId, opts.selfUserId);
           __privateSet(this, _selfAddress, opts.selfAddress);
@@ -8584,6 +8589,7 @@
           await __privateMethod(this, _postEncrypted, postEncrypted_fn).call(this, friendUserId, friendEncrypted);
         }
         async pullOnce() {
+          __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${__privateGet(this, _nodes2).length} node(s)`);
           if (!__privateGet(this, _nodes2).length) {
             return;
           }
@@ -8591,11 +8597,13 @@
             let body2;
             try {
               body2 = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
-            } catch {
+            } catch (error) {
+              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${node.host}:${node.port} failed: ${error?.message ?? error}`);
               continue;
             }
             const messages = parseExpressResponseFrames(body2);
             if (messages.length === 0) {
+              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${body2.length} byte(s) from ${node.host} parsed to 0 frames`);
               continue;
             }
             __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce got ${messages.length} offline frame(s) from ${node.host}:${node.port}`);
@@ -12386,7 +12394,7 @@
           if (__privateGet(this, _started)) {
             return;
           }
-          __privateSet(this, _keyPair2, await loadOrCreateKeyPair(__privateGet(this, _opts3).keyFile));
+          __privateSet(this, _keyPair2, __privateGet(this, _opts3).keyPair ?? await loadOrCreateKeyPair(__privateGet(this, _opts3).keyFile));
           __privateSet(this, _bootstrap, new LegacyBootstrapClient({
             nodes: __privateGet(this, _opts3).bootstrapNodes,
             keyPair: __privateGet(this, _keyPair2),
@@ -12404,6 +12412,7 @@
               selfKeyPair: __privateGet(this, _keyPair2),
               selfUserId: this.userid(),
               selfAddress: this.address(),
+              debug: __privateGet(this, _debug4),
               callbacks: {
                 onOfflineFriendRequest: (fromUserId, packet) => {
                   __privateMethod(this, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn).call(this, fromUserId, packet);
@@ -14316,8 +14325,10 @@
       _ensureExpressPullLoop = new WeakSet();
       ensureExpressPullLoop_fn = function() {
         if (!__privateGet(this, _express)?.hasNodes() || __privateGet(this, _expressPollTimer) || EXPRESS_PULL_INTERVAL_MS <= 0) {
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull loop NOT started: hasClient=${!!__privateGet(this, _express)} hasNodes=${!!__privateGet(this, _express)?.hasNodes()} alreadyRunning=${!!__privateGet(this, _expressPollTimer)} interval=${EXPRESS_PULL_INTERVAL_MS}`);
           return;
         }
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull loop started, every ${EXPRESS_PULL_INTERVAL_MS}ms`);
         const pull = () => {
           void __privateGet(this, _express)?.pullOnce().catch((error) => {
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull failed: ${error.message}`);
@@ -17670,6 +17681,10 @@ ${ts}`);
             backend: "browser",
             transport: "tcp-relay",
             online: joined,
+            // How many store-and-forward nodes the peer was actually given.
+            // Zero here means the SDK built no express client at all, which is
+            // indistinguishable from a healthy-but-empty inbox without it.
+            expressNodeCount: expressNodes.length,
             dht: dht(),
             friends: await friendList(),
             // What the peer will actually put in a friend-request packet and push
