@@ -18717,12 +18717,17 @@ ${ts}`);
     };
   }
   var RELAY_PROXY_PREFIX = "/relay";
+  var RELAY_PROXY_ORIGINS = /* @__PURE__ */ new Set([
+    "https://im.beagle.chat"
+  ]);
   function rewriteRelayUrl(url, relayHosts2) {
     try {
       const u = new URL(url, location.origin);
       if (u.origin === location.origin)
         return url;
       if (!relayHosts2.has(u.hostname))
+        return url;
+      if (!RELAY_PROXY_ORIGINS.has(location.origin))
         return url;
       return `${location.origin}${RELAY_PROXY_PREFIX}${u.pathname}${u.search}`;
     } catch {
