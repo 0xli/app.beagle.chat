@@ -12598,6 +12598,26 @@
           if (!__privateGet(this, _bootstrap)) {
             throw new Error("Peer is not started");
           }
+          if (__privateGet(this, _opts3).tcpOnlyBootstrap) {
+            const seed = __privateGet(this, _opts3).bootstrapNodes ?? [];
+            if (seed.length === 0) {
+              throw new Error("tcpOnlyBootstrap needs at least one bootstrap node to seed from");
+            }
+            __privateSet(this, _knownNodes, dedupeNodes([...seed]));
+            await __privateMethod(this, _runSelfAnnounce, runSelfAnnounce_fn).call(this, false, Date.now() + JOIN_ANNOUNCE_TIMEOUT_MS);
+            __privateMethod(this, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn).call(this);
+            __privateMethod(this, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn).call(this);
+            __privateMethod(this, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn).call(this);
+            __privateMethod(this, _ensureExpressPullLoop, ensureExpressPullLoop_fn).call(this);
+            void __privateMethod(this, _doFriendConnections, doFriendConnections_fn).call(this).catch((error) => {
+              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `initial friend connection cycle failed: ${error.message}`);
+            });
+            const first = seed[0];
+            return {
+              respondingNode: first,
+              discoveredNodes: []
+            };
+          }
           const result = await __privateGet(this, _bootstrap).join();
           __privateMethod(this, _recordNodeSuccess, recordNodeSuccess_fn).call(this, `${result.respondingNode.host}:${result.respondingNode.port}`);
           const discovered = result.discoveredNodes.map((node) => ({
