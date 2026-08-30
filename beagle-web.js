@@ -11227,7 +11227,7 @@
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
-  var import_tweetnacl13, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
+  var import_tweetnacl13, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
   var init_peer = __esm({
     "node_modules/@decentnetwork/peer/dist/peer.js"() {
       init_buffer_global();
@@ -11356,6 +11356,21 @@
           __privateAdd(this, _dispatchTextMessage);
           __privateAdd(this, _sendTextAck);
           __privateAdd(this, _rememberDeliveredTextId);
+          /** Where the delivered-id set lives between runs. Next to the friend store,
+           *  because it is the same kind of state: what this node already knows. */
+          __privateAdd(this, _deliveredStoreFile);
+          /** Persist the seen delivery ids.
+           *
+           *  In memory only, this set died with the process — and the moment it did,
+           *  every message the sender had retransmitted while we were down was
+           *  accepted as new. Restart the daemon during a conversation and the last
+           *  messages arrive TWICE, which is exactly what a restart-heavy evening
+           *  looked like. The sender is behaving correctly: it never got an ACK, so
+           *  it resent. Remembering is the receiver's job.
+           *
+           *  Debounced: a busy chat would otherwise write the file per message. */
+          __privateAdd(this, _persistDeliveredTextIds);
+          __privateAdd(this, _loadDeliveredTextIds);
           /**
            * True once the friend's implicit acks (PACKET_ID_REQUEST walks) have moved
            * our reliable send window past `endPacketNumber` — i.e. every packet we had
@@ -11720,6 +11735,7 @@
           __privateAdd(this, _textHandlers, /* @__PURE__ */ new Set());
           __privateAdd(this, _pendingTextAcks, /* @__PURE__ */ new Map());
           __privateAdd(this, _deliveredTextIds, /* @__PURE__ */ new Set());
+          __privateAdd(this, _deliveredPersistTimer, void 0);
           __privateAdd(this, _deliveredTextOrder, []);
           __privateAdd(this, _friendStoreFile, void 0);
           __privateAdd(this, _persistSeq, 0);
@@ -12406,6 +12422,7 @@
           }
           __privateSet(this, _cookieSymmetricKey, randomBytes2(32));
           await __privateMethod(this, _loadPersistedFriends, loadPersistedFriends_fn).call(this);
+          await __privateMethod(this, _loadDeliveredTextIds, loadDeliveredTextIds_fn).call(this);
           if (__privateGet(this, _opts3).expressNodes && __privateGet(this, _opts3).expressNodes.length > 0) {
             __privateSet(this, _express, new LegacyExpressClient({
               nodes: __privateGet(this, _opts3).expressNodes,
@@ -12718,14 +12735,23 @@
         knownNodes() {
           return [...__privateGet(this, _knownNodes)];
         }
-        async sendFriendRequest(pubkey, hello) {
+        /** @param opts.force  Send even when this friend looks already-accepted.
+         *
+         *  The idempotency guard below is right for automatic retries and wrong for
+         *  a person clicking "add". If the other side REJECTED an earlier request,
+         *  their app forgets it — but a net_crypto session may already have been
+         *  established, so this side keeps acceptedAt and skips every later attempt.
+         *  Neither peer is then in the other's friend list and nothing either user
+         *  does can fix it: every add is silently dropped here. A deliberate add has
+         *  to be able to say "I mean it". */
+        async sendFriendRequest(pubkey, hello, opts) {
           if (!__privateGet(this, _keyPair2) || !__privateGet(this, _announceDataKey)) {
             throw new Error("Peer is not started");
           }
           const friendAddress = parseCarrierAddress(pubkey);
           const friendId = carrierIdFromPublicKey(friendAddress.publicKey);
           const existing = __privateGet(this, _friends).get(friendId);
-          if (existing?.acceptedAt) {
+          if (existing?.acceptedAt && !opts?.force) {
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend request skipped \u2014 ${friendId} already accepted at ${new Date(existing.acceptedAt).toISOString()}`);
             __privateSet(this, _lastFriendRequestDispatch, {
               transport: "onion",
@@ -12869,8 +12895,17 @@
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `accept friend: initiate session failed for ${pubkey}: ${error.message}`);
           });
         }
+        /** Decline an inbound request.
+         *
+         *  Also drops any friend record and session the request already created.
+         *  Clearing only the pending list left the transport half-attached: the
+         *  sender saw a session, marked us accepted, and its idempotency guard then
+         *  skipped every later attempt — so a rejected peer could never ask again,
+         *  and neither side could see why. */
         rejectFriendRequest(pubkey) {
           __privateGet(this, _pendingFriendRequests).delete(pubkey);
+          if (__privateGet(this, _friends).has(pubkey))
+            this.removeFriend(pubkey);
         }
         /**
          * Drop a friend entirely: tear down any active net_crypto session, forget
@@ -13350,6 +13385,7 @@
       _textHandlers = new WeakMap();
       _pendingTextAcks = new WeakMap();
       _deliveredTextIds = new WeakMap();
+      _deliveredPersistTimer = new WeakMap();
       _deliveredTextOrder = new WeakMap();
       _friendStoreFile = new WeakMap();
       _persistSeq = new WeakMap();
@@ -13600,6 +13636,48 @@
           const old = __privateGet(this, _deliveredTextOrder).shift();
           if (old)
             __privateGet(this, _deliveredTextIds).delete(old);
+        }
+        __privateMethod(this, _persistDeliveredTextIds, persistDeliveredTextIds_fn).call(this);
+      };
+      _deliveredStoreFile = new WeakSet();
+      deliveredStoreFile_get = function() {
+        return __privateGet(this, _friendStoreFile) ? `${__privateGet(this, _friendStoreFile)}.delivered.json` : void 0;
+      };
+      _persistDeliveredTextIds = new WeakSet();
+      persistDeliveredTextIds_fn = function() {
+        const file = __privateGet(this, _deliveredStoreFile, deliveredStoreFile_get);
+        if (!file || __privateGet(this, _deliveredPersistTimer))
+          return;
+        __privateSet(this, _deliveredPersistTimer, setTimeout(() => {
+          __privateSet(this, _deliveredPersistTimer, void 0);
+          const payload = JSON.stringify(__privateGet(this, _deliveredTextOrder));
+          const tmp = `${file}.tmp.${process.pid}.${__privateWrapper(this, _persistSeq)._++}`;
+          void mkdir(dirname(file), { recursive: true }).then(() => writeFile(tmp, payload, "utf8")).then(() => rename(tmp, file)).catch((error) => {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `persist delivered ids failed: ${error.message}`);
+          });
+        }, 1e3));
+        __privateGet(this, _deliveredPersistTimer).unref?.();
+      };
+      _loadDeliveredTextIds = new WeakSet();
+      loadDeliveredTextIds_fn = async function() {
+        const file = __privateGet(this, _deliveredStoreFile, deliveredStoreFile_get);
+        if (!file)
+          return;
+        try {
+          const raw = await readFile(file, "utf8");
+          const ids = JSON.parse(raw);
+          if (!Array.isArray(ids))
+            return;
+          for (const id of ids) {
+            if (typeof id !== "string")
+              continue;
+            if (__privateGet(this, _deliveredTextIds).has(id))
+              continue;
+            __privateGet(this, _deliveredTextIds).add(id);
+            __privateGet(this, _deliveredTextOrder).push(id);
+          }
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `loaded ${__privateGet(this, _deliveredTextIds).size} delivered text id(s)`);
+        } catch {
         }
       };
       _awaitTransportAck = new WeakSet();
@@ -17752,7 +17830,7 @@ ${ts}`);
             return fail("that does not look like a Carrier address");
           }
           outgoing.set(userid, { address: req.address, requestedAt: Date.now() });
-          void peer.sendFriendRequest(req.address, req.hello ?? "hi").then(() => onEvent?.({ type: "friend-request-sent", userid })).catch((err) => onEvent?.({
+          void peer.sendFriendRequest(req.address, req.hello ?? "hi", { force: true }).then(() => onEvent?.({ type: "friend-request-sent", userid })).catch((err) => onEvent?.({
             type: "friend-request-failed",
             userid,
             error: String(err?.message || err)
