@@ -18483,9 +18483,9 @@ ${ts}`);
       switch (`${method} ${p}`) {
         case "GET /api/backend":
           return json({ ok: true, kind: "browser", hasVirtualLan: false, state: "browser", switchable: false, releaseSecondsLeft: 0, command: "" });
-        case "GET /api/desktop":
         case "GET /api/diag":
           return json(await call2("diag"));
+        case "GET /api/desktop":
         case "GET /api/state": {
           const [diag, pend, flist, ens] = await Promise.all([
             call2("diag"),
