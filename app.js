@@ -3132,6 +3132,7 @@ ${peer.address}`
         }
       }
     }
+    const IDLE_POLL_MS = 400;
     async function pollLoop() {
       let cursor = null;
       while (!stopped) {
@@ -3159,6 +3160,9 @@ ${peer.address}`
             } catch (e) {
             }
           }
+        }
+        if (!signals.length) {
+          await new Promise((res) => setTimeout(res, IDLE_POLL_MS));
         }
       }
     }
