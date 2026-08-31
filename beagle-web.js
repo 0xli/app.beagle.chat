@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.156","ui":"0.2.2","builtAt":"2026-08-31T02:12:50.183Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.156","ui":"0.2.2","builtAt":"2026-08-31T03:11:54.203Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -17723,6 +17723,29 @@ ${ts}`);
           onEvent?.({ type: "file-complete-no-data", userid: p.friendId, name: p.name, size: p.size });
         await recordMessage(p.friendId, "in", "", "online", { name: rname, size: p.size, status: "received" });
         onEvent?.({ type: "file-received", userid: p.friendId, name: rname, size: p.size });
+      })();
+    });
+    peer.onInlineFile?.((f) => {
+      if (f.via === "online")
+        confirm(f.pubkey);
+      const rname = uniqueName(f.name);
+      void (async () => {
+        try {
+          await stashFile(rname, f.data);
+          await recordMessage(f.pubkey, "in", "", f.via || "online", {
+            name: rname,
+            size: f.data?.length ?? 0,
+            status: "received"
+          });
+          onEvent?.({ type: "file-received", userid: f.pubkey, name: rname, size: f.data?.length ?? 0 });
+        } catch (err) {
+          onEvent?.({
+            type: "inline-file-failed",
+            userid: f.pubkey,
+            name: f.name,
+            error: String(err?.message || err)
+          });
+        }
       })();
     });
     const dec2 = new TextDecoder();
