@@ -1,3 +1,4 @@
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.154","ui":"0.2.2","builtAt":"2026-08-31T00:15:48.903Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -686,7 +687,7 @@
     "node_modules/tweetnacl/nacl-fast.js"(exports, module) {
       init_buffer_global();
       init_process_global();
-      (function(nacl14) {
+      (function(nacl18) {
         "use strict";
         var gf = function(init) {
           var i, r = new Float64Array(16);
@@ -2699,7 +2700,7 @@
           return n;
         }
         var crypto_secretbox_KEYBYTES = 32, crypto_secretbox_NONCEBYTES = 24, crypto_secretbox_ZEROBYTES = 32, crypto_secretbox_BOXZEROBYTES = 16, crypto_scalarmult_BYTES = 32, crypto_scalarmult_SCALARBYTES = 32, crypto_box_PUBLICKEYBYTES = 32, crypto_box_SECRETKEYBYTES = 32, crypto_box_BEFORENMBYTES = 32, crypto_box_NONCEBYTES = crypto_secretbox_NONCEBYTES, crypto_box_ZEROBYTES = crypto_secretbox_ZEROBYTES, crypto_box_BOXZEROBYTES = crypto_secretbox_BOXZEROBYTES, crypto_sign_BYTES = 64, crypto_sign_PUBLICKEYBYTES = 32, crypto_sign_SECRETKEYBYTES = 64, crypto_sign_SEEDBYTES = 32, crypto_hash_BYTES = 64;
-        nacl14.lowlevel = {
+        nacl18.lowlevel = {
           crypto_core_hsalsa20,
           crypto_stream_xor,
           crypto_stream,
@@ -2777,12 +2778,12 @@
           for (var i = 0; i < arr.length; i++)
             arr[i] = 0;
         }
-        nacl14.randomBytes = function(n) {
+        nacl18.randomBytes = function(n) {
           var b = new Uint8Array(n);
           randombytes(b, n);
           return b;
         };
-        nacl14.secretbox = function(msg, nonce, key2) {
+        nacl18.secretbox = function(msg, nonce, key2) {
           checkArrayTypes(msg, nonce, key2);
           checkLengths(key2, nonce);
           var m = new Uint8Array(crypto_secretbox_ZEROBYTES + msg.length);
@@ -2792,7 +2793,7 @@
           crypto_secretbox(c, m, m.length, nonce, key2);
           return c.subarray(crypto_secretbox_BOXZEROBYTES);
         };
-        nacl14.secretbox.open = function(box, nonce, key2) {
+        nacl18.secretbox.open = function(box, nonce, key2) {
           checkArrayTypes(box, nonce, key2);
           checkLengths(key2, nonce);
           var c = new Uint8Array(crypto_secretbox_BOXZEROBYTES + box.length);
@@ -2805,10 +2806,10 @@
             return null;
           return m.subarray(crypto_secretbox_ZEROBYTES);
         };
-        nacl14.secretbox.keyLength = crypto_secretbox_KEYBYTES;
-        nacl14.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
-        nacl14.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
-        nacl14.scalarMult = function(n, p) {
+        nacl18.secretbox.keyLength = crypto_secretbox_KEYBYTES;
+        nacl18.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
+        nacl18.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
+        nacl18.scalarMult = function(n, p) {
           checkArrayTypes(n, p);
           if (n.length !== crypto_scalarmult_SCALARBYTES)
             throw new Error("bad n size");
@@ -2818,7 +2819,7 @@
           crypto_scalarmult(q, n, p);
           return q;
         };
-        nacl14.scalarMult.base = function(n) {
+        nacl18.scalarMult.base = function(n) {
           checkArrayTypes(n);
           if (n.length !== crypto_scalarmult_SCALARBYTES)
             throw new Error("bad n size");
@@ -2826,32 +2827,32 @@
           crypto_scalarmult_base(q, n);
           return q;
         };
-        nacl14.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
-        nacl14.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
-        nacl14.box = function(msg, nonce, publicKey, secretKey) {
-          var k = nacl14.box.before(publicKey, secretKey);
-          return nacl14.secretbox(msg, nonce, k);
+        nacl18.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
+        nacl18.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
+        nacl18.box = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl18.box.before(publicKey, secretKey);
+          return nacl18.secretbox(msg, nonce, k);
         };
-        nacl14.box.before = function(publicKey, secretKey) {
+        nacl18.box.before = function(publicKey, secretKey) {
           checkArrayTypes(publicKey, secretKey);
           checkBoxLengths(publicKey, secretKey);
           var k = new Uint8Array(crypto_box_BEFORENMBYTES);
           crypto_box_beforenm(k, publicKey, secretKey);
           return k;
         };
-        nacl14.box.after = nacl14.secretbox;
-        nacl14.box.open = function(msg, nonce, publicKey, secretKey) {
-          var k = nacl14.box.before(publicKey, secretKey);
-          return nacl14.secretbox.open(msg, nonce, k);
+        nacl18.box.after = nacl18.secretbox;
+        nacl18.box.open = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl18.box.before(publicKey, secretKey);
+          return nacl18.secretbox.open(msg, nonce, k);
         };
-        nacl14.box.open.after = nacl14.secretbox.open;
-        nacl14.box.keyPair = function() {
+        nacl18.box.open.after = nacl18.secretbox.open;
+        nacl18.box.keyPair = function() {
           var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
           var sk = new Uint8Array(crypto_box_SECRETKEYBYTES);
           crypto_box_keypair(pk, sk);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl14.box.keyPair.fromSecretKey = function(secretKey) {
+        nacl18.box.keyPair.fromSecretKey = function(secretKey) {
           checkArrayTypes(secretKey);
           if (secretKey.length !== crypto_box_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -2859,12 +2860,12 @@
           crypto_scalarmult_base(pk, secretKey);
           return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
         };
-        nacl14.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
-        nacl14.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
-        nacl14.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
-        nacl14.box.nonceLength = crypto_box_NONCEBYTES;
-        nacl14.box.overheadLength = nacl14.secretbox.overheadLength;
-        nacl14.sign = function(msg, secretKey) {
+        nacl18.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
+        nacl18.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
+        nacl18.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
+        nacl18.box.nonceLength = crypto_box_NONCEBYTES;
+        nacl18.box.overheadLength = nacl18.secretbox.overheadLength;
+        nacl18.sign = function(msg, secretKey) {
           checkArrayTypes(msg, secretKey);
           if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -2872,7 +2873,7 @@
           crypto_sign(signedMsg, msg, msg.length, secretKey);
           return signedMsg;
         };
-        nacl14.sign.open = function(signedMsg, publicKey) {
+        nacl18.sign.open = function(signedMsg, publicKey) {
           checkArrayTypes(signedMsg, publicKey);
           if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
             throw new Error("bad public key size");
@@ -2885,14 +2886,14 @@
             m[i] = tmp[i];
           return m;
         };
-        nacl14.sign.detached = function(msg, secretKey) {
-          var signedMsg = nacl14.sign(msg, secretKey);
+        nacl18.sign.detached = function(msg, secretKey) {
+          var signedMsg = nacl18.sign(msg, secretKey);
           var sig = new Uint8Array(crypto_sign_BYTES);
           for (var i = 0; i < sig.length; i++)
             sig[i] = signedMsg[i];
           return sig;
         };
-        nacl14.sign.detached.verify = function(msg, sig, publicKey) {
+        nacl18.sign.detached.verify = function(msg, sig, publicKey) {
           checkArrayTypes(msg, sig, publicKey);
           if (sig.length !== crypto_sign_BYTES)
             throw new Error("bad signature size");
@@ -2907,13 +2908,13 @@
             sm[i + crypto_sign_BYTES] = msg[i];
           return crypto_sign_open(m, sm, sm.length, publicKey) >= 0;
         };
-        nacl14.sign.keyPair = function() {
+        nacl18.sign.keyPair = function() {
           var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
           var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
           crypto_sign_keypair(pk, sk);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl14.sign.keyPair.fromSecretKey = function(secretKey) {
+        nacl18.sign.keyPair.fromSecretKey = function(secretKey) {
           checkArrayTypes(secretKey);
           if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -2922,7 +2923,7 @@
             pk[i] = secretKey[32 + i];
           return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
         };
-        nacl14.sign.keyPair.fromSeed = function(seed) {
+        nacl18.sign.keyPair.fromSeed = function(seed) {
           checkArrayTypes(seed);
           if (seed.length !== crypto_sign_SEEDBYTES)
             throw new Error("bad seed size");
@@ -2933,18 +2934,18 @@
           crypto_sign_keypair(pk, sk, true);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl14.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
-        nacl14.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
-        nacl14.sign.seedLength = crypto_sign_SEEDBYTES;
-        nacl14.sign.signatureLength = crypto_sign_BYTES;
-        nacl14.hash = function(msg) {
+        nacl18.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
+        nacl18.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
+        nacl18.sign.seedLength = crypto_sign_SEEDBYTES;
+        nacl18.sign.signatureLength = crypto_sign_BYTES;
+        nacl18.hash = function(msg) {
           checkArrayTypes(msg);
           var h = new Uint8Array(crypto_hash_BYTES);
           crypto_hash(h, msg, msg.length);
           return h;
         };
-        nacl14.hash.hashLength = crypto_hash_BYTES;
-        nacl14.verify = function(x, y) {
+        nacl18.hash.hashLength = crypto_hash_BYTES;
+        nacl18.verify = function(x, y) {
           checkArrayTypes(x, y);
           if (x.length === 0 || y.length === 0)
             return false;
@@ -2952,14 +2953,14 @@
             return false;
           return vn(x, 0, y, 0, x.length) === 0 ? true : false;
         };
-        nacl14.setPRNG = function(fn) {
+        nacl18.setPRNG = function(fn) {
           randombytes = fn;
         };
         (function() {
           var crypto2 = typeof self !== "undefined" ? self.crypto || self.msCrypto : null;
           if (crypto2 && crypto2.getRandomValues) {
             var QUOTA = 65536;
-            nacl14.setPRNG(function(x, n) {
+            nacl18.setPRNG(function(x, n) {
               var i, v = new Uint8Array(n);
               for (i = 0; i < n; i += QUOTA) {
                 crypto2.getRandomValues(v.subarray(i, i + Math.min(n - i, QUOTA)));
@@ -2971,7 +2972,7 @@
           } else if (typeof __require !== "undefined") {
             crypto2 = (init_node_crypto(), __toCommonJS(node_crypto_exports));
             if (crypto2 && crypto2.randomBytes) {
-              nacl14.setPRNG(function(x, n) {
+              nacl18.setPRNG(function(x, n) {
                 var i, v = crypto2.randomBytes(n);
                 for (i = 0; i < n; i++)
                   x[i] = v[i];
@@ -2984,12 +2985,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/utils/base58.js
-  var base58_exports = {};
-  __export(base58_exports, {
-    base58ToBytes: () => base58ToBytes,
-    bytesToBase58: () => bytesToBase58
-  });
+  // ../peer/packages/peer/dist/utils/base58.js
   function base58ToBytes(value) {
     if (!value) {
       throw new Error("base58 value is required");
@@ -3040,7 +3036,8 @@
   }
   var ALPHABET, BASE, indexes;
   var init_base58 = __esm({
-    "node_modules/@decentnetwork/peer/dist/utils/base58.js"() {
+    "../peer/packages/peer/dist/utils/base58.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -3049,84 +3046,9 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/address.js
-  function carrierAddressFromPublicKey(publicKey, nospam = 0) {
-    if (publicKey.length !== CARRIER_PUBLIC_KEY_SIZE) {
-      throw new Error(`Carrier public key must be ${CARRIER_PUBLIC_KEY_SIZE} bytes`);
-    }
-    const address = new Uint8Array(CARRIER_ADDRESS_SIZE);
-    address.set(publicKey, 0);
-    writeUint32LE(address, CARRIER_PUBLIC_KEY_SIZE, nospam);
-    writeUint16LE(address, CARRIER_PUBLIC_KEY_SIZE + CARRIER_NOSPAM_SIZE, addressChecksum(address.subarray(0, -2)));
-    return bytesToBase58(address);
-  }
-  function parseCarrierAddress(address) {
-    const bytes = base58ToBytes(address);
-    if (bytes.length !== CARRIER_ADDRESS_SIZE) {
-      throw new Error(`Carrier address must decode to ${CARRIER_ADDRESS_SIZE} bytes`);
-    }
-    const actual = readUint16LE(bytes, CARRIER_PUBLIC_KEY_SIZE + CARRIER_NOSPAM_SIZE);
-    const expected = addressChecksum(bytes.subarray(0, -2));
-    if (actual !== expected) {
-      throw new Error("Carrier address checksum mismatch");
-    }
-    return {
-      publicKey: bytes.slice(0, CARRIER_PUBLIC_KEY_SIZE),
-      nospam: readUint32LE(bytes, CARRIER_PUBLIC_KEY_SIZE),
-      checksum: actual
-    };
-  }
-  function carrierIdFromAddress(address) {
-    return bytesToBase58(parseCarrierAddress(address).publicKey);
-  }
-  function carrierIdFromPublicKey(publicKey) {
-    if (publicKey.length !== CARRIER_PUBLIC_KEY_SIZE) {
-      throw new Error(`Carrier public key must be ${CARRIER_PUBLIC_KEY_SIZE} bytes`);
-    }
-    return bytesToBase58(publicKey);
-  }
-  function addressChecksum(bytes) {
-    const checksum = [0, 0];
-    for (let i = 0; i < bytes.length; i++) {
-      checksum[i % 2] ^= bytes[i];
-    }
-    return checksum[0] | checksum[1] << 8;
-  }
-  function writeUint16LE(bytes, offset, value) {
-    bytes[offset] = value & 255;
-    bytes[offset + 1] = value >>> 8 & 255;
-  }
-  function readUint16LE(bytes, offset) {
-    return bytes[offset] | bytes[offset + 1] << 8;
-  }
-  function writeUint32LE(bytes, offset, value) {
-    if (!Number.isInteger(value) || value < 0 || value > 4294967295) {
-      throw new Error("Carrier nospam must be a uint32");
-    }
-    bytes[offset] = value & 255;
-    bytes[offset + 1] = value >>> 8 & 255;
-    bytes[offset + 2] = value >>> 16 & 255;
-    bytes[offset + 3] = value >>> 24 & 255;
-  }
-  function readUint32LE(bytes, offset) {
-    return (bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16 | bytes[offset + 3] << 24) >>> 0;
-  }
-  var CARRIER_PUBLIC_KEY_SIZE, CARRIER_NOSPAM_SIZE, CARRIER_ADDRESS_CHECKSUM_SIZE, CARRIER_ADDRESS_SIZE;
-  var init_address = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/address.js"() {
-      init_buffer_global();
-      init_process_global();
-      init_base58();
-      CARRIER_PUBLIC_KEY_SIZE = 32;
-      CARRIER_NOSPAM_SIZE = 4;
-      CARRIER_ADDRESS_CHECKSUM_SIZE = 2;
-      CARRIER_ADDRESS_SIZE = CARRIER_PUBLIC_KEY_SIZE + CARRIER_NOSPAM_SIZE + CARRIER_ADDRESS_CHECKSUM_SIZE;
-    }
-  });
-
-  // node_modules/curve25519-js/lib/index.js
+  // ../peer/packages/peer/node_modules/curve25519-js/lib/index.js
   var require_lib = __commonJS({
-    "node_modules/curve25519-js/lib/index.js"(exports) {
+    "../peer/packages/peer/node_modules/curve25519-js/lib/index.js"(exports) {
       "use strict";
       init_buffer_global();
       init_process_global();
@@ -4595,17 +4517,17 @@
             throw new TypeError("unexpected type " + t + ", use Uint8Array");
         }
       }
-      function sharedKey(secretKey, publicKey) {
+      function sharedKey2(secretKey, publicKey) {
         checkArrayTypes(publicKey, secretKey);
         if (publicKey.length !== 32)
           throw new Error("wrong public key length");
         if (secretKey.length !== 32)
           throw new Error("wrong secret key length");
-        var sharedKey2 = new Uint8Array(32);
-        crypto_scalarmult(sharedKey2, secretKey, publicKey);
-        return sharedKey2;
+        var sharedKey3 = new Uint8Array(32);
+        crypto_scalarmult(sharedKey3, secretKey, publicKey);
+        return sharedKey3;
       }
-      exports.sharedKey = sharedKey;
+      exports.sharedKey = sharedKey2;
       function signMessage(secretKey, msg, opt_random) {
         checkArrayTypes(msg, secretKey);
         if (secretKey.length !== 32)
@@ -4694,60 +4616,2306 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/crypto/sign.js
-  function signDetached(secretKey, message) {
-    if (secretKey.length !== import_tweetnacl2.default.box.secretKeyLength) {
-      throw new Error(`secretKey must be ${import_tweetnacl2.default.box.secretKeyLength} bytes`);
-    }
-    const random = import_tweetnacl2.default.randomBytes(64);
-    return (0, import_curve25519_js.sign)(secretKey, message, random);
-  }
-  var import_curve25519_js, import_tweetnacl2;
-  var init_sign = __esm({
-    "node_modules/@decentnetwork/peer/dist/crypto/sign.js"() {
+  // ../peer/node_modules/.pnpm/tweetnacl@1.0.3/node_modules/tweetnacl/nacl-fast.js
+  var require_nacl_fast2 = __commonJS({
+    "../peer/node_modules/.pnpm/tweetnacl@1.0.3/node_modules/tweetnacl/nacl-fast.js"(exports, module) {
       init_buffer_global();
       init_process_global();
-      import_curve25519_js = __toESM(require_lib());
-      import_tweetnacl2 = __toESM(require_nacl_fast());
-    }
-  });
-
-  // node_modules/@decentnetwork/peer/dist/utils/bytes.js
-  function bytesToHex2(bytes) {
-    return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  }
-  function hexToBytes2(hex2) {
-    if (hex2.length % 2 !== 0) {
-      throw new Error("hex string must have an even length");
-    }
-    const bytes = new Uint8Array(hex2.length / 2);
-    for (let i = 0; i < bytes.length; i++) {
-      const value = Number.parseInt(hex2.slice(i * 2, i * 2 + 2), 16);
-      if (Number.isNaN(value)) {
-        throw new Error("invalid hex string");
-      }
-      bytes[i] = value;
-    }
-    return bytes;
-  }
-  function concatBytes(parts) {
-    const total = parts.reduce((size, part) => size + part.length, 0);
-    const out = new Uint8Array(total);
-    let offset = 0;
-    for (const part of parts) {
-      out.set(part, offset);
-      offset += part.length;
-    }
-    return out;
-  }
-  function randomBytes2(length) {
-    return randomBytes(length);
-  }
-  var init_bytes = __esm({
-    "node_modules/@decentnetwork/peer/dist/utils/bytes.js"() {
-      init_buffer_global();
-      init_process_global();
-      init_node_crypto();
+      (function(nacl18) {
+        "use strict";
+        var gf = function(init) {
+          var i, r = new Float64Array(16);
+          if (init)
+            for (i = 0; i < init.length; i++)
+              r[i] = init[i];
+          return r;
+        };
+        var randombytes = function() {
+          throw new Error("no PRNG");
+        };
+        var _0 = new Uint8Array(16);
+        var _9 = new Uint8Array(32);
+        _9[0] = 9;
+        var gf0 = gf(), gf1 = gf([1]), _121665 = gf([56129, 1]), D = gf([30883, 4953, 19914, 30187, 55467, 16705, 2637, 112, 59544, 30585, 16505, 36039, 65139, 11119, 27886, 20995]), D2 = gf([61785, 9906, 39828, 60374, 45398, 33411, 5274, 224, 53552, 61171, 33010, 6542, 64743, 22239, 55772, 9222]), X = gf([54554, 36645, 11616, 51542, 42930, 38181, 51040, 26924, 56412, 64982, 57905, 49316, 21502, 52590, 14035, 8553]), Y = gf([26200, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214, 26214]), I = gf([41136, 18958, 6951, 50414, 58488, 44335, 6150, 12099, 55207, 15867, 153, 11085, 57099, 20417, 9344, 11139]);
+        function ts64(x, i, h, l) {
+          x[i] = h >> 24 & 255;
+          x[i + 1] = h >> 16 & 255;
+          x[i + 2] = h >> 8 & 255;
+          x[i + 3] = h & 255;
+          x[i + 4] = l >> 24 & 255;
+          x[i + 5] = l >> 16 & 255;
+          x[i + 6] = l >> 8 & 255;
+          x[i + 7] = l & 255;
+        }
+        function vn(x, xi, y, yi, n) {
+          var i, d = 0;
+          for (i = 0; i < n; i++)
+            d |= x[xi + i] ^ y[yi + i];
+          return (1 & d - 1 >>> 8) - 1;
+        }
+        function crypto_verify_16(x, xi, y, yi) {
+          return vn(x, xi, y, yi, 16);
+        }
+        function crypto_verify_32(x, xi, y, yi) {
+          return vn(x, xi, y, yi, 32);
+        }
+        function core_salsa20(o, p, k, c) {
+          var j0 = c[0] & 255 | (c[1] & 255) << 8 | (c[2] & 255) << 16 | (c[3] & 255) << 24, j1 = k[0] & 255 | (k[1] & 255) << 8 | (k[2] & 255) << 16 | (k[3] & 255) << 24, j2 = k[4] & 255 | (k[5] & 255) << 8 | (k[6] & 255) << 16 | (k[7] & 255) << 24, j3 = k[8] & 255 | (k[9] & 255) << 8 | (k[10] & 255) << 16 | (k[11] & 255) << 24, j4 = k[12] & 255 | (k[13] & 255) << 8 | (k[14] & 255) << 16 | (k[15] & 255) << 24, j5 = c[4] & 255 | (c[5] & 255) << 8 | (c[6] & 255) << 16 | (c[7] & 255) << 24, j6 = p[0] & 255 | (p[1] & 255) << 8 | (p[2] & 255) << 16 | (p[3] & 255) << 24, j7 = p[4] & 255 | (p[5] & 255) << 8 | (p[6] & 255) << 16 | (p[7] & 255) << 24, j8 = p[8] & 255 | (p[9] & 255) << 8 | (p[10] & 255) << 16 | (p[11] & 255) << 24, j9 = p[12] & 255 | (p[13] & 255) << 8 | (p[14] & 255) << 16 | (p[15] & 255) << 24, j10 = c[8] & 255 | (c[9] & 255) << 8 | (c[10] & 255) << 16 | (c[11] & 255) << 24, j11 = k[16] & 255 | (k[17] & 255) << 8 | (k[18] & 255) << 16 | (k[19] & 255) << 24, j12 = k[20] & 255 | (k[21] & 255) << 8 | (k[22] & 255) << 16 | (k[23] & 255) << 24, j13 = k[24] & 255 | (k[25] & 255) << 8 | (k[26] & 255) << 16 | (k[27] & 255) << 24, j14 = k[28] & 255 | (k[29] & 255) << 8 | (k[30] & 255) << 16 | (k[31] & 255) << 24, j15 = c[12] & 255 | (c[13] & 255) << 8 | (c[14] & 255) << 16 | (c[15] & 255) << 24;
+          var x0 = j0, x1 = j1, x2 = j2, x3 = j3, x4 = j4, x5 = j5, x6 = j6, x7 = j7, x8 = j8, x9 = j9, x10 = j10, x11 = j11, x12 = j12, x13 = j13, x14 = j14, x15 = j15, u;
+          for (var i = 0; i < 20; i += 2) {
+            u = x0 + x12 | 0;
+            x4 ^= u << 7 | u >>> 32 - 7;
+            u = x4 + x0 | 0;
+            x8 ^= u << 9 | u >>> 32 - 9;
+            u = x8 + x4 | 0;
+            x12 ^= u << 13 | u >>> 32 - 13;
+            u = x12 + x8 | 0;
+            x0 ^= u << 18 | u >>> 32 - 18;
+            u = x5 + x1 | 0;
+            x9 ^= u << 7 | u >>> 32 - 7;
+            u = x9 + x5 | 0;
+            x13 ^= u << 9 | u >>> 32 - 9;
+            u = x13 + x9 | 0;
+            x1 ^= u << 13 | u >>> 32 - 13;
+            u = x1 + x13 | 0;
+            x5 ^= u << 18 | u >>> 32 - 18;
+            u = x10 + x6 | 0;
+            x14 ^= u << 7 | u >>> 32 - 7;
+            u = x14 + x10 | 0;
+            x2 ^= u << 9 | u >>> 32 - 9;
+            u = x2 + x14 | 0;
+            x6 ^= u << 13 | u >>> 32 - 13;
+            u = x6 + x2 | 0;
+            x10 ^= u << 18 | u >>> 32 - 18;
+            u = x15 + x11 | 0;
+            x3 ^= u << 7 | u >>> 32 - 7;
+            u = x3 + x15 | 0;
+            x7 ^= u << 9 | u >>> 32 - 9;
+            u = x7 + x3 | 0;
+            x11 ^= u << 13 | u >>> 32 - 13;
+            u = x11 + x7 | 0;
+            x15 ^= u << 18 | u >>> 32 - 18;
+            u = x0 + x3 | 0;
+            x1 ^= u << 7 | u >>> 32 - 7;
+            u = x1 + x0 | 0;
+            x2 ^= u << 9 | u >>> 32 - 9;
+            u = x2 + x1 | 0;
+            x3 ^= u << 13 | u >>> 32 - 13;
+            u = x3 + x2 | 0;
+            x0 ^= u << 18 | u >>> 32 - 18;
+            u = x5 + x4 | 0;
+            x6 ^= u << 7 | u >>> 32 - 7;
+            u = x6 + x5 | 0;
+            x7 ^= u << 9 | u >>> 32 - 9;
+            u = x7 + x6 | 0;
+            x4 ^= u << 13 | u >>> 32 - 13;
+            u = x4 + x7 | 0;
+            x5 ^= u << 18 | u >>> 32 - 18;
+            u = x10 + x9 | 0;
+            x11 ^= u << 7 | u >>> 32 - 7;
+            u = x11 + x10 | 0;
+            x8 ^= u << 9 | u >>> 32 - 9;
+            u = x8 + x11 | 0;
+            x9 ^= u << 13 | u >>> 32 - 13;
+            u = x9 + x8 | 0;
+            x10 ^= u << 18 | u >>> 32 - 18;
+            u = x15 + x14 | 0;
+            x12 ^= u << 7 | u >>> 32 - 7;
+            u = x12 + x15 | 0;
+            x13 ^= u << 9 | u >>> 32 - 9;
+            u = x13 + x12 | 0;
+            x14 ^= u << 13 | u >>> 32 - 13;
+            u = x14 + x13 | 0;
+            x15 ^= u << 18 | u >>> 32 - 18;
+          }
+          x0 = x0 + j0 | 0;
+          x1 = x1 + j1 | 0;
+          x2 = x2 + j2 | 0;
+          x3 = x3 + j3 | 0;
+          x4 = x4 + j4 | 0;
+          x5 = x5 + j5 | 0;
+          x6 = x6 + j6 | 0;
+          x7 = x7 + j7 | 0;
+          x8 = x8 + j8 | 0;
+          x9 = x9 + j9 | 0;
+          x10 = x10 + j10 | 0;
+          x11 = x11 + j11 | 0;
+          x12 = x12 + j12 | 0;
+          x13 = x13 + j13 | 0;
+          x14 = x14 + j14 | 0;
+          x15 = x15 + j15 | 0;
+          o[0] = x0 >>> 0 & 255;
+          o[1] = x0 >>> 8 & 255;
+          o[2] = x0 >>> 16 & 255;
+          o[3] = x0 >>> 24 & 255;
+          o[4] = x1 >>> 0 & 255;
+          o[5] = x1 >>> 8 & 255;
+          o[6] = x1 >>> 16 & 255;
+          o[7] = x1 >>> 24 & 255;
+          o[8] = x2 >>> 0 & 255;
+          o[9] = x2 >>> 8 & 255;
+          o[10] = x2 >>> 16 & 255;
+          o[11] = x2 >>> 24 & 255;
+          o[12] = x3 >>> 0 & 255;
+          o[13] = x3 >>> 8 & 255;
+          o[14] = x3 >>> 16 & 255;
+          o[15] = x3 >>> 24 & 255;
+          o[16] = x4 >>> 0 & 255;
+          o[17] = x4 >>> 8 & 255;
+          o[18] = x4 >>> 16 & 255;
+          o[19] = x4 >>> 24 & 255;
+          o[20] = x5 >>> 0 & 255;
+          o[21] = x5 >>> 8 & 255;
+          o[22] = x5 >>> 16 & 255;
+          o[23] = x5 >>> 24 & 255;
+          o[24] = x6 >>> 0 & 255;
+          o[25] = x6 >>> 8 & 255;
+          o[26] = x6 >>> 16 & 255;
+          o[27] = x6 >>> 24 & 255;
+          o[28] = x7 >>> 0 & 255;
+          o[29] = x7 >>> 8 & 255;
+          o[30] = x7 >>> 16 & 255;
+          o[31] = x7 >>> 24 & 255;
+          o[32] = x8 >>> 0 & 255;
+          o[33] = x8 >>> 8 & 255;
+          o[34] = x8 >>> 16 & 255;
+          o[35] = x8 >>> 24 & 255;
+          o[36] = x9 >>> 0 & 255;
+          o[37] = x9 >>> 8 & 255;
+          o[38] = x9 >>> 16 & 255;
+          o[39] = x9 >>> 24 & 255;
+          o[40] = x10 >>> 0 & 255;
+          o[41] = x10 >>> 8 & 255;
+          o[42] = x10 >>> 16 & 255;
+          o[43] = x10 >>> 24 & 255;
+          o[44] = x11 >>> 0 & 255;
+          o[45] = x11 >>> 8 & 255;
+          o[46] = x11 >>> 16 & 255;
+          o[47] = x11 >>> 24 & 255;
+          o[48] = x12 >>> 0 & 255;
+          o[49] = x12 >>> 8 & 255;
+          o[50] = x12 >>> 16 & 255;
+          o[51] = x12 >>> 24 & 255;
+          o[52] = x13 >>> 0 & 255;
+          o[53] = x13 >>> 8 & 255;
+          o[54] = x13 >>> 16 & 255;
+          o[55] = x13 >>> 24 & 255;
+          o[56] = x14 >>> 0 & 255;
+          o[57] = x14 >>> 8 & 255;
+          o[58] = x14 >>> 16 & 255;
+          o[59] = x14 >>> 24 & 255;
+          o[60] = x15 >>> 0 & 255;
+          o[61] = x15 >>> 8 & 255;
+          o[62] = x15 >>> 16 & 255;
+          o[63] = x15 >>> 24 & 255;
+        }
+        function core_hsalsa20(o, p, k, c) {
+          var j0 = c[0] & 255 | (c[1] & 255) << 8 | (c[2] & 255) << 16 | (c[3] & 255) << 24, j1 = k[0] & 255 | (k[1] & 255) << 8 | (k[2] & 255) << 16 | (k[3] & 255) << 24, j2 = k[4] & 255 | (k[5] & 255) << 8 | (k[6] & 255) << 16 | (k[7] & 255) << 24, j3 = k[8] & 255 | (k[9] & 255) << 8 | (k[10] & 255) << 16 | (k[11] & 255) << 24, j4 = k[12] & 255 | (k[13] & 255) << 8 | (k[14] & 255) << 16 | (k[15] & 255) << 24, j5 = c[4] & 255 | (c[5] & 255) << 8 | (c[6] & 255) << 16 | (c[7] & 255) << 24, j6 = p[0] & 255 | (p[1] & 255) << 8 | (p[2] & 255) << 16 | (p[3] & 255) << 24, j7 = p[4] & 255 | (p[5] & 255) << 8 | (p[6] & 255) << 16 | (p[7] & 255) << 24, j8 = p[8] & 255 | (p[9] & 255) << 8 | (p[10] & 255) << 16 | (p[11] & 255) << 24, j9 = p[12] & 255 | (p[13] & 255) << 8 | (p[14] & 255) << 16 | (p[15] & 255) << 24, j10 = c[8] & 255 | (c[9] & 255) << 8 | (c[10] & 255) << 16 | (c[11] & 255) << 24, j11 = k[16] & 255 | (k[17] & 255) << 8 | (k[18] & 255) << 16 | (k[19] & 255) << 24, j12 = k[20] & 255 | (k[21] & 255) << 8 | (k[22] & 255) << 16 | (k[23] & 255) << 24, j13 = k[24] & 255 | (k[25] & 255) << 8 | (k[26] & 255) << 16 | (k[27] & 255) << 24, j14 = k[28] & 255 | (k[29] & 255) << 8 | (k[30] & 255) << 16 | (k[31] & 255) << 24, j15 = c[12] & 255 | (c[13] & 255) << 8 | (c[14] & 255) << 16 | (c[15] & 255) << 24;
+          var x0 = j0, x1 = j1, x2 = j2, x3 = j3, x4 = j4, x5 = j5, x6 = j6, x7 = j7, x8 = j8, x9 = j9, x10 = j10, x11 = j11, x12 = j12, x13 = j13, x14 = j14, x15 = j15, u;
+          for (var i = 0; i < 20; i += 2) {
+            u = x0 + x12 | 0;
+            x4 ^= u << 7 | u >>> 32 - 7;
+            u = x4 + x0 | 0;
+            x8 ^= u << 9 | u >>> 32 - 9;
+            u = x8 + x4 | 0;
+            x12 ^= u << 13 | u >>> 32 - 13;
+            u = x12 + x8 | 0;
+            x0 ^= u << 18 | u >>> 32 - 18;
+            u = x5 + x1 | 0;
+            x9 ^= u << 7 | u >>> 32 - 7;
+            u = x9 + x5 | 0;
+            x13 ^= u << 9 | u >>> 32 - 9;
+            u = x13 + x9 | 0;
+            x1 ^= u << 13 | u >>> 32 - 13;
+            u = x1 + x13 | 0;
+            x5 ^= u << 18 | u >>> 32 - 18;
+            u = x10 + x6 | 0;
+            x14 ^= u << 7 | u >>> 32 - 7;
+            u = x14 + x10 | 0;
+            x2 ^= u << 9 | u >>> 32 - 9;
+            u = x2 + x14 | 0;
+            x6 ^= u << 13 | u >>> 32 - 13;
+            u = x6 + x2 | 0;
+            x10 ^= u << 18 | u >>> 32 - 18;
+            u = x15 + x11 | 0;
+            x3 ^= u << 7 | u >>> 32 - 7;
+            u = x3 + x15 | 0;
+            x7 ^= u << 9 | u >>> 32 - 9;
+            u = x7 + x3 | 0;
+            x11 ^= u << 13 | u >>> 32 - 13;
+            u = x11 + x7 | 0;
+            x15 ^= u << 18 | u >>> 32 - 18;
+            u = x0 + x3 | 0;
+            x1 ^= u << 7 | u >>> 32 - 7;
+            u = x1 + x0 | 0;
+            x2 ^= u << 9 | u >>> 32 - 9;
+            u = x2 + x1 | 0;
+            x3 ^= u << 13 | u >>> 32 - 13;
+            u = x3 + x2 | 0;
+            x0 ^= u << 18 | u >>> 32 - 18;
+            u = x5 + x4 | 0;
+            x6 ^= u << 7 | u >>> 32 - 7;
+            u = x6 + x5 | 0;
+            x7 ^= u << 9 | u >>> 32 - 9;
+            u = x7 + x6 | 0;
+            x4 ^= u << 13 | u >>> 32 - 13;
+            u = x4 + x7 | 0;
+            x5 ^= u << 18 | u >>> 32 - 18;
+            u = x10 + x9 | 0;
+            x11 ^= u << 7 | u >>> 32 - 7;
+            u = x11 + x10 | 0;
+            x8 ^= u << 9 | u >>> 32 - 9;
+            u = x8 + x11 | 0;
+            x9 ^= u << 13 | u >>> 32 - 13;
+            u = x9 + x8 | 0;
+            x10 ^= u << 18 | u >>> 32 - 18;
+            u = x15 + x14 | 0;
+            x12 ^= u << 7 | u >>> 32 - 7;
+            u = x12 + x15 | 0;
+            x13 ^= u << 9 | u >>> 32 - 9;
+            u = x13 + x12 | 0;
+            x14 ^= u << 13 | u >>> 32 - 13;
+            u = x14 + x13 | 0;
+            x15 ^= u << 18 | u >>> 32 - 18;
+          }
+          o[0] = x0 >>> 0 & 255;
+          o[1] = x0 >>> 8 & 255;
+          o[2] = x0 >>> 16 & 255;
+          o[3] = x0 >>> 24 & 255;
+          o[4] = x5 >>> 0 & 255;
+          o[5] = x5 >>> 8 & 255;
+          o[6] = x5 >>> 16 & 255;
+          o[7] = x5 >>> 24 & 255;
+          o[8] = x10 >>> 0 & 255;
+          o[9] = x10 >>> 8 & 255;
+          o[10] = x10 >>> 16 & 255;
+          o[11] = x10 >>> 24 & 255;
+          o[12] = x15 >>> 0 & 255;
+          o[13] = x15 >>> 8 & 255;
+          o[14] = x15 >>> 16 & 255;
+          o[15] = x15 >>> 24 & 255;
+          o[16] = x6 >>> 0 & 255;
+          o[17] = x6 >>> 8 & 255;
+          o[18] = x6 >>> 16 & 255;
+          o[19] = x6 >>> 24 & 255;
+          o[20] = x7 >>> 0 & 255;
+          o[21] = x7 >>> 8 & 255;
+          o[22] = x7 >>> 16 & 255;
+          o[23] = x7 >>> 24 & 255;
+          o[24] = x8 >>> 0 & 255;
+          o[25] = x8 >>> 8 & 255;
+          o[26] = x8 >>> 16 & 255;
+          o[27] = x8 >>> 24 & 255;
+          o[28] = x9 >>> 0 & 255;
+          o[29] = x9 >>> 8 & 255;
+          o[30] = x9 >>> 16 & 255;
+          o[31] = x9 >>> 24 & 255;
+        }
+        function crypto_core_salsa20(out, inp, k, c) {
+          core_salsa20(out, inp, k, c);
+        }
+        function crypto_core_hsalsa20(out, inp, k, c) {
+          core_hsalsa20(out, inp, k, c);
+        }
+        var sigma = new Uint8Array([101, 120, 112, 97, 110, 100, 32, 51, 50, 45, 98, 121, 116, 101, 32, 107]);
+        function crypto_stream_salsa20_xor(c, cpos, m, mpos, b, n, k) {
+          var z = new Uint8Array(16), x = new Uint8Array(64);
+          var u, i;
+          for (i = 0; i < 16; i++)
+            z[i] = 0;
+          for (i = 0; i < 8; i++)
+            z[i] = n[i];
+          while (b >= 64) {
+            crypto_core_salsa20(x, z, k, sigma);
+            for (i = 0; i < 64; i++)
+              c[cpos + i] = m[mpos + i] ^ x[i];
+            u = 1;
+            for (i = 8; i < 16; i++) {
+              u = u + (z[i] & 255) | 0;
+              z[i] = u & 255;
+              u >>>= 8;
+            }
+            b -= 64;
+            cpos += 64;
+            mpos += 64;
+          }
+          if (b > 0) {
+            crypto_core_salsa20(x, z, k, sigma);
+            for (i = 0; i < b; i++)
+              c[cpos + i] = m[mpos + i] ^ x[i];
+          }
+          return 0;
+        }
+        function crypto_stream_salsa20(c, cpos, b, n, k) {
+          var z = new Uint8Array(16), x = new Uint8Array(64);
+          var u, i;
+          for (i = 0; i < 16; i++)
+            z[i] = 0;
+          for (i = 0; i < 8; i++)
+            z[i] = n[i];
+          while (b >= 64) {
+            crypto_core_salsa20(x, z, k, sigma);
+            for (i = 0; i < 64; i++)
+              c[cpos + i] = x[i];
+            u = 1;
+            for (i = 8; i < 16; i++) {
+              u = u + (z[i] & 255) | 0;
+              z[i] = u & 255;
+              u >>>= 8;
+            }
+            b -= 64;
+            cpos += 64;
+          }
+          if (b > 0) {
+            crypto_core_salsa20(x, z, k, sigma);
+            for (i = 0; i < b; i++)
+              c[cpos + i] = x[i];
+          }
+          return 0;
+        }
+        function crypto_stream(c, cpos, d, n, k) {
+          var s = new Uint8Array(32);
+          crypto_core_hsalsa20(s, n, k, sigma);
+          var sn = new Uint8Array(8);
+          for (var i = 0; i < 8; i++)
+            sn[i] = n[i + 16];
+          return crypto_stream_salsa20(c, cpos, d, sn, s);
+        }
+        function crypto_stream_xor(c, cpos, m, mpos, d, n, k) {
+          var s = new Uint8Array(32);
+          crypto_core_hsalsa20(s, n, k, sigma);
+          var sn = new Uint8Array(8);
+          for (var i = 0; i < 8; i++)
+            sn[i] = n[i + 16];
+          return crypto_stream_salsa20_xor(c, cpos, m, mpos, d, sn, s);
+        }
+        var poly1305 = function(key2) {
+          this.buffer = new Uint8Array(16);
+          this.r = new Uint16Array(10);
+          this.h = new Uint16Array(10);
+          this.pad = new Uint16Array(8);
+          this.leftover = 0;
+          this.fin = 0;
+          var t0, t1, t2, t3, t4, t5, t6, t7;
+          t0 = key2[0] & 255 | (key2[1] & 255) << 8;
+          this.r[0] = t0 & 8191;
+          t1 = key2[2] & 255 | (key2[3] & 255) << 8;
+          this.r[1] = (t0 >>> 13 | t1 << 3) & 8191;
+          t2 = key2[4] & 255 | (key2[5] & 255) << 8;
+          this.r[2] = (t1 >>> 10 | t2 << 6) & 7939;
+          t3 = key2[6] & 255 | (key2[7] & 255) << 8;
+          this.r[3] = (t2 >>> 7 | t3 << 9) & 8191;
+          t4 = key2[8] & 255 | (key2[9] & 255) << 8;
+          this.r[4] = (t3 >>> 4 | t4 << 12) & 255;
+          this.r[5] = t4 >>> 1 & 8190;
+          t5 = key2[10] & 255 | (key2[11] & 255) << 8;
+          this.r[6] = (t4 >>> 14 | t5 << 2) & 8191;
+          t6 = key2[12] & 255 | (key2[13] & 255) << 8;
+          this.r[7] = (t5 >>> 11 | t6 << 5) & 8065;
+          t7 = key2[14] & 255 | (key2[15] & 255) << 8;
+          this.r[8] = (t6 >>> 8 | t7 << 8) & 8191;
+          this.r[9] = t7 >>> 5 & 127;
+          this.pad[0] = key2[16] & 255 | (key2[17] & 255) << 8;
+          this.pad[1] = key2[18] & 255 | (key2[19] & 255) << 8;
+          this.pad[2] = key2[20] & 255 | (key2[21] & 255) << 8;
+          this.pad[3] = key2[22] & 255 | (key2[23] & 255) << 8;
+          this.pad[4] = key2[24] & 255 | (key2[25] & 255) << 8;
+          this.pad[5] = key2[26] & 255 | (key2[27] & 255) << 8;
+          this.pad[6] = key2[28] & 255 | (key2[29] & 255) << 8;
+          this.pad[7] = key2[30] & 255 | (key2[31] & 255) << 8;
+        };
+        poly1305.prototype.blocks = function(m, mpos, bytes) {
+          var hibit = this.fin ? 0 : 1 << 11;
+          var t0, t1, t2, t3, t4, t5, t6, t7, c;
+          var d0, d1, d2, d3, d4, d5, d6, d7, d8, d9;
+          var h0 = this.h[0], h1 = this.h[1], h2 = this.h[2], h3 = this.h[3], h4 = this.h[4], h5 = this.h[5], h6 = this.h[6], h7 = this.h[7], h8 = this.h[8], h9 = this.h[9];
+          var r0 = this.r[0], r1 = this.r[1], r2 = this.r[2], r3 = this.r[3], r4 = this.r[4], r5 = this.r[5], r6 = this.r[6], r7 = this.r[7], r8 = this.r[8], r9 = this.r[9];
+          while (bytes >= 16) {
+            t0 = m[mpos + 0] & 255 | (m[mpos + 1] & 255) << 8;
+            h0 += t0 & 8191;
+            t1 = m[mpos + 2] & 255 | (m[mpos + 3] & 255) << 8;
+            h1 += (t0 >>> 13 | t1 << 3) & 8191;
+            t2 = m[mpos + 4] & 255 | (m[mpos + 5] & 255) << 8;
+            h2 += (t1 >>> 10 | t2 << 6) & 8191;
+            t3 = m[mpos + 6] & 255 | (m[mpos + 7] & 255) << 8;
+            h3 += (t2 >>> 7 | t3 << 9) & 8191;
+            t4 = m[mpos + 8] & 255 | (m[mpos + 9] & 255) << 8;
+            h4 += (t3 >>> 4 | t4 << 12) & 8191;
+            h5 += t4 >>> 1 & 8191;
+            t5 = m[mpos + 10] & 255 | (m[mpos + 11] & 255) << 8;
+            h6 += (t4 >>> 14 | t5 << 2) & 8191;
+            t6 = m[mpos + 12] & 255 | (m[mpos + 13] & 255) << 8;
+            h7 += (t5 >>> 11 | t6 << 5) & 8191;
+            t7 = m[mpos + 14] & 255 | (m[mpos + 15] & 255) << 8;
+            h8 += (t6 >>> 8 | t7 << 8) & 8191;
+            h9 += t7 >>> 5 | hibit;
+            c = 0;
+            d0 = c;
+            d0 += h0 * r0;
+            d0 += h1 * (5 * r9);
+            d0 += h2 * (5 * r8);
+            d0 += h3 * (5 * r7);
+            d0 += h4 * (5 * r6);
+            c = d0 >>> 13;
+            d0 &= 8191;
+            d0 += h5 * (5 * r5);
+            d0 += h6 * (5 * r4);
+            d0 += h7 * (5 * r3);
+            d0 += h8 * (5 * r2);
+            d0 += h9 * (5 * r1);
+            c += d0 >>> 13;
+            d0 &= 8191;
+            d1 = c;
+            d1 += h0 * r1;
+            d1 += h1 * r0;
+            d1 += h2 * (5 * r9);
+            d1 += h3 * (5 * r8);
+            d1 += h4 * (5 * r7);
+            c = d1 >>> 13;
+            d1 &= 8191;
+            d1 += h5 * (5 * r6);
+            d1 += h6 * (5 * r5);
+            d1 += h7 * (5 * r4);
+            d1 += h8 * (5 * r3);
+            d1 += h9 * (5 * r2);
+            c += d1 >>> 13;
+            d1 &= 8191;
+            d2 = c;
+            d2 += h0 * r2;
+            d2 += h1 * r1;
+            d2 += h2 * r0;
+            d2 += h3 * (5 * r9);
+            d2 += h4 * (5 * r8);
+            c = d2 >>> 13;
+            d2 &= 8191;
+            d2 += h5 * (5 * r7);
+            d2 += h6 * (5 * r6);
+            d2 += h7 * (5 * r5);
+            d2 += h8 * (5 * r4);
+            d2 += h9 * (5 * r3);
+            c += d2 >>> 13;
+            d2 &= 8191;
+            d3 = c;
+            d3 += h0 * r3;
+            d3 += h1 * r2;
+            d3 += h2 * r1;
+            d3 += h3 * r0;
+            d3 += h4 * (5 * r9);
+            c = d3 >>> 13;
+            d3 &= 8191;
+            d3 += h5 * (5 * r8);
+            d3 += h6 * (5 * r7);
+            d3 += h7 * (5 * r6);
+            d3 += h8 * (5 * r5);
+            d3 += h9 * (5 * r4);
+            c += d3 >>> 13;
+            d3 &= 8191;
+            d4 = c;
+            d4 += h0 * r4;
+            d4 += h1 * r3;
+            d4 += h2 * r2;
+            d4 += h3 * r1;
+            d4 += h4 * r0;
+            c = d4 >>> 13;
+            d4 &= 8191;
+            d4 += h5 * (5 * r9);
+            d4 += h6 * (5 * r8);
+            d4 += h7 * (5 * r7);
+            d4 += h8 * (5 * r6);
+            d4 += h9 * (5 * r5);
+            c += d4 >>> 13;
+            d4 &= 8191;
+            d5 = c;
+            d5 += h0 * r5;
+            d5 += h1 * r4;
+            d5 += h2 * r3;
+            d5 += h3 * r2;
+            d5 += h4 * r1;
+            c = d5 >>> 13;
+            d5 &= 8191;
+            d5 += h5 * r0;
+            d5 += h6 * (5 * r9);
+            d5 += h7 * (5 * r8);
+            d5 += h8 * (5 * r7);
+            d5 += h9 * (5 * r6);
+            c += d5 >>> 13;
+            d5 &= 8191;
+            d6 = c;
+            d6 += h0 * r6;
+            d6 += h1 * r5;
+            d6 += h2 * r4;
+            d6 += h3 * r3;
+            d6 += h4 * r2;
+            c = d6 >>> 13;
+            d6 &= 8191;
+            d6 += h5 * r1;
+            d6 += h6 * r0;
+            d6 += h7 * (5 * r9);
+            d6 += h8 * (5 * r8);
+            d6 += h9 * (5 * r7);
+            c += d6 >>> 13;
+            d6 &= 8191;
+            d7 = c;
+            d7 += h0 * r7;
+            d7 += h1 * r6;
+            d7 += h2 * r5;
+            d7 += h3 * r4;
+            d7 += h4 * r3;
+            c = d7 >>> 13;
+            d7 &= 8191;
+            d7 += h5 * r2;
+            d7 += h6 * r1;
+            d7 += h7 * r0;
+            d7 += h8 * (5 * r9);
+            d7 += h9 * (5 * r8);
+            c += d7 >>> 13;
+            d7 &= 8191;
+            d8 = c;
+            d8 += h0 * r8;
+            d8 += h1 * r7;
+            d8 += h2 * r6;
+            d8 += h3 * r5;
+            d8 += h4 * r4;
+            c = d8 >>> 13;
+            d8 &= 8191;
+            d8 += h5 * r3;
+            d8 += h6 * r2;
+            d8 += h7 * r1;
+            d8 += h8 * r0;
+            d8 += h9 * (5 * r9);
+            c += d8 >>> 13;
+            d8 &= 8191;
+            d9 = c;
+            d9 += h0 * r9;
+            d9 += h1 * r8;
+            d9 += h2 * r7;
+            d9 += h3 * r6;
+            d9 += h4 * r5;
+            c = d9 >>> 13;
+            d9 &= 8191;
+            d9 += h5 * r4;
+            d9 += h6 * r3;
+            d9 += h7 * r2;
+            d9 += h8 * r1;
+            d9 += h9 * r0;
+            c += d9 >>> 13;
+            d9 &= 8191;
+            c = (c << 2) + c | 0;
+            c = c + d0 | 0;
+            d0 = c & 8191;
+            c = c >>> 13;
+            d1 += c;
+            h0 = d0;
+            h1 = d1;
+            h2 = d2;
+            h3 = d3;
+            h4 = d4;
+            h5 = d5;
+            h6 = d6;
+            h7 = d7;
+            h8 = d8;
+            h9 = d9;
+            mpos += 16;
+            bytes -= 16;
+          }
+          this.h[0] = h0;
+          this.h[1] = h1;
+          this.h[2] = h2;
+          this.h[3] = h3;
+          this.h[4] = h4;
+          this.h[5] = h5;
+          this.h[6] = h6;
+          this.h[7] = h7;
+          this.h[8] = h8;
+          this.h[9] = h9;
+        };
+        poly1305.prototype.finish = function(mac, macpos) {
+          var g = new Uint16Array(10);
+          var c, mask, f, i;
+          if (this.leftover) {
+            i = this.leftover;
+            this.buffer[i++] = 1;
+            for (; i < 16; i++)
+              this.buffer[i] = 0;
+            this.fin = 1;
+            this.blocks(this.buffer, 0, 16);
+          }
+          c = this.h[1] >>> 13;
+          this.h[1] &= 8191;
+          for (i = 2; i < 10; i++) {
+            this.h[i] += c;
+            c = this.h[i] >>> 13;
+            this.h[i] &= 8191;
+          }
+          this.h[0] += c * 5;
+          c = this.h[0] >>> 13;
+          this.h[0] &= 8191;
+          this.h[1] += c;
+          c = this.h[1] >>> 13;
+          this.h[1] &= 8191;
+          this.h[2] += c;
+          g[0] = this.h[0] + 5;
+          c = g[0] >>> 13;
+          g[0] &= 8191;
+          for (i = 1; i < 10; i++) {
+            g[i] = this.h[i] + c;
+            c = g[i] >>> 13;
+            g[i] &= 8191;
+          }
+          g[9] -= 1 << 13;
+          mask = (c ^ 1) - 1;
+          for (i = 0; i < 10; i++)
+            g[i] &= mask;
+          mask = ~mask;
+          for (i = 0; i < 10; i++)
+            this.h[i] = this.h[i] & mask | g[i];
+          this.h[0] = (this.h[0] | this.h[1] << 13) & 65535;
+          this.h[1] = (this.h[1] >>> 3 | this.h[2] << 10) & 65535;
+          this.h[2] = (this.h[2] >>> 6 | this.h[3] << 7) & 65535;
+          this.h[3] = (this.h[3] >>> 9 | this.h[4] << 4) & 65535;
+          this.h[4] = (this.h[4] >>> 12 | this.h[5] << 1 | this.h[6] << 14) & 65535;
+          this.h[5] = (this.h[6] >>> 2 | this.h[7] << 11) & 65535;
+          this.h[6] = (this.h[7] >>> 5 | this.h[8] << 8) & 65535;
+          this.h[7] = (this.h[8] >>> 8 | this.h[9] << 5) & 65535;
+          f = this.h[0] + this.pad[0];
+          this.h[0] = f & 65535;
+          for (i = 1; i < 8; i++) {
+            f = (this.h[i] + this.pad[i] | 0) + (f >>> 16) | 0;
+            this.h[i] = f & 65535;
+          }
+          mac[macpos + 0] = this.h[0] >>> 0 & 255;
+          mac[macpos + 1] = this.h[0] >>> 8 & 255;
+          mac[macpos + 2] = this.h[1] >>> 0 & 255;
+          mac[macpos + 3] = this.h[1] >>> 8 & 255;
+          mac[macpos + 4] = this.h[2] >>> 0 & 255;
+          mac[macpos + 5] = this.h[2] >>> 8 & 255;
+          mac[macpos + 6] = this.h[3] >>> 0 & 255;
+          mac[macpos + 7] = this.h[3] >>> 8 & 255;
+          mac[macpos + 8] = this.h[4] >>> 0 & 255;
+          mac[macpos + 9] = this.h[4] >>> 8 & 255;
+          mac[macpos + 10] = this.h[5] >>> 0 & 255;
+          mac[macpos + 11] = this.h[5] >>> 8 & 255;
+          mac[macpos + 12] = this.h[6] >>> 0 & 255;
+          mac[macpos + 13] = this.h[6] >>> 8 & 255;
+          mac[macpos + 14] = this.h[7] >>> 0 & 255;
+          mac[macpos + 15] = this.h[7] >>> 8 & 255;
+        };
+        poly1305.prototype.update = function(m, mpos, bytes) {
+          var i, want;
+          if (this.leftover) {
+            want = 16 - this.leftover;
+            if (want > bytes)
+              want = bytes;
+            for (i = 0; i < want; i++)
+              this.buffer[this.leftover + i] = m[mpos + i];
+            bytes -= want;
+            mpos += want;
+            this.leftover += want;
+            if (this.leftover < 16)
+              return;
+            this.blocks(this.buffer, 0, 16);
+            this.leftover = 0;
+          }
+          if (bytes >= 16) {
+            want = bytes - bytes % 16;
+            this.blocks(m, mpos, want);
+            mpos += want;
+            bytes -= want;
+          }
+          if (bytes) {
+            for (i = 0; i < bytes; i++)
+              this.buffer[this.leftover + i] = m[mpos + i];
+            this.leftover += bytes;
+          }
+        };
+        function crypto_onetimeauth(out, outpos, m, mpos, n, k) {
+          var s = new poly1305(k);
+          s.update(m, mpos, n);
+          s.finish(out, outpos);
+          return 0;
+        }
+        function crypto_onetimeauth_verify(h, hpos, m, mpos, n, k) {
+          var x = new Uint8Array(16);
+          crypto_onetimeauth(x, 0, m, mpos, n, k);
+          return crypto_verify_16(h, hpos, x, 0);
+        }
+        function crypto_secretbox(c, m, d, n, k) {
+          var i;
+          if (d < 32)
+            return -1;
+          crypto_stream_xor(c, 0, m, 0, d, n, k);
+          crypto_onetimeauth(c, 16, c, 32, d - 32, c);
+          for (i = 0; i < 16; i++)
+            c[i] = 0;
+          return 0;
+        }
+        function crypto_secretbox_open(m, c, d, n, k) {
+          var i;
+          var x = new Uint8Array(32);
+          if (d < 32)
+            return -1;
+          crypto_stream(x, 0, 32, n, k);
+          if (crypto_onetimeauth_verify(c, 16, c, 32, d - 32, x) !== 0)
+            return -1;
+          crypto_stream_xor(m, 0, c, 0, d, n, k);
+          for (i = 0; i < 32; i++)
+            m[i] = 0;
+          return 0;
+        }
+        function set25519(r, a) {
+          var i;
+          for (i = 0; i < 16; i++)
+            r[i] = a[i] | 0;
+        }
+        function car25519(o) {
+          var i, v, c = 1;
+          for (i = 0; i < 16; i++) {
+            v = o[i] + c + 65535;
+            c = Math.floor(v / 65536);
+            o[i] = v - c * 65536;
+          }
+          o[0] += c - 1 + 37 * (c - 1);
+        }
+        function sel25519(p, q, b) {
+          var t, c = ~(b - 1);
+          for (var i = 0; i < 16; i++) {
+            t = c & (p[i] ^ q[i]);
+            p[i] ^= t;
+            q[i] ^= t;
+          }
+        }
+        function pack25519(o, n) {
+          var i, j, b;
+          var m = gf(), t = gf();
+          for (i = 0; i < 16; i++)
+            t[i] = n[i];
+          car25519(t);
+          car25519(t);
+          car25519(t);
+          for (j = 0; j < 2; j++) {
+            m[0] = t[0] - 65517;
+            for (i = 1; i < 15; i++) {
+              m[i] = t[i] - 65535 - (m[i - 1] >> 16 & 1);
+              m[i - 1] &= 65535;
+            }
+            m[15] = t[15] - 32767 - (m[14] >> 16 & 1);
+            b = m[15] >> 16 & 1;
+            m[14] &= 65535;
+            sel25519(t, m, 1 - b);
+          }
+          for (i = 0; i < 16; i++) {
+            o[2 * i] = t[i] & 255;
+            o[2 * i + 1] = t[i] >> 8;
+          }
+        }
+        function neq25519(a, b) {
+          var c = new Uint8Array(32), d = new Uint8Array(32);
+          pack25519(c, a);
+          pack25519(d, b);
+          return crypto_verify_32(c, 0, d, 0);
+        }
+        function par25519(a) {
+          var d = new Uint8Array(32);
+          pack25519(d, a);
+          return d[0] & 1;
+        }
+        function unpack25519(o, n) {
+          var i;
+          for (i = 0; i < 16; i++)
+            o[i] = n[2 * i] + (n[2 * i + 1] << 8);
+          o[15] &= 32767;
+        }
+        function A(o, a, b) {
+          for (var i = 0; i < 16; i++)
+            o[i] = a[i] + b[i];
+        }
+        function Z(o, a, b) {
+          for (var i = 0; i < 16; i++)
+            o[i] = a[i] - b[i];
+        }
+        function M(o, a, b) {
+          var v, c, t0 = 0, t1 = 0, t2 = 0, t3 = 0, t4 = 0, t5 = 0, t6 = 0, t7 = 0, t8 = 0, t9 = 0, t10 = 0, t11 = 0, t12 = 0, t13 = 0, t14 = 0, t15 = 0, t16 = 0, t17 = 0, t18 = 0, t19 = 0, t20 = 0, t21 = 0, t22 = 0, t23 = 0, t24 = 0, t25 = 0, t26 = 0, t27 = 0, t28 = 0, t29 = 0, t30 = 0, b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3], b4 = b[4], b5 = b[5], b6 = b[6], b7 = b[7], b8 = b[8], b9 = b[9], b10 = b[10], b11 = b[11], b12 = b[12], b13 = b[13], b14 = b[14], b15 = b[15];
+          v = a[0];
+          t0 += v * b0;
+          t1 += v * b1;
+          t2 += v * b2;
+          t3 += v * b3;
+          t4 += v * b4;
+          t5 += v * b5;
+          t6 += v * b6;
+          t7 += v * b7;
+          t8 += v * b8;
+          t9 += v * b9;
+          t10 += v * b10;
+          t11 += v * b11;
+          t12 += v * b12;
+          t13 += v * b13;
+          t14 += v * b14;
+          t15 += v * b15;
+          v = a[1];
+          t1 += v * b0;
+          t2 += v * b1;
+          t3 += v * b2;
+          t4 += v * b3;
+          t5 += v * b4;
+          t6 += v * b5;
+          t7 += v * b6;
+          t8 += v * b7;
+          t9 += v * b8;
+          t10 += v * b9;
+          t11 += v * b10;
+          t12 += v * b11;
+          t13 += v * b12;
+          t14 += v * b13;
+          t15 += v * b14;
+          t16 += v * b15;
+          v = a[2];
+          t2 += v * b0;
+          t3 += v * b1;
+          t4 += v * b2;
+          t5 += v * b3;
+          t6 += v * b4;
+          t7 += v * b5;
+          t8 += v * b6;
+          t9 += v * b7;
+          t10 += v * b8;
+          t11 += v * b9;
+          t12 += v * b10;
+          t13 += v * b11;
+          t14 += v * b12;
+          t15 += v * b13;
+          t16 += v * b14;
+          t17 += v * b15;
+          v = a[3];
+          t3 += v * b0;
+          t4 += v * b1;
+          t5 += v * b2;
+          t6 += v * b3;
+          t7 += v * b4;
+          t8 += v * b5;
+          t9 += v * b6;
+          t10 += v * b7;
+          t11 += v * b8;
+          t12 += v * b9;
+          t13 += v * b10;
+          t14 += v * b11;
+          t15 += v * b12;
+          t16 += v * b13;
+          t17 += v * b14;
+          t18 += v * b15;
+          v = a[4];
+          t4 += v * b0;
+          t5 += v * b1;
+          t6 += v * b2;
+          t7 += v * b3;
+          t8 += v * b4;
+          t9 += v * b5;
+          t10 += v * b6;
+          t11 += v * b7;
+          t12 += v * b8;
+          t13 += v * b9;
+          t14 += v * b10;
+          t15 += v * b11;
+          t16 += v * b12;
+          t17 += v * b13;
+          t18 += v * b14;
+          t19 += v * b15;
+          v = a[5];
+          t5 += v * b0;
+          t6 += v * b1;
+          t7 += v * b2;
+          t8 += v * b3;
+          t9 += v * b4;
+          t10 += v * b5;
+          t11 += v * b6;
+          t12 += v * b7;
+          t13 += v * b8;
+          t14 += v * b9;
+          t15 += v * b10;
+          t16 += v * b11;
+          t17 += v * b12;
+          t18 += v * b13;
+          t19 += v * b14;
+          t20 += v * b15;
+          v = a[6];
+          t6 += v * b0;
+          t7 += v * b1;
+          t8 += v * b2;
+          t9 += v * b3;
+          t10 += v * b4;
+          t11 += v * b5;
+          t12 += v * b6;
+          t13 += v * b7;
+          t14 += v * b8;
+          t15 += v * b9;
+          t16 += v * b10;
+          t17 += v * b11;
+          t18 += v * b12;
+          t19 += v * b13;
+          t20 += v * b14;
+          t21 += v * b15;
+          v = a[7];
+          t7 += v * b0;
+          t8 += v * b1;
+          t9 += v * b2;
+          t10 += v * b3;
+          t11 += v * b4;
+          t12 += v * b5;
+          t13 += v * b6;
+          t14 += v * b7;
+          t15 += v * b8;
+          t16 += v * b9;
+          t17 += v * b10;
+          t18 += v * b11;
+          t19 += v * b12;
+          t20 += v * b13;
+          t21 += v * b14;
+          t22 += v * b15;
+          v = a[8];
+          t8 += v * b0;
+          t9 += v * b1;
+          t10 += v * b2;
+          t11 += v * b3;
+          t12 += v * b4;
+          t13 += v * b5;
+          t14 += v * b6;
+          t15 += v * b7;
+          t16 += v * b8;
+          t17 += v * b9;
+          t18 += v * b10;
+          t19 += v * b11;
+          t20 += v * b12;
+          t21 += v * b13;
+          t22 += v * b14;
+          t23 += v * b15;
+          v = a[9];
+          t9 += v * b0;
+          t10 += v * b1;
+          t11 += v * b2;
+          t12 += v * b3;
+          t13 += v * b4;
+          t14 += v * b5;
+          t15 += v * b6;
+          t16 += v * b7;
+          t17 += v * b8;
+          t18 += v * b9;
+          t19 += v * b10;
+          t20 += v * b11;
+          t21 += v * b12;
+          t22 += v * b13;
+          t23 += v * b14;
+          t24 += v * b15;
+          v = a[10];
+          t10 += v * b0;
+          t11 += v * b1;
+          t12 += v * b2;
+          t13 += v * b3;
+          t14 += v * b4;
+          t15 += v * b5;
+          t16 += v * b6;
+          t17 += v * b7;
+          t18 += v * b8;
+          t19 += v * b9;
+          t20 += v * b10;
+          t21 += v * b11;
+          t22 += v * b12;
+          t23 += v * b13;
+          t24 += v * b14;
+          t25 += v * b15;
+          v = a[11];
+          t11 += v * b0;
+          t12 += v * b1;
+          t13 += v * b2;
+          t14 += v * b3;
+          t15 += v * b4;
+          t16 += v * b5;
+          t17 += v * b6;
+          t18 += v * b7;
+          t19 += v * b8;
+          t20 += v * b9;
+          t21 += v * b10;
+          t22 += v * b11;
+          t23 += v * b12;
+          t24 += v * b13;
+          t25 += v * b14;
+          t26 += v * b15;
+          v = a[12];
+          t12 += v * b0;
+          t13 += v * b1;
+          t14 += v * b2;
+          t15 += v * b3;
+          t16 += v * b4;
+          t17 += v * b5;
+          t18 += v * b6;
+          t19 += v * b7;
+          t20 += v * b8;
+          t21 += v * b9;
+          t22 += v * b10;
+          t23 += v * b11;
+          t24 += v * b12;
+          t25 += v * b13;
+          t26 += v * b14;
+          t27 += v * b15;
+          v = a[13];
+          t13 += v * b0;
+          t14 += v * b1;
+          t15 += v * b2;
+          t16 += v * b3;
+          t17 += v * b4;
+          t18 += v * b5;
+          t19 += v * b6;
+          t20 += v * b7;
+          t21 += v * b8;
+          t22 += v * b9;
+          t23 += v * b10;
+          t24 += v * b11;
+          t25 += v * b12;
+          t26 += v * b13;
+          t27 += v * b14;
+          t28 += v * b15;
+          v = a[14];
+          t14 += v * b0;
+          t15 += v * b1;
+          t16 += v * b2;
+          t17 += v * b3;
+          t18 += v * b4;
+          t19 += v * b5;
+          t20 += v * b6;
+          t21 += v * b7;
+          t22 += v * b8;
+          t23 += v * b9;
+          t24 += v * b10;
+          t25 += v * b11;
+          t26 += v * b12;
+          t27 += v * b13;
+          t28 += v * b14;
+          t29 += v * b15;
+          v = a[15];
+          t15 += v * b0;
+          t16 += v * b1;
+          t17 += v * b2;
+          t18 += v * b3;
+          t19 += v * b4;
+          t20 += v * b5;
+          t21 += v * b6;
+          t22 += v * b7;
+          t23 += v * b8;
+          t24 += v * b9;
+          t25 += v * b10;
+          t26 += v * b11;
+          t27 += v * b12;
+          t28 += v * b13;
+          t29 += v * b14;
+          t30 += v * b15;
+          t0 += 38 * t16;
+          t1 += 38 * t17;
+          t2 += 38 * t18;
+          t3 += 38 * t19;
+          t4 += 38 * t20;
+          t5 += 38 * t21;
+          t6 += 38 * t22;
+          t7 += 38 * t23;
+          t8 += 38 * t24;
+          t9 += 38 * t25;
+          t10 += 38 * t26;
+          t11 += 38 * t27;
+          t12 += 38 * t28;
+          t13 += 38 * t29;
+          t14 += 38 * t30;
+          c = 1;
+          v = t0 + c + 65535;
+          c = Math.floor(v / 65536);
+          t0 = v - c * 65536;
+          v = t1 + c + 65535;
+          c = Math.floor(v / 65536);
+          t1 = v - c * 65536;
+          v = t2 + c + 65535;
+          c = Math.floor(v / 65536);
+          t2 = v - c * 65536;
+          v = t3 + c + 65535;
+          c = Math.floor(v / 65536);
+          t3 = v - c * 65536;
+          v = t4 + c + 65535;
+          c = Math.floor(v / 65536);
+          t4 = v - c * 65536;
+          v = t5 + c + 65535;
+          c = Math.floor(v / 65536);
+          t5 = v - c * 65536;
+          v = t6 + c + 65535;
+          c = Math.floor(v / 65536);
+          t6 = v - c * 65536;
+          v = t7 + c + 65535;
+          c = Math.floor(v / 65536);
+          t7 = v - c * 65536;
+          v = t8 + c + 65535;
+          c = Math.floor(v / 65536);
+          t8 = v - c * 65536;
+          v = t9 + c + 65535;
+          c = Math.floor(v / 65536);
+          t9 = v - c * 65536;
+          v = t10 + c + 65535;
+          c = Math.floor(v / 65536);
+          t10 = v - c * 65536;
+          v = t11 + c + 65535;
+          c = Math.floor(v / 65536);
+          t11 = v - c * 65536;
+          v = t12 + c + 65535;
+          c = Math.floor(v / 65536);
+          t12 = v - c * 65536;
+          v = t13 + c + 65535;
+          c = Math.floor(v / 65536);
+          t13 = v - c * 65536;
+          v = t14 + c + 65535;
+          c = Math.floor(v / 65536);
+          t14 = v - c * 65536;
+          v = t15 + c + 65535;
+          c = Math.floor(v / 65536);
+          t15 = v - c * 65536;
+          t0 += c - 1 + 37 * (c - 1);
+          c = 1;
+          v = t0 + c + 65535;
+          c = Math.floor(v / 65536);
+          t0 = v - c * 65536;
+          v = t1 + c + 65535;
+          c = Math.floor(v / 65536);
+          t1 = v - c * 65536;
+          v = t2 + c + 65535;
+          c = Math.floor(v / 65536);
+          t2 = v - c * 65536;
+          v = t3 + c + 65535;
+          c = Math.floor(v / 65536);
+          t3 = v - c * 65536;
+          v = t4 + c + 65535;
+          c = Math.floor(v / 65536);
+          t4 = v - c * 65536;
+          v = t5 + c + 65535;
+          c = Math.floor(v / 65536);
+          t5 = v - c * 65536;
+          v = t6 + c + 65535;
+          c = Math.floor(v / 65536);
+          t6 = v - c * 65536;
+          v = t7 + c + 65535;
+          c = Math.floor(v / 65536);
+          t7 = v - c * 65536;
+          v = t8 + c + 65535;
+          c = Math.floor(v / 65536);
+          t8 = v - c * 65536;
+          v = t9 + c + 65535;
+          c = Math.floor(v / 65536);
+          t9 = v - c * 65536;
+          v = t10 + c + 65535;
+          c = Math.floor(v / 65536);
+          t10 = v - c * 65536;
+          v = t11 + c + 65535;
+          c = Math.floor(v / 65536);
+          t11 = v - c * 65536;
+          v = t12 + c + 65535;
+          c = Math.floor(v / 65536);
+          t12 = v - c * 65536;
+          v = t13 + c + 65535;
+          c = Math.floor(v / 65536);
+          t13 = v - c * 65536;
+          v = t14 + c + 65535;
+          c = Math.floor(v / 65536);
+          t14 = v - c * 65536;
+          v = t15 + c + 65535;
+          c = Math.floor(v / 65536);
+          t15 = v - c * 65536;
+          t0 += c - 1 + 37 * (c - 1);
+          o[0] = t0;
+          o[1] = t1;
+          o[2] = t2;
+          o[3] = t3;
+          o[4] = t4;
+          o[5] = t5;
+          o[6] = t6;
+          o[7] = t7;
+          o[8] = t8;
+          o[9] = t9;
+          o[10] = t10;
+          o[11] = t11;
+          o[12] = t12;
+          o[13] = t13;
+          o[14] = t14;
+          o[15] = t15;
+        }
+        function S(o, a) {
+          M(o, a, a);
+        }
+        function inv25519(o, i) {
+          var c = gf();
+          var a;
+          for (a = 0; a < 16; a++)
+            c[a] = i[a];
+          for (a = 253; a >= 0; a--) {
+            S(c, c);
+            if (a !== 2 && a !== 4)
+              M(c, c, i);
+          }
+          for (a = 0; a < 16; a++)
+            o[a] = c[a];
+        }
+        function pow2523(o, i) {
+          var c = gf();
+          var a;
+          for (a = 0; a < 16; a++)
+            c[a] = i[a];
+          for (a = 250; a >= 0; a--) {
+            S(c, c);
+            if (a !== 1)
+              M(c, c, i);
+          }
+          for (a = 0; a < 16; a++)
+            o[a] = c[a];
+        }
+        function crypto_scalarmult(q, n, p) {
+          var z = new Uint8Array(32);
+          var x = new Float64Array(80), r, i;
+          var a = gf(), b = gf(), c = gf(), d = gf(), e = gf(), f = gf();
+          for (i = 0; i < 31; i++)
+            z[i] = n[i];
+          z[31] = n[31] & 127 | 64;
+          z[0] &= 248;
+          unpack25519(x, p);
+          for (i = 0; i < 16; i++) {
+            b[i] = x[i];
+            d[i] = a[i] = c[i] = 0;
+          }
+          a[0] = d[0] = 1;
+          for (i = 254; i >= 0; --i) {
+            r = z[i >>> 3] >>> (i & 7) & 1;
+            sel25519(a, b, r);
+            sel25519(c, d, r);
+            A(e, a, c);
+            Z(a, a, c);
+            A(c, b, d);
+            Z(b, b, d);
+            S(d, e);
+            S(f, a);
+            M(a, c, a);
+            M(c, b, e);
+            A(e, a, c);
+            Z(a, a, c);
+            S(b, a);
+            Z(c, d, f);
+            M(a, c, _121665);
+            A(a, a, d);
+            M(c, c, a);
+            M(a, d, f);
+            M(d, b, x);
+            S(b, e);
+            sel25519(a, b, r);
+            sel25519(c, d, r);
+          }
+          for (i = 0; i < 16; i++) {
+            x[i + 16] = a[i];
+            x[i + 32] = c[i];
+            x[i + 48] = b[i];
+            x[i + 64] = d[i];
+          }
+          var x32 = x.subarray(32);
+          var x16 = x.subarray(16);
+          inv25519(x32, x32);
+          M(x16, x16, x32);
+          pack25519(q, x16);
+          return 0;
+        }
+        function crypto_scalarmult_base(q, n) {
+          return crypto_scalarmult(q, n, _9);
+        }
+        function crypto_box_keypair(y, x) {
+          randombytes(x, 32);
+          return crypto_scalarmult_base(y, x);
+        }
+        function crypto_box_beforenm(k, y, x) {
+          var s = new Uint8Array(32);
+          crypto_scalarmult(s, x, y);
+          return crypto_core_hsalsa20(k, _0, s, sigma);
+        }
+        var crypto_box_afternm = crypto_secretbox;
+        var crypto_box_open_afternm = crypto_secretbox_open;
+        function crypto_box(c, m, d, n, y, x) {
+          var k = new Uint8Array(32);
+          crypto_box_beforenm(k, y, x);
+          return crypto_box_afternm(c, m, d, n, k);
+        }
+        function crypto_box_open(m, c, d, n, y, x) {
+          var k = new Uint8Array(32);
+          crypto_box_beforenm(k, y, x);
+          return crypto_box_open_afternm(m, c, d, n, k);
+        }
+        var K = [
+          1116352408,
+          3609767458,
+          1899447441,
+          602891725,
+          3049323471,
+          3964484399,
+          3921009573,
+          2173295548,
+          961987163,
+          4081628472,
+          1508970993,
+          3053834265,
+          2453635748,
+          2937671579,
+          2870763221,
+          3664609560,
+          3624381080,
+          2734883394,
+          310598401,
+          1164996542,
+          607225278,
+          1323610764,
+          1426881987,
+          3590304994,
+          1925078388,
+          4068182383,
+          2162078206,
+          991336113,
+          2614888103,
+          633803317,
+          3248222580,
+          3479774868,
+          3835390401,
+          2666613458,
+          4022224774,
+          944711139,
+          264347078,
+          2341262773,
+          604807628,
+          2007800933,
+          770255983,
+          1495990901,
+          1249150122,
+          1856431235,
+          1555081692,
+          3175218132,
+          1996064986,
+          2198950837,
+          2554220882,
+          3999719339,
+          2821834349,
+          766784016,
+          2952996808,
+          2566594879,
+          3210313671,
+          3203337956,
+          3336571891,
+          1034457026,
+          3584528711,
+          2466948901,
+          113926993,
+          3758326383,
+          338241895,
+          168717936,
+          666307205,
+          1188179964,
+          773529912,
+          1546045734,
+          1294757372,
+          1522805485,
+          1396182291,
+          2643833823,
+          1695183700,
+          2343527390,
+          1986661051,
+          1014477480,
+          2177026350,
+          1206759142,
+          2456956037,
+          344077627,
+          2730485921,
+          1290863460,
+          2820302411,
+          3158454273,
+          3259730800,
+          3505952657,
+          3345764771,
+          106217008,
+          3516065817,
+          3606008344,
+          3600352804,
+          1432725776,
+          4094571909,
+          1467031594,
+          275423344,
+          851169720,
+          430227734,
+          3100823752,
+          506948616,
+          1363258195,
+          659060556,
+          3750685593,
+          883997877,
+          3785050280,
+          958139571,
+          3318307427,
+          1322822218,
+          3812723403,
+          1537002063,
+          2003034995,
+          1747873779,
+          3602036899,
+          1955562222,
+          1575990012,
+          2024104815,
+          1125592928,
+          2227730452,
+          2716904306,
+          2361852424,
+          442776044,
+          2428436474,
+          593698344,
+          2756734187,
+          3733110249,
+          3204031479,
+          2999351573,
+          3329325298,
+          3815920427,
+          3391569614,
+          3928383900,
+          3515267271,
+          566280711,
+          3940187606,
+          3454069534,
+          4118630271,
+          4000239992,
+          116418474,
+          1914138554,
+          174292421,
+          2731055270,
+          289380356,
+          3203993006,
+          460393269,
+          320620315,
+          685471733,
+          587496836,
+          852142971,
+          1086792851,
+          1017036298,
+          365543100,
+          1126000580,
+          2618297676,
+          1288033470,
+          3409855158,
+          1501505948,
+          4234509866,
+          1607167915,
+          987167468,
+          1816402316,
+          1246189591
+        ];
+        function crypto_hashblocks_hl(hh, hl, m, n) {
+          var wh = new Int32Array(16), wl = new Int32Array(16), bh0, bh1, bh2, bh3, bh4, bh5, bh6, bh7, bl0, bl1, bl2, bl3, bl4, bl5, bl6, bl7, th, tl, i, j, h, l, a, b, c, d;
+          var ah0 = hh[0], ah1 = hh[1], ah2 = hh[2], ah3 = hh[3], ah4 = hh[4], ah5 = hh[5], ah6 = hh[6], ah7 = hh[7], al0 = hl[0], al1 = hl[1], al2 = hl[2], al3 = hl[3], al4 = hl[4], al5 = hl[5], al6 = hl[6], al7 = hl[7];
+          var pos = 0;
+          while (n >= 128) {
+            for (i = 0; i < 16; i++) {
+              j = 8 * i + pos;
+              wh[i] = m[j + 0] << 24 | m[j + 1] << 16 | m[j + 2] << 8 | m[j + 3];
+              wl[i] = m[j + 4] << 24 | m[j + 5] << 16 | m[j + 6] << 8 | m[j + 7];
+            }
+            for (i = 0; i < 80; i++) {
+              bh0 = ah0;
+              bh1 = ah1;
+              bh2 = ah2;
+              bh3 = ah3;
+              bh4 = ah4;
+              bh5 = ah5;
+              bh6 = ah6;
+              bh7 = ah7;
+              bl0 = al0;
+              bl1 = al1;
+              bl2 = al2;
+              bl3 = al3;
+              bl4 = al4;
+              bl5 = al5;
+              bl6 = al6;
+              bl7 = al7;
+              h = ah7;
+              l = al7;
+              a = l & 65535;
+              b = l >>> 16;
+              c = h & 65535;
+              d = h >>> 16;
+              h = (ah4 >>> 14 | al4 << 32 - 14) ^ (ah4 >>> 18 | al4 << 32 - 18) ^ (al4 >>> 41 - 32 | ah4 << 32 - (41 - 32));
+              l = (al4 >>> 14 | ah4 << 32 - 14) ^ (al4 >>> 18 | ah4 << 32 - 18) ^ (ah4 >>> 41 - 32 | al4 << 32 - (41 - 32));
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              h = ah4 & ah5 ^ ~ah4 & ah6;
+              l = al4 & al5 ^ ~al4 & al6;
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              h = K[i * 2];
+              l = K[i * 2 + 1];
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              h = wh[i % 16];
+              l = wl[i % 16];
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              b += a >>> 16;
+              c += b >>> 16;
+              d += c >>> 16;
+              th = c & 65535 | d << 16;
+              tl = a & 65535 | b << 16;
+              h = th;
+              l = tl;
+              a = l & 65535;
+              b = l >>> 16;
+              c = h & 65535;
+              d = h >>> 16;
+              h = (ah0 >>> 28 | al0 << 32 - 28) ^ (al0 >>> 34 - 32 | ah0 << 32 - (34 - 32)) ^ (al0 >>> 39 - 32 | ah0 << 32 - (39 - 32));
+              l = (al0 >>> 28 | ah0 << 32 - 28) ^ (ah0 >>> 34 - 32 | al0 << 32 - (34 - 32)) ^ (ah0 >>> 39 - 32 | al0 << 32 - (39 - 32));
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              h = ah0 & ah1 ^ ah0 & ah2 ^ ah1 & ah2;
+              l = al0 & al1 ^ al0 & al2 ^ al1 & al2;
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              b += a >>> 16;
+              c += b >>> 16;
+              d += c >>> 16;
+              bh7 = c & 65535 | d << 16;
+              bl7 = a & 65535 | b << 16;
+              h = bh3;
+              l = bl3;
+              a = l & 65535;
+              b = l >>> 16;
+              c = h & 65535;
+              d = h >>> 16;
+              h = th;
+              l = tl;
+              a += l & 65535;
+              b += l >>> 16;
+              c += h & 65535;
+              d += h >>> 16;
+              b += a >>> 16;
+              c += b >>> 16;
+              d += c >>> 16;
+              bh3 = c & 65535 | d << 16;
+              bl3 = a & 65535 | b << 16;
+              ah1 = bh0;
+              ah2 = bh1;
+              ah3 = bh2;
+              ah4 = bh3;
+              ah5 = bh4;
+              ah6 = bh5;
+              ah7 = bh6;
+              ah0 = bh7;
+              al1 = bl0;
+              al2 = bl1;
+              al3 = bl2;
+              al4 = bl3;
+              al5 = bl4;
+              al6 = bl5;
+              al7 = bl6;
+              al0 = bl7;
+              if (i % 16 === 15) {
+                for (j = 0; j < 16; j++) {
+                  h = wh[j];
+                  l = wl[j];
+                  a = l & 65535;
+                  b = l >>> 16;
+                  c = h & 65535;
+                  d = h >>> 16;
+                  h = wh[(j + 9) % 16];
+                  l = wl[(j + 9) % 16];
+                  a += l & 65535;
+                  b += l >>> 16;
+                  c += h & 65535;
+                  d += h >>> 16;
+                  th = wh[(j + 1) % 16];
+                  tl = wl[(j + 1) % 16];
+                  h = (th >>> 1 | tl << 32 - 1) ^ (th >>> 8 | tl << 32 - 8) ^ th >>> 7;
+                  l = (tl >>> 1 | th << 32 - 1) ^ (tl >>> 8 | th << 32 - 8) ^ (tl >>> 7 | th << 32 - 7);
+                  a += l & 65535;
+                  b += l >>> 16;
+                  c += h & 65535;
+                  d += h >>> 16;
+                  th = wh[(j + 14) % 16];
+                  tl = wl[(j + 14) % 16];
+                  h = (th >>> 19 | tl << 32 - 19) ^ (tl >>> 61 - 32 | th << 32 - (61 - 32)) ^ th >>> 6;
+                  l = (tl >>> 19 | th << 32 - 19) ^ (th >>> 61 - 32 | tl << 32 - (61 - 32)) ^ (tl >>> 6 | th << 32 - 6);
+                  a += l & 65535;
+                  b += l >>> 16;
+                  c += h & 65535;
+                  d += h >>> 16;
+                  b += a >>> 16;
+                  c += b >>> 16;
+                  d += c >>> 16;
+                  wh[j] = c & 65535 | d << 16;
+                  wl[j] = a & 65535 | b << 16;
+                }
+              }
+            }
+            h = ah0;
+            l = al0;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[0];
+            l = hl[0];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[0] = ah0 = c & 65535 | d << 16;
+            hl[0] = al0 = a & 65535 | b << 16;
+            h = ah1;
+            l = al1;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[1];
+            l = hl[1];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[1] = ah1 = c & 65535 | d << 16;
+            hl[1] = al1 = a & 65535 | b << 16;
+            h = ah2;
+            l = al2;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[2];
+            l = hl[2];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[2] = ah2 = c & 65535 | d << 16;
+            hl[2] = al2 = a & 65535 | b << 16;
+            h = ah3;
+            l = al3;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[3];
+            l = hl[3];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[3] = ah3 = c & 65535 | d << 16;
+            hl[3] = al3 = a & 65535 | b << 16;
+            h = ah4;
+            l = al4;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[4];
+            l = hl[4];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[4] = ah4 = c & 65535 | d << 16;
+            hl[4] = al4 = a & 65535 | b << 16;
+            h = ah5;
+            l = al5;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[5];
+            l = hl[5];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[5] = ah5 = c & 65535 | d << 16;
+            hl[5] = al5 = a & 65535 | b << 16;
+            h = ah6;
+            l = al6;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[6];
+            l = hl[6];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[6] = ah6 = c & 65535 | d << 16;
+            hl[6] = al6 = a & 65535 | b << 16;
+            h = ah7;
+            l = al7;
+            a = l & 65535;
+            b = l >>> 16;
+            c = h & 65535;
+            d = h >>> 16;
+            h = hh[7];
+            l = hl[7];
+            a += l & 65535;
+            b += l >>> 16;
+            c += h & 65535;
+            d += h >>> 16;
+            b += a >>> 16;
+            c += b >>> 16;
+            d += c >>> 16;
+            hh[7] = ah7 = c & 65535 | d << 16;
+            hl[7] = al7 = a & 65535 | b << 16;
+            pos += 128;
+            n -= 128;
+          }
+          return n;
+        }
+        function crypto_hash(out, m, n) {
+          var hh = new Int32Array(8), hl = new Int32Array(8), x = new Uint8Array(256), i, b = n;
+          hh[0] = 1779033703;
+          hh[1] = 3144134277;
+          hh[2] = 1013904242;
+          hh[3] = 2773480762;
+          hh[4] = 1359893119;
+          hh[5] = 2600822924;
+          hh[6] = 528734635;
+          hh[7] = 1541459225;
+          hl[0] = 4089235720;
+          hl[1] = 2227873595;
+          hl[2] = 4271175723;
+          hl[3] = 1595750129;
+          hl[4] = 2917565137;
+          hl[5] = 725511199;
+          hl[6] = 4215389547;
+          hl[7] = 327033209;
+          crypto_hashblocks_hl(hh, hl, m, n);
+          n %= 128;
+          for (i = 0; i < n; i++)
+            x[i] = m[b - n + i];
+          x[n] = 128;
+          n = 256 - 128 * (n < 112 ? 1 : 0);
+          x[n - 9] = 0;
+          ts64(x, n - 8, b / 536870912 | 0, b << 3);
+          crypto_hashblocks_hl(hh, hl, x, n);
+          for (i = 0; i < 8; i++)
+            ts64(out, 8 * i, hh[i], hl[i]);
+          return 0;
+        }
+        function add(p, q) {
+          var a = gf(), b = gf(), c = gf(), d = gf(), e = gf(), f = gf(), g = gf(), h = gf(), t = gf();
+          Z(a, p[1], p[0]);
+          Z(t, q[1], q[0]);
+          M(a, a, t);
+          A(b, p[0], p[1]);
+          A(t, q[0], q[1]);
+          M(b, b, t);
+          M(c, p[3], q[3]);
+          M(c, c, D2);
+          M(d, p[2], q[2]);
+          A(d, d, d);
+          Z(e, b, a);
+          Z(f, d, c);
+          A(g, d, c);
+          A(h, b, a);
+          M(p[0], e, f);
+          M(p[1], h, g);
+          M(p[2], g, f);
+          M(p[3], e, h);
+        }
+        function cswap(p, q, b) {
+          var i;
+          for (i = 0; i < 4; i++) {
+            sel25519(p[i], q[i], b);
+          }
+        }
+        function pack(r, p) {
+          var tx2 = gf(), ty = gf(), zi = gf();
+          inv25519(zi, p[2]);
+          M(tx2, p[0], zi);
+          M(ty, p[1], zi);
+          pack25519(r, ty);
+          r[31] ^= par25519(tx2) << 7;
+        }
+        function scalarmult(p, q, s) {
+          var b, i;
+          set25519(p[0], gf0);
+          set25519(p[1], gf1);
+          set25519(p[2], gf1);
+          set25519(p[3], gf0);
+          for (i = 255; i >= 0; --i) {
+            b = s[i / 8 | 0] >> (i & 7) & 1;
+            cswap(p, q, b);
+            add(q, p);
+            add(p, p);
+            cswap(p, q, b);
+          }
+        }
+        function scalarbase(p, s) {
+          var q = [gf(), gf(), gf(), gf()];
+          set25519(q[0], X);
+          set25519(q[1], Y);
+          set25519(q[2], gf1);
+          M(q[3], X, Y);
+          scalarmult(p, q, s);
+        }
+        function crypto_sign_keypair(pk, sk, seeded) {
+          var d = new Uint8Array(64);
+          var p = [gf(), gf(), gf(), gf()];
+          var i;
+          if (!seeded)
+            randombytes(sk, 32);
+          crypto_hash(d, sk, 32);
+          d[0] &= 248;
+          d[31] &= 127;
+          d[31] |= 64;
+          scalarbase(p, d);
+          pack(pk, p);
+          for (i = 0; i < 32; i++)
+            sk[i + 32] = pk[i];
+          return 0;
+        }
+        var L = new Float64Array([237, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16]);
+        function modL(r, x) {
+          var carry, i, j, k;
+          for (i = 63; i >= 32; --i) {
+            carry = 0;
+            for (j = i - 32, k = i - 12; j < k; ++j) {
+              x[j] += carry - 16 * x[i] * L[j - (i - 32)];
+              carry = Math.floor((x[j] + 128) / 256);
+              x[j] -= carry * 256;
+            }
+            x[j] += carry;
+            x[i] = 0;
+          }
+          carry = 0;
+          for (j = 0; j < 32; j++) {
+            x[j] += carry - (x[31] >> 4) * L[j];
+            carry = x[j] >> 8;
+            x[j] &= 255;
+          }
+          for (j = 0; j < 32; j++)
+            x[j] -= carry * L[j];
+          for (i = 0; i < 32; i++) {
+            x[i + 1] += x[i] >> 8;
+            r[i] = x[i] & 255;
+          }
+        }
+        function reduce(r) {
+          var x = new Float64Array(64), i;
+          for (i = 0; i < 64; i++)
+            x[i] = r[i];
+          for (i = 0; i < 64; i++)
+            r[i] = 0;
+          modL(r, x);
+        }
+        function crypto_sign(sm, m, n, sk) {
+          var d = new Uint8Array(64), h = new Uint8Array(64), r = new Uint8Array(64);
+          var i, j, x = new Float64Array(64);
+          var p = [gf(), gf(), gf(), gf()];
+          crypto_hash(d, sk, 32);
+          d[0] &= 248;
+          d[31] &= 127;
+          d[31] |= 64;
+          var smlen = n + 64;
+          for (i = 0; i < n; i++)
+            sm[64 + i] = m[i];
+          for (i = 0; i < 32; i++)
+            sm[32 + i] = d[32 + i];
+          crypto_hash(r, sm.subarray(32), n + 32);
+          reduce(r);
+          scalarbase(p, r);
+          pack(sm, p);
+          for (i = 32; i < 64; i++)
+            sm[i] = sk[i];
+          crypto_hash(h, sm, n + 64);
+          reduce(h);
+          for (i = 0; i < 64; i++)
+            x[i] = 0;
+          for (i = 0; i < 32; i++)
+            x[i] = r[i];
+          for (i = 0; i < 32; i++) {
+            for (j = 0; j < 32; j++) {
+              x[i + j] += h[i] * d[j];
+            }
+          }
+          modL(sm.subarray(32), x);
+          return smlen;
+        }
+        function unpackneg(r, p) {
+          var t = gf(), chk = gf(), num = gf(), den = gf(), den2 = gf(), den4 = gf(), den6 = gf();
+          set25519(r[2], gf1);
+          unpack25519(r[1], p);
+          S(num, r[1]);
+          M(den, num, D);
+          Z(num, num, r[2]);
+          A(den, r[2], den);
+          S(den2, den);
+          S(den4, den2);
+          M(den6, den4, den2);
+          M(t, den6, num);
+          M(t, t, den);
+          pow2523(t, t);
+          M(t, t, num);
+          M(t, t, den);
+          M(t, t, den);
+          M(r[0], t, den);
+          S(chk, r[0]);
+          M(chk, chk, den);
+          if (neq25519(chk, num))
+            M(r[0], r[0], I);
+          S(chk, r[0]);
+          M(chk, chk, den);
+          if (neq25519(chk, num))
+            return -1;
+          if (par25519(r[0]) === p[31] >> 7)
+            Z(r[0], gf0, r[0]);
+          M(r[3], r[0], r[1]);
+          return 0;
+        }
+        function crypto_sign_open(m, sm, n, pk) {
+          var i;
+          var t = new Uint8Array(32), h = new Uint8Array(64);
+          var p = [gf(), gf(), gf(), gf()], q = [gf(), gf(), gf(), gf()];
+          if (n < 64)
+            return -1;
+          if (unpackneg(q, pk))
+            return -1;
+          for (i = 0; i < n; i++)
+            m[i] = sm[i];
+          for (i = 0; i < 32; i++)
+            m[i + 32] = pk[i];
+          crypto_hash(h, m, n);
+          reduce(h);
+          scalarmult(p, q, h);
+          scalarbase(q, sm.subarray(32));
+          add(p, q);
+          pack(t, p);
+          n -= 64;
+          if (crypto_verify_32(sm, 0, t, 0)) {
+            for (i = 0; i < n; i++)
+              m[i] = 0;
+            return -1;
+          }
+          for (i = 0; i < n; i++)
+            m[i] = sm[i + 64];
+          return n;
+        }
+        var crypto_secretbox_KEYBYTES = 32, crypto_secretbox_NONCEBYTES = 24, crypto_secretbox_ZEROBYTES = 32, crypto_secretbox_BOXZEROBYTES = 16, crypto_scalarmult_BYTES = 32, crypto_scalarmult_SCALARBYTES = 32, crypto_box_PUBLICKEYBYTES = 32, crypto_box_SECRETKEYBYTES = 32, crypto_box_BEFORENMBYTES = 32, crypto_box_NONCEBYTES = crypto_secretbox_NONCEBYTES, crypto_box_ZEROBYTES = crypto_secretbox_ZEROBYTES, crypto_box_BOXZEROBYTES = crypto_secretbox_BOXZEROBYTES, crypto_sign_BYTES = 64, crypto_sign_PUBLICKEYBYTES = 32, crypto_sign_SECRETKEYBYTES = 64, crypto_sign_SEEDBYTES = 32, crypto_hash_BYTES = 64;
+        nacl18.lowlevel = {
+          crypto_core_hsalsa20,
+          crypto_stream_xor,
+          crypto_stream,
+          crypto_stream_salsa20_xor,
+          crypto_stream_salsa20,
+          crypto_onetimeauth,
+          crypto_onetimeauth_verify,
+          crypto_verify_16,
+          crypto_verify_32,
+          crypto_secretbox,
+          crypto_secretbox_open,
+          crypto_scalarmult,
+          crypto_scalarmult_base,
+          crypto_box_beforenm,
+          crypto_box_afternm,
+          crypto_box,
+          crypto_box_open,
+          crypto_box_keypair,
+          crypto_hash,
+          crypto_sign,
+          crypto_sign_keypair,
+          crypto_sign_open,
+          crypto_secretbox_KEYBYTES,
+          crypto_secretbox_NONCEBYTES,
+          crypto_secretbox_ZEROBYTES,
+          crypto_secretbox_BOXZEROBYTES,
+          crypto_scalarmult_BYTES,
+          crypto_scalarmult_SCALARBYTES,
+          crypto_box_PUBLICKEYBYTES,
+          crypto_box_SECRETKEYBYTES,
+          crypto_box_BEFORENMBYTES,
+          crypto_box_NONCEBYTES,
+          crypto_box_ZEROBYTES,
+          crypto_box_BOXZEROBYTES,
+          crypto_sign_BYTES,
+          crypto_sign_PUBLICKEYBYTES,
+          crypto_sign_SECRETKEYBYTES,
+          crypto_sign_SEEDBYTES,
+          crypto_hash_BYTES,
+          gf,
+          D,
+          L,
+          pack25519,
+          unpack25519,
+          M,
+          A,
+          S,
+          Z,
+          pow2523,
+          add,
+          set25519,
+          modL,
+          scalarmult,
+          scalarbase
+        };
+        function checkLengths(k, n) {
+          if (k.length !== crypto_secretbox_KEYBYTES)
+            throw new Error("bad key size");
+          if (n.length !== crypto_secretbox_NONCEBYTES)
+            throw new Error("bad nonce size");
+        }
+        function checkBoxLengths(pk, sk) {
+          if (pk.length !== crypto_box_PUBLICKEYBYTES)
+            throw new Error("bad public key size");
+          if (sk.length !== crypto_box_SECRETKEYBYTES)
+            throw new Error("bad secret key size");
+        }
+        function checkArrayTypes() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (!(arguments[i] instanceof Uint8Array))
+              throw new TypeError("unexpected type, use Uint8Array");
+          }
+        }
+        function cleanup(arr) {
+          for (var i = 0; i < arr.length; i++)
+            arr[i] = 0;
+        }
+        nacl18.randomBytes = function(n) {
+          var b = new Uint8Array(n);
+          randombytes(b, n);
+          return b;
+        };
+        nacl18.secretbox = function(msg, nonce, key2) {
+          checkArrayTypes(msg, nonce, key2);
+          checkLengths(key2, nonce);
+          var m = new Uint8Array(crypto_secretbox_ZEROBYTES + msg.length);
+          var c = new Uint8Array(m.length);
+          for (var i = 0; i < msg.length; i++)
+            m[i + crypto_secretbox_ZEROBYTES] = msg[i];
+          crypto_secretbox(c, m, m.length, nonce, key2);
+          return c.subarray(crypto_secretbox_BOXZEROBYTES);
+        };
+        nacl18.secretbox.open = function(box, nonce, key2) {
+          checkArrayTypes(box, nonce, key2);
+          checkLengths(key2, nonce);
+          var c = new Uint8Array(crypto_secretbox_BOXZEROBYTES + box.length);
+          var m = new Uint8Array(c.length);
+          for (var i = 0; i < box.length; i++)
+            c[i + crypto_secretbox_BOXZEROBYTES] = box[i];
+          if (c.length < 32)
+            return null;
+          if (crypto_secretbox_open(m, c, c.length, nonce, key2) !== 0)
+            return null;
+          return m.subarray(crypto_secretbox_ZEROBYTES);
+        };
+        nacl18.secretbox.keyLength = crypto_secretbox_KEYBYTES;
+        nacl18.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
+        nacl18.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
+        nacl18.scalarMult = function(n, p) {
+          checkArrayTypes(n, p);
+          if (n.length !== crypto_scalarmult_SCALARBYTES)
+            throw new Error("bad n size");
+          if (p.length !== crypto_scalarmult_BYTES)
+            throw new Error("bad p size");
+          var q = new Uint8Array(crypto_scalarmult_BYTES);
+          crypto_scalarmult(q, n, p);
+          return q;
+        };
+        nacl18.scalarMult.base = function(n) {
+          checkArrayTypes(n);
+          if (n.length !== crypto_scalarmult_SCALARBYTES)
+            throw new Error("bad n size");
+          var q = new Uint8Array(crypto_scalarmult_BYTES);
+          crypto_scalarmult_base(q, n);
+          return q;
+        };
+        nacl18.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
+        nacl18.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
+        nacl18.box = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl18.box.before(publicKey, secretKey);
+          return nacl18.secretbox(msg, nonce, k);
+        };
+        nacl18.box.before = function(publicKey, secretKey) {
+          checkArrayTypes(publicKey, secretKey);
+          checkBoxLengths(publicKey, secretKey);
+          var k = new Uint8Array(crypto_box_BEFORENMBYTES);
+          crypto_box_beforenm(k, publicKey, secretKey);
+          return k;
+        };
+        nacl18.box.after = nacl18.secretbox;
+        nacl18.box.open = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl18.box.before(publicKey, secretKey);
+          return nacl18.secretbox.open(msg, nonce, k);
+        };
+        nacl18.box.open.after = nacl18.secretbox.open;
+        nacl18.box.keyPair = function() {
+          var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
+          var sk = new Uint8Array(crypto_box_SECRETKEYBYTES);
+          crypto_box_keypair(pk, sk);
+          return { publicKey: pk, secretKey: sk };
+        };
+        nacl18.box.keyPair.fromSecretKey = function(secretKey) {
+          checkArrayTypes(secretKey);
+          if (secretKey.length !== crypto_box_SECRETKEYBYTES)
+            throw new Error("bad secret key size");
+          var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
+          crypto_scalarmult_base(pk, secretKey);
+          return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
+        };
+        nacl18.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
+        nacl18.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
+        nacl18.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
+        nacl18.box.nonceLength = crypto_box_NONCEBYTES;
+        nacl18.box.overheadLength = nacl18.secretbox.overheadLength;
+        nacl18.sign = function(msg, secretKey) {
+          checkArrayTypes(msg, secretKey);
+          if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
+            throw new Error("bad secret key size");
+          var signedMsg = new Uint8Array(crypto_sign_BYTES + msg.length);
+          crypto_sign(signedMsg, msg, msg.length, secretKey);
+          return signedMsg;
+        };
+        nacl18.sign.open = function(signedMsg, publicKey) {
+          checkArrayTypes(signedMsg, publicKey);
+          if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
+            throw new Error("bad public key size");
+          var tmp = new Uint8Array(signedMsg.length);
+          var mlen = crypto_sign_open(tmp, signedMsg, signedMsg.length, publicKey);
+          if (mlen < 0)
+            return null;
+          var m = new Uint8Array(mlen);
+          for (var i = 0; i < m.length; i++)
+            m[i] = tmp[i];
+          return m;
+        };
+        nacl18.sign.detached = function(msg, secretKey) {
+          var signedMsg = nacl18.sign(msg, secretKey);
+          var sig = new Uint8Array(crypto_sign_BYTES);
+          for (var i = 0; i < sig.length; i++)
+            sig[i] = signedMsg[i];
+          return sig;
+        };
+        nacl18.sign.detached.verify = function(msg, sig, publicKey) {
+          checkArrayTypes(msg, sig, publicKey);
+          if (sig.length !== crypto_sign_BYTES)
+            throw new Error("bad signature size");
+          if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
+            throw new Error("bad public key size");
+          var sm = new Uint8Array(crypto_sign_BYTES + msg.length);
+          var m = new Uint8Array(crypto_sign_BYTES + msg.length);
+          var i;
+          for (i = 0; i < crypto_sign_BYTES; i++)
+            sm[i] = sig[i];
+          for (i = 0; i < msg.length; i++)
+            sm[i + crypto_sign_BYTES] = msg[i];
+          return crypto_sign_open(m, sm, sm.length, publicKey) >= 0;
+        };
+        nacl18.sign.keyPair = function() {
+          var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
+          var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
+          crypto_sign_keypair(pk, sk);
+          return { publicKey: pk, secretKey: sk };
+        };
+        nacl18.sign.keyPair.fromSecretKey = function(secretKey) {
+          checkArrayTypes(secretKey);
+          if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
+            throw new Error("bad secret key size");
+          var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
+          for (var i = 0; i < pk.length; i++)
+            pk[i] = secretKey[32 + i];
+          return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
+        };
+        nacl18.sign.keyPair.fromSeed = function(seed) {
+          checkArrayTypes(seed);
+          if (seed.length !== crypto_sign_SEEDBYTES)
+            throw new Error("bad seed size");
+          var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
+          var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
+          for (var i = 0; i < 32; i++)
+            sk[i] = seed[i];
+          crypto_sign_keypair(pk, sk, true);
+          return { publicKey: pk, secretKey: sk };
+        };
+        nacl18.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
+        nacl18.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
+        nacl18.sign.seedLength = crypto_sign_SEEDBYTES;
+        nacl18.sign.signatureLength = crypto_sign_BYTES;
+        nacl18.hash = function(msg) {
+          checkArrayTypes(msg);
+          var h = new Uint8Array(crypto_hash_BYTES);
+          crypto_hash(h, msg, msg.length);
+          return h;
+        };
+        nacl18.hash.hashLength = crypto_hash_BYTES;
+        nacl18.verify = function(x, y) {
+          checkArrayTypes(x, y);
+          if (x.length === 0 || y.length === 0)
+            return false;
+          if (x.length !== y.length)
+            return false;
+          return vn(x, 0, y, 0, x.length) === 0 ? true : false;
+        };
+        nacl18.setPRNG = function(fn) {
+          randombytes = fn;
+        };
+        (function() {
+          var crypto2 = typeof self !== "undefined" ? self.crypto || self.msCrypto : null;
+          if (crypto2 && crypto2.getRandomValues) {
+            var QUOTA = 65536;
+            nacl18.setPRNG(function(x, n) {
+              var i, v = new Uint8Array(n);
+              for (i = 0; i < n; i += QUOTA) {
+                crypto2.getRandomValues(v.subarray(i, i + Math.min(n - i, QUOTA)));
+              }
+              for (i = 0; i < n; i++)
+                x[i] = v[i];
+              cleanup(v);
+            });
+          } else if (typeof __require !== "undefined") {
+            crypto2 = (init_node_crypto(), __toCommonJS(node_crypto_exports));
+            if (crypto2 && crypto2.randomBytes) {
+              nacl18.setPRNG(function(x, n) {
+                var i, v = crypto2.randomBytes(n);
+                for (i = 0; i < n; i++)
+                  x[i] = v[i];
+                cleanup(v);
+              });
+            }
+          }
+        })();
+      })(typeof module !== "undefined" && module.exports ? module.exports : self.nacl = self.nacl || {});
     }
   });
 
@@ -5078,15 +7246,132 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/bootstrap.js
+  // ../peer/packages/peer/dist/compat/address.js
+  function carrierAddressFromPublicKey2(publicKey, nospam = 0) {
+    if (publicKey.length !== CARRIER_PUBLIC_KEY_SIZE2) {
+      throw new Error(`Carrier public key must be ${CARRIER_PUBLIC_KEY_SIZE2} bytes`);
+    }
+    const address = new Uint8Array(CARRIER_ADDRESS_SIZE2);
+    address.set(publicKey, 0);
+    writeUint32LE2(address, CARRIER_PUBLIC_KEY_SIZE2, nospam);
+    writeUint16LE2(address, CARRIER_PUBLIC_KEY_SIZE2 + CARRIER_NOSPAM_SIZE2, addressChecksum2(address.subarray(0, -2)));
+    return bytesToBase58(address);
+  }
+  function parseCarrierAddress2(address) {
+    const bytes = base58ToBytes(address);
+    if (bytes.length !== CARRIER_ADDRESS_SIZE2) {
+      throw new Error(`Carrier address must decode to ${CARRIER_ADDRESS_SIZE2} bytes`);
+    }
+    const actual = readUint16LE2(bytes, CARRIER_PUBLIC_KEY_SIZE2 + CARRIER_NOSPAM_SIZE2);
+    const expected = addressChecksum2(bytes.subarray(0, -2));
+    if (actual !== expected) {
+      throw new Error("Carrier address checksum mismatch");
+    }
+    return {
+      publicKey: bytes.slice(0, CARRIER_PUBLIC_KEY_SIZE2),
+      nospam: readUint32LE2(bytes, CARRIER_PUBLIC_KEY_SIZE2),
+      checksum: actual
+    };
+  }
+  function carrierIdFromAddress2(address) {
+    return bytesToBase58(parseCarrierAddress2(address).publicKey);
+  }
+  function carrierIdFromPublicKey2(publicKey) {
+    if (publicKey.length !== CARRIER_PUBLIC_KEY_SIZE2) {
+      throw new Error(`Carrier public key must be ${CARRIER_PUBLIC_KEY_SIZE2} bytes`);
+    }
+    return bytesToBase58(publicKey);
+  }
+  function addressChecksum2(bytes) {
+    const checksum = [0, 0];
+    for (let i = 0; i < bytes.length; i++) {
+      checksum[i % 2] ^= bytes[i];
+    }
+    return checksum[0] | checksum[1] << 8;
+  }
+  function writeUint16LE2(bytes, offset, value) {
+    bytes[offset] = value & 255;
+    bytes[offset + 1] = value >>> 8 & 255;
+  }
+  function readUint16LE2(bytes, offset) {
+    return bytes[offset] | bytes[offset + 1] << 8;
+  }
+  function writeUint32LE2(bytes, offset, value) {
+    if (!Number.isInteger(value) || value < 0 || value > 4294967295) {
+      throw new Error("Carrier nospam must be a uint32");
+    }
+    bytes[offset] = value & 255;
+    bytes[offset + 1] = value >>> 8 & 255;
+    bytes[offset + 2] = value >>> 16 & 255;
+    bytes[offset + 3] = value >>> 24 & 255;
+  }
+  function readUint32LE2(bytes, offset) {
+    return (bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16 | bytes[offset + 3] << 24) >>> 0;
+  }
+  var CARRIER_PUBLIC_KEY_SIZE2, CARRIER_NOSPAM_SIZE2, CARRIER_ADDRESS_CHECKSUM_SIZE2, CARRIER_ADDRESS_SIZE2;
+  var init_address = __esm({
+    "../peer/packages/peer/dist/compat/address.js"() {
+      "use strict";
+      init_buffer_global();
+      init_process_global();
+      init_base58();
+      CARRIER_PUBLIC_KEY_SIZE2 = 32;
+      CARRIER_NOSPAM_SIZE2 = 4;
+      CARRIER_ADDRESS_CHECKSUM_SIZE2 = 2;
+      CARRIER_ADDRESS_SIZE2 = CARRIER_PUBLIC_KEY_SIZE2 + CARRIER_NOSPAM_SIZE2 + CARRIER_ADDRESS_CHECKSUM_SIZE2;
+    }
+  });
+
+  // ../peer/packages/peer/dist/utils/bytes.js
+  function bytesToHex3(bytes) {
+    return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  function hexToBytes3(hex2) {
+    if (hex2.length % 2 !== 0) {
+      throw new Error("hex string must have an even length");
+    }
+    const bytes = new Uint8Array(hex2.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      const value = Number.parseInt(hex2.slice(i * 2, i * 2 + 2), 16);
+      if (Number.isNaN(value)) {
+        throw new Error("invalid hex string");
+      }
+      bytes[i] = value;
+    }
+    return bytes;
+  }
+  function concatBytes(parts) {
+    const total = parts.reduce((size, part) => size + part.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+      out.set(part, offset);
+      offset += part.length;
+    }
+    return out;
+  }
+  function randomBytes2(length) {
+    return randomBytes(length);
+  }
+  var init_bytes = __esm({
+    "../peer/packages/peer/dist/utils/bytes.js"() {
+      "use strict";
+      init_buffer_global();
+      init_process_global();
+      init_node_crypto();
+    }
+  });
+
+  // ../peer/packages/peer/dist/compat/bootstrap.js
   var import_tweetnacl4, NET_PACKET_GET_NODES, NET_PACKET_SEND_NODES_IPV6, CARRIER_MAGIC, PUBLIC_KEY_SIZE, NONCE_SIZE, MAC_SIZE, SENDBACK_SIZE, MAX_SENT_NODES, _nodes, _keyPair, _transport, _sendGetNodes, sendGetNodes_fn, _createCarrierPacket, createCarrierPacket_fn, _createGetNodesPacket, createGetNodesPacket_fn, _parseSendNodes, parseSendNodes_fn, _stripCarrierMagic, stripCarrierMagic_fn, _parseNodes, parseNodes_fn, LegacyBootstrapClient;
   var init_bootstrap = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/bootstrap.js"() {
+    "../peer/packages/peer/dist/compat/bootstrap.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_base58();
       init_bytes();
-      import_tweetnacl4 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl4 = __toESM(require_nacl_fast2(), 1);
       NET_PACKET_GET_NODES = 2;
       NET_PACKET_SEND_NODES_IPV6 = 4;
       CARRIER_MAGIC = Uint8Array.of(105, 118, 101, 103);
@@ -5177,8 +7462,8 @@
       createGetNodesPacket_fn = function(nodePublicKey, requestedNodeId, sendback) {
         const nonce = randomBytes2(NONCE_SIZE);
         const plain = concatBytes([requestedNodeId, sendback]);
-        const sharedKey = import_tweetnacl4.default.box.before(nodePublicKey, __privateGet(this, _keyPair).secretKey);
-        const encrypted = import_tweetnacl4.default.box.after(plain, nonce, sharedKey);
+        const sharedKey2 = import_tweetnacl4.default.box.before(nodePublicKey, __privateGet(this, _keyPair).secretKey);
+        const encrypted = import_tweetnacl4.default.box.after(plain, nonce, sharedKey2);
         return concatBytes([
           Uint8Array.of(NET_PACKET_GET_NODES),
           __privateGet(this, _keyPair).publicKey,
@@ -5196,8 +7481,8 @@
         const remotePublicKey = data.slice(1, 1 + PUBLIC_KEY_SIZE);
         const nonce = data.slice(1 + PUBLIC_KEY_SIZE, 1 + PUBLIC_KEY_SIZE + NONCE_SIZE);
         const encrypted = data.slice(1 + PUBLIC_KEY_SIZE + NONCE_SIZE);
-        const sharedKey = import_tweetnacl4.default.box.before(remotePublicKey, __privateGet(this, _keyPair).secretKey);
-        const plain = import_tweetnacl4.default.box.open.after(encrypted, nonce, sharedKey);
+        const sharedKey2 = import_tweetnacl4.default.box.before(remotePublicKey, __privateGet(this, _keyPair).secretKey);
+        const plain = import_tweetnacl4.default.box.open.after(encrypted, nonce, sharedKey2);
         if (!plain || plain.length < 1 + SENDBACK_SIZE) {
           return void 0;
         }
@@ -5265,7 +7550,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/inline-file.js
+  // ../peer/packages/peer/dist/compat/inline-file.js
   function decodeAndroidFileEnvelope(bytes) {
     if (bytes.length < 6 || bytes[0] !== 0 || bytes[1] !== 0)
       return void 0;
@@ -5307,17 +7592,18 @@
   }
   var MAX_META_LEN;
   var init_inline_file = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/inline-file.js"() {
+    "../peer/packages/peer/dist/compat/inline-file.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       MAX_META_LEN = 4096;
     }
   });
 
-  // node_modules/flatbuffers/mjs/constants.js
+  // ../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/constants.js
   var SIZEOF_SHORT, SIZEOF_INT, FILE_IDENTIFIER_LENGTH, SIZE_PREFIX_LENGTH;
   var init_constants = __esm({
-    "node_modules/flatbuffers/mjs/constants.js"() {
+    "../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/constants.js"() {
       init_buffer_global();
       init_process_global();
       SIZEOF_SHORT = 2;
@@ -5327,10 +7613,10 @@
     }
   });
 
-  // node_modules/flatbuffers/mjs/utils.js
+  // ../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/utils.js
   var int32, float32, float64, isLittleEndian;
   var init_utils2 = __esm({
-    "node_modules/flatbuffers/mjs/utils.js"() {
+    "../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/utils.js"() {
       init_buffer_global();
       init_process_global();
       int32 = new Int32Array(2);
@@ -5340,10 +7626,10 @@
     }
   });
 
-  // node_modules/flatbuffers/mjs/encoding.js
+  // ../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/encoding.js
   var Encoding;
   var init_encoding = __esm({
-    "node_modules/flatbuffers/mjs/encoding.js"() {
+    "../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/encoding.js"() {
       init_buffer_global();
       init_process_global();
       (function(Encoding2) {
@@ -5353,10 +7639,10 @@
     }
   });
 
-  // node_modules/flatbuffers/mjs/byte-buffer.js
+  // ../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/byte-buffer.js
   var ByteBuffer;
   var init_byte_buffer = __esm({
-    "node_modules/flatbuffers/mjs/byte-buffer.js"() {
+    "../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/byte-buffer.js"() {
       init_buffer_global();
       init_process_global();
       init_constants();
@@ -5607,10 +7893,10 @@
     }
   });
 
-  // node_modules/flatbuffers/mjs/builder.js
+  // ../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/builder.js
   var Builder;
   var init_builder = __esm({
-    "node_modules/flatbuffers/mjs/builder.js"() {
+    "../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/builder.js"() {
       init_buffer_global();
       init_process_global();
       init_byte_buffer();
@@ -6114,9 +8400,9 @@
     }
   });
 
-  // node_modules/flatbuffers/mjs/flatbuffers.js
+  // ../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/flatbuffers.js
   var init_flatbuffers = __esm({
-    "node_modules/flatbuffers/mjs/flatbuffers.js"() {
+    "../peer/node_modules/.pnpm/flatbuffers@25.9.23/node_modules/flatbuffers/mjs/flatbuffers.js"() {
       init_buffer_global();
       init_process_global();
       init_constants();
@@ -6127,7 +8413,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/packet.js
+  // ../peer/packages/peer/dist/compat/packet.js
   function encodeUserInfoPacket(opts) {
     const builder = new Builder(256);
     const name = builder.createString(opts.name ?? "");
@@ -6376,7 +8662,8 @@
   }
   var PACKET_TYPE_USERINFO, PACKET_TYPE_FRIEND_REQUEST, PACKET_TYPE_MESSAGE, PACKET_TYPE_INVITE_REQUEST, PACKET_TYPE_INVITE_RESPONSE, PACKET_TYPE_BULKMSG, CARRIER_MAX_APP_MESSAGE_LEN, CARRIER_MAX_APP_BULKMSG_LEN, INVITE_DATA_UNIT, CARRIER_MAX_INVITE_DATA_LEN, CARRIER_EXTENSION_NAME, ANYBODY_USERINFO, ANYBODY_FRIENDREQ, ANYBODY_FRIENDMSG, ANYBODY_INVITEREQ, ANYBODY_INVITERSP, ANYBODY_BULKMSG;
   var init_packet = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/packet.js"() {
+    "../peer/packages/peer/dist/compat/packet.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_flatbuffers();
@@ -6400,7 +8687,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/tox-onion.js
+  // ../peer/packages/peer/dist/compat/tox-onion.js
   function createOnionAnnounceRequest(opts) {
     ensureLen(opts.senderPublicKey, KEY_SIZE, "sender public key");
     ensureLen(opts.senderSecretKey, KEY_SIZE, "sender secret key");
@@ -6584,10 +8871,11 @@
   }
   var import_tweetnacl5, NET_PACKET_ONION_ANNOUNCE_REQUEST, NET_PACKET_ONION_ANNOUNCE_RESPONSE, NET_PACKET_ONION_DATA_REQUEST, NET_PACKET_ONION_DATA_RESPONSE, ONION_FRIEND_REQUEST_ID, NET_PACKET_ONION_REQUEST_0, KEY_SIZE, NONCE_SIZE2, SEND_BACK_SIZE, PACKED_IP_PORT_SIZE;
   var init_tox_onion = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/tox-onion.js"() {
+    "../peer/packages/peer/dist/compat/tox-onion.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
-      import_tweetnacl5 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl5 = __toESM(require_nacl_fast2(), 1);
       init_bytes();
       NET_PACKET_ONION_ANNOUNCE_REQUEST = 131;
       NET_PACKET_ONION_ANNOUNCE_RESPONSE = 132;
@@ -6602,7 +8890,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/tox-dht-crypto.js
+  // ../peer/packages/peer/dist/compat/tox-dht-crypto.js
   function createToxDhtCryptoRequest(opts) {
     if (opts.receiverPublicKey.length !== PUBLIC_KEY_SIZE2) {
       throw new Error(`receiver public key must be ${PUBLIC_KEY_SIZE2} bytes`);
@@ -6664,10 +8952,11 @@
   }
   var import_tweetnacl6, NET_PACKET_CRYPTO, CRYPTO_PACKET_FRIEND_REQ, CRYPTO_PACKET_DHTPK, PUBLIC_KEY_SIZE2, NONCE_SIZE3, MAC_SIZE2, MAX_CRYPTO_REQUEST_SIZE;
   var init_tox_dht_crypto = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/tox-dht-crypto.js"() {
+    "../peer/packages/peer/dist/compat/tox-dht-crypto.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
-      import_tweetnacl6 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl6 = __toESM(require_nacl_fast2(), 1);
       init_bytes();
       NET_PACKET_CRYPTO = 32;
       CRYPTO_PACKET_FRIEND_REQ = 32;
@@ -6679,7 +8968,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/dht-rpc.js
+  // ../peer/packages/peer/dist/compat/dht-rpc.js
   function isDhtRpcType(t) {
     return t === NET_PACKET_PING_REQUEST || t === NET_PACKET_PING_RESPONSE || t === NET_PACKET_GET_NODES2 || t === NET_PACKET_SEND_NODES;
   }
@@ -6748,10 +9037,11 @@
   }
   var import_tweetnacl7, NET_PACKET_PING_REQUEST, NET_PACKET_PING_RESPONSE, NET_PACKET_GET_NODES2, NET_PACKET_SEND_NODES, KEY_SIZE2, NONCE_SIZE4, MAC_SIZE3;
   var init_dht_rpc = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/dht-rpc.js"() {
+    "../peer/packages/peer/dist/compat/dht-rpc.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
-      import_tweetnacl7 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl7 = __toESM(require_nacl_fast2(), 1);
       init_bytes();
       NET_PACKET_PING_REQUEST = 0;
       NET_PACKET_PING_RESPONSE = 1;
@@ -6763,7 +9053,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/reed-solomon.js
+  // ../peer/packages/peer/dist/compat/reed-solomon.js
   function gmul(a, b) {
     if (a === 0 || b === 0)
       return 0;
@@ -6904,7 +9194,8 @@
   }
   var EXP, LOG;
   var init_reed_solomon = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/reed-solomon.js"() {
+    "../peer/packages/peer/dist/compat/reed-solomon.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       EXP = new Uint8Array(512);
@@ -6924,7 +9215,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/filetransfer.js
+  // ../peer/packages/peer/dist/compat/filetransfer.js
   function encodeFec(fileNumber, blockIndex, parityIndex, parity) {
     return concatBytes([Uint8Array.of(fileNumber & 255), u32be(blockIndex), Uint8Array.of(parityIndex & 255), parity]);
   }
@@ -6996,7 +9287,8 @@
   }
   var PACKET_ID_FILE_SENDREQUEST, PACKET_ID_FILE_CONTROL, PACKET_ID_FILE_DATA, PACKET_ID_FILE_FEC, FILE_ID_LENGTH, MAX_FILENAME_LENGTH, MAX_CONCURRENT_FILE_PIPES, MAX_FILE_DATA_SIZE, FEC_K, FEC_M_MIN, FEC_M_MAX, FEC_MARGIN, FEC_SAFETY, FEC_ACTIVE_WINDOW_MS, FILECONTROL, FILEKIND, WINDOW_CHUNKS, CWND_INIT_CHUNKS, CWND_MIN_CHUNKS, PACE_CYCLE_GAINS, PACE_BW_WINDOW, PACE_SAMPLE_MS, PACE_INIT_BPS, LAN_PACE_INIT_BPS, PACE_BURST_MS, LAN_SAMPLE_MAX_GAIN, LAN_STARTUP_MAX_GAIN, LAN_STARTUP_DELIVERY_GAIN, LAN_STARTUP_QUEUE_MS, LAN_STARTUP_HARD_QUEUE_MS, LAN_STARTUP_QUEUE_ROUNDS, LAN_STARTUP_KEEPUP, LAN_RECOVERY_GAIN, LAN_RECOVERY_QUEUE_MS, LAN_STARTUP_SLOW_ROUNDS, LAN_BDP_RTT_FLOOR_MS, LAN_CWND_INIT_CHUNKS, WATCHDOG_MS, WATCHDOG_MAX_MS, STALL_PROBE_THRESHOLD, FAST_RT_MIN_MS, ACK_THROTTLE_MS, REACK_MS, FINAL_ACK_GRACE_MS, SEND_GIVEUP_MS, PERSIST_INTERVAL_BYTES, enc, dec, hex, nowMs, chunkCount, _sending, _receiving, _resumeDir, _partPath, partPath_fn, _map, map_fn, _freeNumber, freeNumber_fn, _onSendRequest, onSendRequest_fn, _onControl, onControl_fn, _onData, onData_fn, _advanceContiguous, advanceContiguous_fn, _finishOrAck, finishOrAck_fn, _onFec, onFec_fn, _tryRecoverBlock, tryRecoverBlock_fn, _persistPartial, persistPartial_fn, _finishRecv, finishRecv_fn, _scheduleAck, scheduleAck_fn, _measureLoss, measureLoss_fn, _sendAck, sendAck_fn, _onAck, onAck_fn, _rewindRetransmit, rewindRetransmit_fn, _sendProbeChunk, sendProbeChunk_fn, _pump, pump_fn, _schedulePace, schedulePace_fn, _emitParity, emitParity_fn, _completeSend, completeSend_fn, _endSend, endSend_fn, _endRecv, endRecv_fn, FileTransferManager;
   var init_filetransfer = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/filetransfer.js"() {
+    "../peer/packages/peer/dist/compat/filetransfer.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_bytes();
@@ -8036,7 +10328,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/dnft1.js
+  // ../peer/packages/peer/dist/compat/dnft1.js
   function encodeDnft1Frame(packetId, payload) {
     const out = new Uint8Array(DNFT1_HEADER_LENGTH + payload.length);
     out.set(DNFT1_MAGIC, 0);
@@ -8069,7 +10361,8 @@
   }
   var DNFT1_MAGIC, DNFT1_HEADER_LENGTH, _dnft1, _pinned, _unanswered, _Dnft1TransportPolicy, Dnft1TransportPolicy;
   var init_dnft1 = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/dnft1.js"() {
+    "../peer/packages/peer/dist/compat/dnft1.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_filetransfer();
@@ -8136,7 +10429,35 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/net-crypto.js
+  // ../peer/packages/peer/dist/crypto/shared-key.js
+  function sharedKey(theirPublicKey, ourSecretKey) {
+    const id = bytesToHex3(theirPublicKey);
+    const hit = cache.get(id);
+    if (hit && hit.sk === ourSecretKey)
+      return hit.key;
+    const key2 = import_tweetnacl8.default.box.before(theirPublicKey, ourSecretKey);
+    if (cache.size >= MAX_ENTRIES) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== void 0)
+        cache.delete(oldest);
+    }
+    cache.set(id, { sk: ourSecretKey, key: key2 });
+    return key2;
+  }
+  var import_tweetnacl8, cache, MAX_ENTRIES;
+  var init_shared_key = __esm({
+    "../peer/packages/peer/dist/crypto/shared-key.js"() {
+      "use strict";
+      init_buffer_global();
+      init_process_global();
+      import_tweetnacl8 = __toESM(require_nacl_fast2(), 1);
+      init_bytes();
+      cache = /* @__PURE__ */ new Map();
+      MAX_ENTRIES = 1024;
+    }
+  });
+
+  // ../peer/packages/peer/dist/compat/net-crypto.js
   function createCookieRequest(opts) {
     if (opts.senderRealPublicKey.length !== KEY_SIZE3) {
       throw new Error("sender real public key must be 32 bytes");
@@ -8159,8 +10480,8 @@
       throw new Error("cookie request plaintext size mismatch");
     }
     const nonce = randomBytes2(NONCE_SIZE5);
-    const sharedKey = import_tweetnacl8.default.box.before(opts.receiverDhtPublicKey, opts.senderDhtSecretKey);
-    const cipher = import_tweetnacl8.default.secretbox(plain, nonce, sharedKey);
+    const sharedKey2 = sharedKey(opts.receiverDhtPublicKey, opts.senderDhtSecretKey);
+    const cipher = import_tweetnacl9.default.secretbox(plain, nonce, sharedKey2);
     return concatBytes([
       Uint8Array.of(NET_PACKET_COOKIE_REQUEST),
       opts.senderDhtPublicKey,
@@ -8175,8 +10496,8 @@
     const senderDhtPublicKey = packet.slice(1, 1 + KEY_SIZE3);
     const nonce = packet.slice(1 + KEY_SIZE3, 1 + KEY_SIZE3 + NONCE_SIZE5);
     const cipher = packet.slice(1 + KEY_SIZE3 + NONCE_SIZE5);
-    const sharedKey = import_tweetnacl8.default.box.before(senderDhtPublicKey, opts.receiverDhtSecretKey);
-    const plain = import_tweetnacl8.default.secretbox.open(cipher, nonce, sharedKey);
+    const sharedKey2 = sharedKey(senderDhtPublicKey, opts.receiverDhtSecretKey);
+    const plain = import_tweetnacl9.default.secretbox.open(cipher, nonce, sharedKey2);
     if (!plain || plain.length !== COOKIE_REQUEST_PLAIN_LENGTH) {
       return void 0;
     }
@@ -8194,8 +10515,8 @@
     });
     const plain = concatBytes([cookie, writeUint64Le(opts.request.echo)]);
     const nonce = randomBytes2(NONCE_SIZE5);
-    const sharedKey = import_tweetnacl8.default.box.before(opts.request.senderDhtPublicKey, opts.receiverDhtSecretKey);
-    const cipher = import_tweetnacl8.default.secretbox(plain, nonce, sharedKey);
+    const sharedKey2 = sharedKey(opts.request.senderDhtPublicKey, opts.receiverDhtSecretKey);
+    const cipher = import_tweetnacl9.default.secretbox(plain, nonce, sharedKey2);
     return concatBytes([Uint8Array.of(NET_PACKET_COOKIE_RESPONSE), nonce, cipher]);
   }
   function openCookieResponse(packet, opts) {
@@ -8204,8 +10525,8 @@
     }
     const nonce = packet.slice(1, 1 + NONCE_SIZE5);
     const cipher = packet.slice(1 + NONCE_SIZE5);
-    const sharedKey = import_tweetnacl8.default.box.before(opts.receiverDhtPublicKey, opts.senderDhtSecretKey);
-    const plain = import_tweetnacl8.default.secretbox.open(cipher, nonce, sharedKey);
+    const sharedKey2 = sharedKey(opts.receiverDhtPublicKey, opts.senderDhtSecretKey);
+    const plain = import_tweetnacl9.default.secretbox.open(cipher, nonce, sharedKey2);
     if (!plain || plain.length !== COOKIE_RESPONSE_PLAIN_LENGTH) {
       return void 0;
     }
@@ -8220,7 +10541,7 @@
     }
     const nonce = cookie.slice(0, NONCE_SIZE5);
     const cipher = cookie.slice(NONCE_SIZE5);
-    const plain = import_tweetnacl8.default.secretbox.open(cipher, nonce, opts.symmetricKey);
+    const plain = import_tweetnacl9.default.secretbox.open(cipher, nonce, opts.symmetricKey);
     if (!plain || plain.length !== COOKIE_CONTENTS_LENGTH) {
       return void 0;
     }
@@ -8243,8 +10564,8 @@
       sha512(opts.recipientCookie),
       ownCookie
     ]);
-    const sharedKey = import_tweetnacl8.default.box.before(opts.receiverRealPublicKey, opts.senderRealSecretKey);
-    const innerCipher = import_tweetnacl8.default.secretbox(innerPlain, innerNonce, sharedKey);
+    const sharedKey2 = sharedKey(opts.receiverRealPublicKey, opts.senderRealSecretKey);
+    const innerCipher = import_tweetnacl9.default.secretbox(innerPlain, innerNonce, sharedKey2);
     return concatBytes([Uint8Array.of(NET_PACKET_CRYPTO_HS), opts.recipientCookie, innerNonce, innerCipher]);
   }
   function openCryptoHandshake(packet, opts) {
@@ -8260,8 +10581,8 @@
     const senderDhtPublicKey = cookieParsed.dhtPublicKey;
     const nonce = packet.slice(1 + COOKIE_LENGTH, 1 + COOKIE_LENGTH + NONCE_SIZE5);
     const cipher = packet.slice(1 + COOKIE_LENGTH + NONCE_SIZE5);
-    const sharedKey = import_tweetnacl8.default.box.before(senderRealPublicKey, opts.receiverRealSecretKey);
-    const inner = import_tweetnacl8.default.secretbox.open(cipher, nonce, sharedKey);
+    const sharedKey2 = sharedKey(senderRealPublicKey, opts.receiverRealSecretKey);
+    const inner = import_tweetnacl9.default.secretbox.open(cipher, nonce, sharedKey2);
     if (!inner || inner.length !== HANDSHAKE_INNER_LENGTH) {
       return void 0;
     }
@@ -8291,7 +10612,7 @@
     writeUint32BeInto(plain, 0, opts.bufferStart);
     writeUint32BeInto(plain, 4, opts.packetNumber);
     plain.set(opts.payload, CRYPTO_DATA_PLAIN_HEADER_LENGTH + paddingLength);
-    const cipher = import_tweetnacl8.default.secretbox(plain, opts.sentNonce, opts.sessionSharedKey);
+    const cipher = import_tweetnacl9.default.secretbox(plain, opts.sentNonce, opts.sessionSharedKey);
     const last2 = opts.sentNonce.slice(opts.sentNonce.length - 2);
     return concatBytes([Uint8Array.of(NET_PACKET_CRYPTO_DATA), last2, cipher]);
   }
@@ -8309,7 +10630,7 @@
       subFromNonceCounter(nonce, 65536 - diff);
     }
     const cipher = packet.slice(3);
-    const plain = import_tweetnacl8.default.secretbox.open(cipher, nonce, opts.sessionSharedKey);
+    const plain = import_tweetnacl9.default.secretbox.open(cipher, nonce, opts.sessionSharedKey);
     if (!plain || plain.length <= CRYPTO_DATA_PLAIN_HEADER_LENGTH) {
       return void 0;
     }
@@ -8354,7 +10675,7 @@
       opts.dhtPublicKey
     ]);
     const nonce = randomBytes2(NONCE_SIZE5);
-    const cipher = import_tweetnacl8.default.secretbox(contents, nonce, opts.symmetricKey);
+    const cipher = import_tweetnacl9.default.secretbox(contents, nonce, opts.symmetricKey);
     return concatBytes([nonce, cipher]);
   }
   function incrementNonce(nonce) {
@@ -8404,14 +10725,16 @@
   function readUint32Be(bytes, offset) {
     return (bytes[offset] << 24 >>> 0 | bytes[offset + 1] << 16 | bytes[offset + 2] << 8 | bytes[offset + 3]) >>> 0;
   }
-  var import_tweetnacl8, NET_PACKET_COOKIE_REQUEST, NET_PACKET_COOKIE_RESPONSE, NET_PACKET_CRYPTO_HS, NET_PACKET_CRYPTO_DATA, KEY_SIZE3, NONCE_SIZE5, MAC_SIZE4, COOKIE_DATA_LENGTH, COOKIE_CONTENTS_LENGTH, COOKIE_LENGTH, COOKIE_REQUEST_PLAIN_LENGTH, COOKIE_REQUEST_LENGTH, COOKIE_RESPONSE_PLAIN_LENGTH, COOKIE_RESPONSE_LENGTH, HANDSHAKE_INNER_LENGTH, HANDSHAKE_LENGTH, MAX_CRYPTO_PACKET_SIZE, CRYPTO_DATA_PACKET_MIN_SIZE, MAX_CRYPTO_DATA_SIZE, CRYPTO_MAX_PADDING, CRYPTO_DATA_PLAIN_HEADER_LENGTH;
+  var import_tweetnacl9, NET_PACKET_COOKIE_REQUEST, NET_PACKET_COOKIE_RESPONSE, NET_PACKET_CRYPTO_HS, NET_PACKET_CRYPTO_DATA, KEY_SIZE3, NONCE_SIZE5, MAC_SIZE4, COOKIE_DATA_LENGTH, COOKIE_CONTENTS_LENGTH, COOKIE_LENGTH, COOKIE_REQUEST_PLAIN_LENGTH, COOKIE_REQUEST_LENGTH, COOKIE_RESPONSE_PLAIN_LENGTH, COOKIE_RESPONSE_LENGTH, HANDSHAKE_INNER_LENGTH, HANDSHAKE_LENGTH, MAX_CRYPTO_PACKET_SIZE, CRYPTO_DATA_PACKET_MIN_SIZE, MAX_CRYPTO_DATA_SIZE, CRYPTO_MAX_PADDING, CRYPTO_DATA_PLAIN_HEADER_LENGTH;
   var init_net_crypto = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/net-crypto.js"() {
+    "../peer/packages/peer/dist/compat/net-crypto.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
-      import_tweetnacl8 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl9 = __toESM(require_nacl_fast2(), 1);
       init_node_crypto();
       init_bytes();
+      init_shared_key();
       NET_PACKET_COOKIE_REQUEST = 24;
       NET_PACKET_COOKIE_RESPONSE = 25;
       NET_PACKET_CRYPTO_HS = 26;
@@ -8436,10 +10759,10 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/express.js
+  // ../peer/packages/peer/dist/compat/express.js
   function encrypt(key2, plain) {
     const nonce = randomBytes2(NONCE_SIZE6);
-    const cipher = import_tweetnacl9.default.secretbox(plain, nonce, key2);
+    const cipher = import_tweetnacl10.default.secretbox(plain, nonce, key2);
     const out = new Uint8Array(nonce.length + cipher.length);
     out.set(nonce, 0);
     out.set(cipher, nonce.length);
@@ -8451,7 +10774,7 @@
     }
     const nonce = encrypted.slice(0, NONCE_SIZE6);
     const cipher = encrypted.slice(NONCE_SIZE6);
-    return import_tweetnacl9.default.secretbox.open(cipher, nonce, key2) ?? void 0;
+    return import_tweetnacl10.default.secretbox.open(cipher, nonce, key2) ?? void 0;
   }
   function parseExpressResponseFrames(body2) {
     const out = [];
@@ -8524,15 +10847,17 @@
     const length = table.bb.__vector_len(table.bb_pos + offset);
     return table.bb.bytes().slice(vector, vector + length);
   }
-  var import_tweetnacl9, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _callbacks, _debug, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
+  var import_tweetnacl10, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _callbacks, _debug, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
   var init_express = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/express.js"() {
+    "../peer/packages/peer/dist/compat/express.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_flatbuffers();
-      import_tweetnacl9 = __toESM(require_nacl_fast());
+      import_tweetnacl10 = __toESM(require_nacl_fast2(), 1);
       init_base58();
       init_bytes();
+      init_shared_key();
       EXPRESS_MAGIC = 3396265365;
       NONCE_SIZE6 = 24;
       HTTP_TIMEOUT_MS = 15e3;
@@ -8569,7 +10894,7 @@
               port: node.port,
               tls: node.tls !== false,
               // default HTTPS; opt into HTTP with tls:false
-              sharedKey: import_tweetnacl9.default.box.before(expressPk, __privateGet(this, _selfKeyPair).secretKey)
+              sharedKey: sharedKey(expressPk, __privateGet(this, _selfKeyPair).secretKey)
             };
           }));
         }
@@ -8584,7 +10909,7 @@
           if (friendPk.length !== 32) {
             throw new Error("friend user id must decode to 32-byte public key");
           }
-          const friendSharedKey = import_tweetnacl9.default.box.before(friendPk, __privateGet(this, _selfKeyPair).secretKey);
+          const friendSharedKey = sharedKey(friendPk, __privateGet(this, _selfKeyPair).secretKey);
           const friendEncrypted = encrypt(friendSharedKey, carrierPacket);
           await __privateMethod(this, _postEncrypted, postEncrypted_fn).call(this, friendUserId, friendEncrypted);
         }
@@ -8634,7 +10959,7 @@
                   if (friendPk.length !== 32) {
                     continue;
                   }
-                  const friendSharedKey = import_tweetnacl9.default.box.before(friendPk, __privateGet(this, _selfKeyPair).secretKey);
+                  const friendSharedKey = sharedKey(friendPk, __privateGet(this, _selfKeyPair).secretKey);
                   const packet = decrypt(friendSharedKey, msg.payload);
                   if (!packet) {
                     continue;
@@ -8959,27 +11284,14 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/tcp-relay.js
-  var tcp_relay_exports = {};
-  __export(tcp_relay_exports, {
-    TCP_PACKET_CONNECTION_NOTIFICATION: () => TCP_PACKET_CONNECTION_NOTIFICATION,
-    TCP_PACKET_DISCONNECT_NOTIFICATION: () => TCP_PACKET_DISCONNECT_NOTIFICATION,
-    TCP_PACKET_ONION_REQUEST: () => TCP_PACKET_ONION_REQUEST,
-    TCP_PACKET_ONION_RESPONSE: () => TCP_PACKET_ONION_RESPONSE,
-    TCP_PACKET_OOB_RECV: () => TCP_PACKET_OOB_RECV,
-    TCP_PACKET_OOB_SEND: () => TCP_PACKET_OOB_SEND,
-    TCP_PACKET_PING: () => TCP_PACKET_PING,
-    TCP_PACKET_PONG: () => TCP_PACKET_PONG,
-    TCP_PACKET_ROUTING_REQUEST: () => TCP_PACKET_ROUTING_REQUEST,
-    TCP_PACKET_ROUTING_RESPONSE: () => TCP_PACKET_ROUTING_RESPONSE,
-    TcpRelayClient: () => TcpRelayClient
-  });
-  var import_tweetnacl10, KEY_SIZE4, NONCE_SIZE7, MAC_SIZE5, RELAY_SEND_BUFFER_CAP, TCP_HANDSHAKE_PLAIN_SIZE, TCP_CLIENT_HANDSHAKE_SIZE, TCP_SERVER_HANDSHAKE_SIZE, TCP_PACKET_ROUTING_REQUEST, TCP_PACKET_ROUTING_RESPONSE, TCP_PACKET_CONNECTION_NOTIFICATION, TCP_PACKET_DISCONNECT_NOTIFICATION, TCP_PACKET_PING, TCP_PACKET_PONG, TCP_PACKET_OOB_SEND, TCP_PACKET_OOB_RECV, TCP_PACKET_ONION_REQUEST, TCP_PACKET_ONION_RESPONSE, MAX_PACKET_SIZE, CARRIER_TCP_MAGIC, _opts, _socket, _state, _debug2, _tempKeyPair, _sentNonce, _recvNonce, _sessionKey, _rxBuf, _cidByFriend, _friendByCid, _routesRequested, _buildHandshake, buildHandshake_fn, _processHandshakeResponse, processHandshakeResponse_fn, _onData2, onData_fn2, _decryptFrame, decryptFrame_fn, _sendFrame, sendFrame_fn, _dispatch, dispatch_fn, _close, close_fn, _log, log_fn, TcpRelayClient;
+  // ../peer/packages/peer/dist/compat/tcp-relay.js
+  var import_tweetnacl11, KEY_SIZE4, NONCE_SIZE7, MAC_SIZE5, RELAY_SEND_BUFFER_CAP, TCP_HANDSHAKE_PLAIN_SIZE, TCP_CLIENT_HANDSHAKE_SIZE, TCP_SERVER_HANDSHAKE_SIZE, TCP_PACKET_ROUTING_REQUEST, TCP_PACKET_ROUTING_RESPONSE, TCP_PACKET_CONNECTION_NOTIFICATION, TCP_PACKET_DISCONNECT_NOTIFICATION, TCP_PACKET_PING, TCP_PACKET_PONG, TCP_PACKET_OOB_SEND, TCP_PACKET_OOB_RECV, TCP_PACKET_ONION_REQUEST, TCP_PACKET_ONION_RESPONSE, MAX_PACKET_SIZE, CARRIER_TCP_MAGIC, _opts, _socket, _state, _debug2, _tempKeyPair, _sentNonce, _recvNonce, _sessionKey, _rxBuf, _cidByFriend, _friendByCid, _routesRequested, _buildHandshake, buildHandshake_fn, _processHandshakeResponse, processHandshakeResponse_fn, _onData2, onData_fn2, _decryptFrame, decryptFrame_fn, _sendFrame, sendFrame_fn, _dispatch, dispatch_fn, _close, close_fn, _log, log_fn, TcpRelayClient;
   var init_tcp_relay = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/tcp-relay.js"() {
+    "../peer/packages/peer/dist/compat/tcp-relay.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
-      import_tweetnacl10 = __toESM(require_nacl_fast());
+      import_tweetnacl11 = __toESM(require_nacl_fast2(), 1);
       init_node_net();
       init_node_events();
       init_bytes();
@@ -9259,14 +11571,14 @@
       _buildHandshake = new WeakSet();
       buildHandshake_fn = function() {
         __privateSet(this, _tempKeyPair, (() => {
-          const kp = import_tweetnacl10.default.box.keyPair();
+          const kp = import_tweetnacl11.default.box.keyPair();
           return { publicKey: kp.publicKey, secretKey: kp.secretKey };
         })());
         __privateSet(this, _sentNonce, randomBytes2(NONCE_SIZE7));
         const plain = concatBytes([__privateGet(this, _tempKeyPair).publicKey, __privateGet(this, _sentNonce)]);
         const handshakeNonce = randomBytes2(NONCE_SIZE7);
-        const sharedKey = import_tweetnacl10.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
-        const encrypted = import_tweetnacl10.default.box.after(plain, handshakeNonce, sharedKey);
+        const sharedKey2 = import_tweetnacl11.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
+        const encrypted = import_tweetnacl11.default.box.after(plain, handshakeNonce, sharedKey2);
         return concatBytes([__privateGet(this, _opts).selfKeyPair.publicKey, handshakeNonce, encrypted]);
       };
       _processHandshakeResponse = new WeakSet();
@@ -9276,8 +11588,8 @@
         }
         const nonce = hs.subarray(0, NONCE_SIZE7);
         const cipher = hs.subarray(NONCE_SIZE7);
-        const sharedKey = import_tweetnacl10.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
-        const plain = import_tweetnacl10.default.box.open.after(cipher, nonce, sharedKey);
+        const sharedKey2 = import_tweetnacl11.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
+        const plain = import_tweetnacl11.default.box.open.after(cipher, nonce, sharedKey2);
         if (!plain || plain.length !== TCP_HANDSHAKE_PLAIN_SIZE) {
           throw new Error("handshake response decrypt failed");
         }
@@ -9286,7 +11598,7 @@
         if (!__privateGet(this, _tempKeyPair)) {
           throw new Error("no temp keypair set");
         }
-        __privateSet(this, _sessionKey, import_tweetnacl10.default.box.before(serverTempPub, __privateGet(this, _tempKeyPair).secretKey));
+        __privateSet(this, _sessionKey, import_tweetnacl11.default.box.before(serverTempPub, __privateGet(this, _tempKeyPair).secretKey));
         __privateSet(this, _recvNonce, new Uint8Array(recvNonce));
         __privateGet(this, _tempKeyPair).secretKey.fill(0);
       };
@@ -9320,7 +11632,7 @@
       decryptFrame_fn = function(cipher) {
         if (!__privateGet(this, _sessionKey) || !__privateGet(this, _recvNonce))
           return void 0;
-        const opened = import_tweetnacl10.default.secretbox.open(cipher, __privateGet(this, _recvNonce), __privateGet(this, _sessionKey));
+        const opened = import_tweetnacl11.default.secretbox.open(cipher, __privateGet(this, _recvNonce), __privateGet(this, _sessionKey));
         if (!opened)
           return void 0;
         incrementNonce(__privateGet(this, _recvNonce));
@@ -9337,7 +11649,7 @@
         if (droppable && __privateGet(this, _socket).writableLength > RELAY_SEND_BUFFER_CAP) {
           return false;
         }
-        const cipher = import_tweetnacl10.default.secretbox(payload, __privateGet(this, _sentNonce), __privateGet(this, _sessionKey));
+        const cipher = import_tweetnacl11.default.secretbox(payload, __privateGet(this, _sentNonce), __privateGet(this, _sessionKey));
         incrementNonce(__privateGet(this, _sentNonce));
         const frame = Buffer2.alloc(4 + 2 + cipher.length);
         frame.set(CARRIER_TCP_MAGIC, 0);
@@ -9459,10 +11771,11 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/tcp-relay-pool.js
+  // ../peer/packages/peer/dist/compat/tcp-relay-pool.js
   var ONION_RELAY_FANOUT, KEY_SIZE5, MAX_RELAY_CONNECTIONS, RECONNECT_BASE_MS, RECONNECT_MAX_MS, _opts2, _relays, _stopped, _wantedFriends, _onlineRelaysByFriend, _debug3, _openOne, openOne_fn, _scheduleReconnect, scheduleReconnect_fn, _emitStatus, emitStatus_fn, _log2, log_fn2, TcpRelayPool;
   var init_tcp_relay_pool = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/tcp-relay-pool.js"() {
+    "../peer/packages/peer/dist/compat/tcp-relay-pool.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_node_events();
@@ -9832,10 +12145,11 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/runtime/errors.js
+  // ../peer/packages/peer/dist/runtime/errors.js
   var LegacyProtocolNotImplementedError;
   var init_errors = __esm({
-    "node_modules/@decentnetwork/peer/dist/runtime/errors.js"() {
+    "../peer/packages/peer/dist/runtime/errors.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       LegacyProtocolNotImplementedError = class extends Error {
@@ -9847,10 +12161,11 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/compat/dht.js
+  // ../peer/packages/peer/dist/compat/dht.js
   var LegacyDhtClient;
   var init_dht = __esm({
-    "node_modules/@decentnetwork/peer/dist/compat/dht.js"() {
+    "../peer/packages/peer/dist/compat/dht.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_errors();
@@ -9865,16 +12180,16 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/crypto/keypair.js
+  // ../peer/packages/peer/dist/crypto/keypair.js
   async function loadOrCreateKeyPair(path) {
     try {
       const parsed = JSON.parse(await readFile(path, "utf8"));
       if (parsed.format !== "decent-peer-tox-keypair-v1") {
         throw new Error(`unsupported key file format: ${parsed.format}`);
       }
-      const publicKey = hexToBytes2(parsed.publicKey);
-      const secretKey = hexToBytes2(parsed.secretKey);
-      if (publicKey.length !== import_tweetnacl11.default.box.publicKeyLength || secretKey.length !== import_tweetnacl11.default.box.secretKeyLength) {
+      const publicKey = hexToBytes3(parsed.publicKey);
+      const secretKey = hexToBytes3(parsed.secretKey);
+      if (publicKey.length !== import_tweetnacl12.default.box.publicKeyLength || secretKey.length !== import_tweetnacl12.default.box.secretKeyLength) {
         throw new Error("invalid key file key length");
       }
       return { publicKey, secretKey };
@@ -9884,7 +12199,7 @@
         throw error;
       }
     }
-    const generated = import_tweetnacl11.default.box.keyPair();
+    const generated = import_tweetnacl12.default.box.keyPair();
     const keyPair = {
       publicKey: generated.publicKey,
       secretKey: generated.secretKey
@@ -9892,22 +12207,42 @@
     await mkdir(dirname(path), { recursive: true });
     const stored = {
       format: "decent-peer-tox-keypair-v1",
-      publicKey: bytesToHex2(keyPair.publicKey),
-      secretKey: bytesToHex2(keyPair.secretKey)
+      publicKey: bytesToHex3(keyPair.publicKey),
+      secretKey: bytesToHex3(keyPair.secretKey)
     };
     await writeFile(path, `${JSON.stringify(stored, null, 2)}
 `);
     return keyPair;
   }
-  var import_tweetnacl11;
+  var import_tweetnacl12;
   var init_keypair = __esm({
-    "node_modules/@decentnetwork/peer/dist/crypto/keypair.js"() {
+    "../peer/packages/peer/dist/crypto/keypair.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_node_stub();
       init_node_stub();
-      import_tweetnacl11 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl12 = __toESM(require_nacl_fast2(), 1);
       init_bytes();
+    }
+  });
+
+  // ../peer/packages/peer/dist/crypto/sign.js
+  function signDetached2(secretKey, message) {
+    if (secretKey.length !== import_tweetnacl13.default.box.secretKeyLength) {
+      throw new Error(`secretKey must be ${import_tweetnacl13.default.box.secretKeyLength} bytes`);
+    }
+    const random = import_tweetnacl13.default.randomBytes(64);
+    return (0, import_curve25519_js2.sign)(secretKey, message, random);
+  }
+  var import_curve25519_js2, import_tweetnacl13;
+  var init_sign = __esm({
+    "../peer/packages/peer/dist/crypto/sign.js"() {
+      "use strict";
+      init_buffer_global();
+      init_process_global();
+      import_curve25519_js2 = __toESM(require_lib(), 1);
+      import_tweetnacl13 = __toESM(require_nacl_fast2(), 1);
     }
   });
 
@@ -10006,7 +12341,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/transport/udp.js
+  // ../peer/packages/peer/dist/transport/udp.js
   function looksLikeStun(data) {
     if (data.length < 8)
       return false;
@@ -10016,7 +12351,8 @@
   }
   var STUN_MAGIC_COOKIE_BYTES, _socket2, _bound, _stunInterceptors, _turnRoutes, UdpTransport;
   var init_udp = __esm({
-    "node_modules/@decentnetwork/peer/dist/transport/udp.js"() {
+    "../peer/packages/peer/dist/transport/udp.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_node_dgram();
@@ -10157,7 +12493,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/stun.js
+  // ../peer/packages/peer/dist/stun.js
   function u16(n) {
     return Uint8Array.of(n >> 8 & 255, n & 255);
   }
@@ -10333,7 +12669,8 @@
   }
   var STUN_MAGIC_COOKIE, STUN_BINDING_REQUEST, STUN_BINDING_SUCCESS, TURN_ALLOCATE_REQUEST, TURN_ALLOCATE_SUCCESS, TURN_ALLOCATE_ERROR, TURN_REFRESH_REQUEST, TURN_REFRESH_SUCCESS, TURN_CREATE_PERMISSION_REQUEST, TURN_CREATE_PERMISSION_SUCCESS, TURN_SEND_INDICATION, TURN_DATA_INDICATION, STUN_ATTR_USERNAME, STUN_ATTR_MESSAGE_INTEGRITY, STUN_ATTR_ERROR_CODE, STUN_ATTR_REALM, STUN_ATTR_NONCE, STUN_ATTR_XOR_MAPPED_ADDRESS, STUN_ATTR_SOFTWARE, STUN_ATTR_FINGERPRINT, STUN_ATTR_LIFETIME, STUN_ATTR_XOR_PEER_ADDRESS, STUN_ATTR_DATA, STUN_ATTR_XOR_RELAYED_ADDRESS, STUN_ATTR_REQUESTED_TRANSPORT, FINGERPRINT_XOR, CRC32_TABLE;
   var init_stun = __esm({
-    "node_modules/@decentnetwork/peer/dist/stun.js"() {
+    "../peer/packages/peer/dist/stun.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_node_crypto();
@@ -10378,7 +12715,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/turn.js
+  // ../peer/packages/peer/dist/turn.js
   function u32Bytes(n) {
     return Uint8Array.of(n >>> 24 & 255, n >>> 16 & 255, n >>> 8 & 255, n & 255);
   }
@@ -10387,7 +12724,8 @@
   }
   var REQUEST_TIMEOUT_MS, REQUEST_RETRIES, SOFTWARE_NAME, _sock, _realm, _nonce, _integrityKey, _allocation, _pending, _onData3, _refreshTimer, _closed, _serverIp, _onMessage, _authedRequest, authedRequest_fn, _request, request_fn, _parseAllocateSuccess, parseAllocateSuccess_fn, _scheduleRefresh, scheduleRefresh_fn, TurnClient;
   var init_turn = __esm({
-    "node_modules/@decentnetwork/peer/dist/turn.js"() {
+    "../peer/packages/peer/dist/turn.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_stun();
@@ -10682,7 +13020,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/turn-creds.js
+  // ../peer/packages/peer/dist/turn-creds.js
   function deriveCarrierTurnCreds(opts) {
     if (opts.bootnodePublicKey.length !== 32) {
       throw new Error(`bootnodePublicKey must be 32 bytes, got ${opts.bootnodePublicKey.length}`);
@@ -10690,9 +13028,9 @@
     if (opts.ourSecretKey.length !== 32) {
       throw new Error(`ourSecretKey must be 32 bytes, got ${opts.ourSecretKey.length}`);
     }
-    const sharedKey = import_tweetnacl12.default.box.before(opts.bootnodePublicKey, opts.ourSecretKey);
+    const sharedKey2 = import_tweetnacl14.default.box.before(opts.bootnodePublicKey, opts.ourSecretKey);
     const nonce = randomBytes2(24);
-    const digest = createHmac("sha256", Buffer2.from(sharedKey)).update(nonce).digest();
+    const digest = createHmac("sha256", Buffer2.from(sharedKey2)).update(nonce).digest();
     const nonceB58 = bytesToBase58(nonce);
     const passwordB58 = bytesToBase58(Uint8Array.from(digest));
     return {
@@ -10703,13 +13041,14 @@
       password: passwordB58
     };
   }
-  var import_tweetnacl12, CARRIER_TURN_PORT, CARRIER_TURN_REALM, CARRIER_TURN_USER_SUFFIX;
+  var import_tweetnacl14, CARRIER_TURN_PORT, CARRIER_TURN_REALM, CARRIER_TURN_USER_SUFFIX;
   var init_turn_creds = __esm({
-    "node_modules/@decentnetwork/peer/dist/turn-creds.js"() {
+    "../peer/packages/peer/dist/turn-creds.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_node_crypto();
-      import_tweetnacl12 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl14 = __toESM(require_nacl_fast2(), 1);
       init_base58();
       init_bytes();
       CARRIER_TURN_PORT = 3478;
@@ -10718,7 +13057,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/ice-servers.js
+  // ../peer/packages/peer/dist/ice-servers.js
   function bootnodePublicKey(node) {
     if (node.pkBytes && node.pkBytes.length === 32)
       return node.pkBytes;
@@ -10774,7 +13113,8 @@
     return ice;
   }
   var init_ice_servers = __esm({
-    "node_modules/@decentnetwork/peer/dist/ice-servers.js"() {
+    "../peer/packages/peer/dist/ice-servers.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_base58();
@@ -10782,7 +13122,7 @@
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/transport/dgram-lifecycle.js
+  // ../peer/packages/peer/dist/transport/dgram-lifecycle.js
   async function createBoundUdp4Socket(createSocket2 = () => createSocket("udp4")) {
     const sock = createSocket2();
     try {
@@ -10832,7 +13172,8 @@
     });
   }
   var init_dgram_lifecycle = __esm({
-    "node_modules/@decentnetwork/peer/dist/transport/dgram-lifecycle.js"() {
+    "../peer/packages/peer/dist/transport/dgram-lifecycle.js"() {
+      "use strict";
       init_buffer_global();
       init_process_global();
       init_node_dgram();
@@ -10891,7 +13232,7 @@
         const decoded = decodeCarrierPacket(withPrefix);
         if (decoded.type === PACKET_TYPE_FRIEND_REQUEST) {
           return {
-            nospam: readUint32LE2(payload, 0),
+            nospam: readUint32LE3(payload, 0),
             carrierPacket: withPrefix
           };
         }
@@ -10929,7 +13270,7 @@
       value >>> 24 & 255
     ]);
   }
-  function readUint32LE2(bytes, offset) {
+  function readUint32LE3(bytes, offset) {
     return (bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16 | bytes[offset + 3] << 24) >>> 0;
   }
   function readUint64BE(bytes, offset) {
@@ -10976,7 +13317,7 @@
       }
       const port = data[offset] << 8 | data[offset + 1];
       offset += 2;
-      const pk = carrierIdFromPublicKey(data.slice(offset, offset + 32));
+      const pk = carrierIdFromPublicKey2(data.slice(offset, offset + 32));
       offset += 32;
       nodes.push({ host: host2, port, pk, isTcp });
     }
@@ -10993,7 +13334,7 @@
     return diff === 0;
   }
   function createEphemeralKeyPair() {
-    return import_tweetnacl13.default.box.keyPair();
+    return import_tweetnacl15.default.box.keyPair();
   }
   function xorCloser(target, a, b) {
     const n = Math.min(target.length, a.length, b.length);
@@ -11227,7 +13568,7 @@
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
-  var import_tweetnacl13, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
+  var import_tweetnacl15, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
   var init_peer = __esm({
     "node_modules/@decentnetwork/peer/dist/peer.js"() {
       init_buffer_global();
@@ -11238,7 +13579,7 @@
       init_node_stub();
       init_node_stub();
       init_node_stub();
-      import_tweetnacl13 = __toESM(require_nacl_fast());
+      import_tweetnacl15 = __toESM(require_nacl_fast2());
       init_address();
       init_bootstrap();
       init_inline_file();
@@ -11614,6 +13955,8 @@
           __privateAdd(this, _sendAnnounceAndWait);
           __privateAdd(this, _waitForAnnounceResponse);
           __privateAdd(this, _sendPacket);
+          /** Hand an onion request to the connected relays, which stand in for hop A. */
+          __privateAdd(this, _sendOnionOverRelays);
           __privateAdd(this, _sendThroughOnionPath);
           /** Ranked hop candidates for a path to nodeD. Shared by the 3-hop UDP
            *  selector and the 2-hop TCP one — a relay stands in for node A, so a
@@ -11901,7 +14244,7 @@
             if (packet[0] === NET_PACKET_LAN_DISCOVERY && packet.length === 33 && __privateGet(this, _keyPair2) && !__privateMethod(this, _remoteIsTcp, remoteIsTcp_fn).call(this, remote)) {
               const announcedPk = packet.slice(1, 33);
               if (!Buffer2.from(announcedPk).equals(Buffer2.from(__privateGet(this, _keyPair2).publicKey))) {
-                const announcerId = carrierIdFromPublicKey(announcedPk);
+                const announcerId = carrierIdFromPublicKey2(announcedPk);
                 void __privateMethod(this, _sendDhtPing, sendDhtPing_fn).call(this, { host: remote.address, port: remote.port, pk: announcerId, isTcp: false }).catch(() => void 0);
               }
               return;
@@ -11938,7 +14281,7 @@
                 __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `cookie request parse failed from ${remote.address}:${remote.port}`);
                 return;
               }
-              const senderId = carrierIdFromPublicKey(request.senderRealPublicKey);
+              const senderId = carrierIdFromPublicKey2(request.senderRealPublicKey);
               const fromTcp = __privateMethod(this, _remoteIsTcp, remoteIsTcp_fn).call(this, remote);
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `cookie request received from ${senderId} via ${remote.address}:${remote.port}${fromTcp ? " (tcp)" : ""}`);
               if (!fromTcp) {
@@ -11946,7 +14289,7 @@
               } else if (request.senderDhtPublicKey && request.senderDhtPublicKey.length === 32) {
                 const session = __privateGet(this, _friendSessions).get(senderId);
                 if (session && !(session.friendDhtPublicKey && Buffer2.from(session.friendDhtPublicKey).equals(Buffer2.from(request.senderDhtPublicKey)))) {
-                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dht_key_from_tcp_cookie friend=${senderId} new=${carrierIdFromPublicKey(request.senderDhtPublicKey)}`);
+                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dht_key_from_tcp_cookie friend=${senderId} new=${carrierIdFromPublicKey2(request.senderDhtPublicKey)}`);
                   session.friendDhtPublicKey = request.senderDhtPublicKey;
                 }
                 __privateMethod(this, _learnFriendDhtKey, learnFriendDhtKey_fn).call(this, senderId, request.senderDhtPublicKey);
@@ -11959,7 +14302,7 @@
               if (fromTcp) {
                 const sent = __privateGet(this, _tcpRelays)?.sendOobToFriend(request.senderDhtPublicKey, response) ?? 0;
                 if (sent > 0) {
-                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `cookie response sent via tcp_oob to ${senderId} dhtpk=${carrierIdFromPublicKey(request.senderDhtPublicKey)} (relays=${sent})`);
+                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `cookie response sent via tcp_oob to ${senderId} dhtpk=${carrierIdFromPublicKey2(request.senderDhtPublicKey)} (relays=${sent})`);
                 } else {
                   __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `cookie response: no tcp relay accepted oob send for ${senderId}`);
                 }
@@ -12074,7 +14417,7 @@
                 __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto handshake parse failed from ${remote.address}:${remote.port}`);
                 return;
               }
-              const friendId = carrierIdFromPublicKey(hs.senderRealPublicKey);
+              const friendId = carrierIdFromPublicKey2(hs.senderRealPublicKey);
               let state = __privateGet(this, _friendSessions).get(friendId);
               const weInitiated = state !== void 0 && state.handshakeSentMs !== void 0;
               if (state && state.established && state.peerSessionPublicKey && bytesEqual3(state.peerSessionPublicKey, hs.sessionPublicKey)) {
@@ -12119,7 +14462,7 @@
                   state.friendRealPublicKey = hs.senderRealPublicKey;
                 if (hs.senderDhtPublicKey && hs.senderDhtPublicKey.length === 32 && !(state.friendDhtPublicKey && Buffer2.from(state.friendDhtPublicKey).equals(Buffer2.from(hs.senderDhtPublicKey)))) {
                   if (state.friendDhtPublicKey) {
-                    __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dht_key_from_hs friend=${friendId} new=${carrierIdFromPublicKey(hs.senderDhtPublicKey)}`);
+                    __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dht_key_from_hs friend=${friendId} new=${carrierIdFromPublicKey2(hs.senderDhtPublicKey)}`);
                   }
                   state.friendDhtPublicKey = hs.senderDhtPublicKey;
                 }
@@ -12162,7 +14505,7 @@
               }
               state.peerSessionPublicKey = hs.sessionPublicKey;
               state.peerBaseNonce = hs.baseNonce.slice();
-              state.sessionSharedKey = import_tweetnacl13.default.box.before(hs.sessionPublicKey, state.ourSessionKeyPair.secretKey);
+              state.sessionSharedKey = import_tweetnacl15.default.box.before(hs.sessionPublicKey, state.ourSessionKeyPair.secretKey);
               state.established = true;
               state.sessionEstablishedAtMs = Date.now();
               state.rehsCount = void 0;
@@ -12370,7 +14713,7 @@
                 }
                 const previewLen = Math.min(48, onionData.innerPayload.length);
                 const previewHex = Buffer2.from(onionData.innerPayload.slice(0, previewLen)).toString("hex");
-                const senderId = carrierIdFromPublicKey(onionData.senderPublicKey);
+                const senderId = carrierIdFromPublicKey2(onionData.senderPublicKey);
                 __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `onion data response ignored innerPacketId=${onionData.innerPacketId} sender=${senderId} payloadLen=${onionData.innerPayload.length} payloadPreviewHex=${previewHex}`);
                 return;
               }
@@ -12455,10 +14798,10 @@
             });
             __privateGet(this, _tcpRelays).on("friendOnline", (friendKey) => {
               const friendId = __privateMethod(this, _friendIdForPoolKey, friendIdForPoolKey_fn).call(this, friendKey);
-              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `tcp_relay friend_online ${carrierIdFromPublicKey(friendKey)} (friend=${friendId})`);
+              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `tcp_relay friend_online ${carrierIdFromPublicKey2(friendKey)} (friend=${friendId})`);
               const session = __privateGet(this, _friendSessions).get(friendId) ?? __privateMethod(this, _newSessionShell, newSessionShell_fn).call(this);
               session.hasTcpRoute = true;
-              if (friendId === carrierIdFromPublicKey(friendKey)) {
+              if (friendId === carrierIdFromPublicKey2(friendKey)) {
                 session.friendRealPublicKey ?? (session.friendRealPublicKey = new Uint8Array(friendKey));
               } else {
                 session.friendDhtPublicKey ?? (session.friendDhtPublicKey = new Uint8Array(friendKey));
@@ -12476,7 +14819,7 @@
               if (session) {
                 session.hasTcpRoute = false;
               }
-              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `tcp_relay friend_offline ${carrierIdFromPublicKey(friendKey)} (friend=${friendId})`);
+              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `tcp_relay friend_offline ${carrierIdFromPublicKey2(friendKey)} (friend=${friendId})`);
               __privateGet(this, _tcpRelays)?.requestRoute(friendKey);
             });
             __privateGet(this, _tcpRelays).on("status", (connected, total) => {
@@ -12489,7 +14832,7 @@
               if (kind !== NET_PACKET_COOKIE_REQUEST && kind !== NET_PACKET_COOKIE_RESPONSE && kind !== NET_PACKET_CRYPTO_HS) {
                 return;
               }
-              const senderId = carrierIdFromPublicKey(senderKey);
+              const senderId = carrierIdFromPublicKey2(senderKey);
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `tcp_oob_recv from ${senderId} kind=0x${kind.toString(16)} len=${payload.length}`);
               __privateGet(this, _tcpRelays)?.requestRoute(senderKey);
               __privateMethod(this, _handleTcpDatagram, handleTcpDatagram_fn).call(this, senderKey, payload);
@@ -12575,13 +14918,13 @@
           if (!__privateGet(this, _keyPair2)) {
             throw new Error("Peer is not started");
           }
-          return bytesToHex2(__privateGet(this, _keyPair2).publicKey);
+          return bytesToHex3(__privateGet(this, _keyPair2).publicKey);
         }
         userid() {
           if (!__privateGet(this, _keyPair2)) {
             throw new Error("Peer is not started");
           }
-          return carrierIdFromPublicKey(__privateGet(this, _keyPair2).publicKey);
+          return carrierIdFromPublicKey2(__privateGet(this, _keyPair2).publicKey);
         }
         /**
          * Sign `message` with this identity's private key (XEdDSA over the X25519
@@ -12594,13 +14937,13 @@
           if (!__privateGet(this, _keyPair2)) {
             throw new Error("Peer is not started");
           }
-          return signDetached(__privateGet(this, _keyPair2).secretKey, message);
+          return signDetached2(__privateGet(this, _keyPair2).secretKey, message);
         }
         address() {
           if (!__privateGet(this, _keyPair2)) {
             throw new Error("Peer is not started");
           }
-          return carrierAddressFromPublicKey(__privateGet(this, _keyPair2).publicKey);
+          return carrierAddressFromPublicKey2(__privateGet(this, _keyPair2).publicKey);
         }
         /**
          * Carrier bootstrap TURN credentials — peer analogue of Android
@@ -12668,7 +15011,7 @@
           const discovered = result.discoveredNodes.map((node) => ({
             host: node.host,
             port: node.port,
-            pk: carrierIdFromPublicKey(node.publicKey)
+            pk: carrierIdFromPublicKey2(node.publicKey)
           }));
           __privateSet(this, _knownNodes, dedupeNodes([result.respondingNode, ...discovered, ...__privateGet(this, _opts3).bootstrapNodes]));
           await __privateMethod(this, _runSelfAnnounce, runSelfAnnounce_fn).call(this, false, Date.now() + JOIN_ANNOUNCE_TIMEOUT_MS);
@@ -12748,8 +15091,8 @@
           if (!__privateGet(this, _keyPair2) || !__privateGet(this, _announceDataKey)) {
             throw new Error("Peer is not started");
           }
-          const friendAddress = parseCarrierAddress(pubkey);
-          const friendId = carrierIdFromPublicKey(friendAddress.publicKey);
+          const friendAddress = parseCarrierAddress2(pubkey);
+          const friendId = carrierIdFromPublicKey2(friendAddress.publicKey);
           const existing = __privateGet(this, _friends).get(friendId);
           if (existing?.acceptedAt && !opts?.force) {
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend request skipped \u2014 ${friendId} already accepted at ${new Date(existing.acceptedAt).toISOString()}`);
@@ -12920,7 +15263,7 @@
         removeFriend(pubkey) {
           let friendId = pubkey;
           try {
-            friendId = carrierIdFromAddress(pubkey);
+            friendId = carrierIdFromAddress2(pubkey);
           } catch {
           }
           const existed = __privateGet(this, _friends).delete(friendId);
@@ -13219,7 +15562,7 @@
             if (f.address)
               return f;
             try {
-              return { ...f, address: carrierAddressFromPublicKey(base58ToBytes(f.pubkey), f.nospam ?? 0) };
+              return { ...f, address: carrierAddressFromPublicKey2(base58ToBytes(f.pubkey), f.nospam ?? 0) };
             } catch {
               return f;
             }
@@ -13458,7 +15801,7 @@
         __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
         if (__privateGet(this, _tcpRelays)) {
           try {
-            const pk = parseCarrierAddress(address).publicKey;
+            const pk = parseCarrierAddress2(address).publicKey;
             __privateGet(this, _tcpRelays).requestRoute(pk);
           } catch {
           }
@@ -13727,7 +16070,7 @@
         __privateGet(this, _friendDhtKeys).set(friendId, new Uint8Array(dhtPublicKey));
         const friend = __privateGet(this, _friends).get(friendId);
         if (friend) {
-          const b58 = carrierIdFromPublicKey(dhtPublicKey);
+          const b58 = carrierIdFromPublicKey2(dhtPublicKey);
           if (friend.dhtPubkey !== b58) {
             __privateGet(this, _friends).set(friendId, { ...friend, dhtPubkey: b58 });
             __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
@@ -13736,7 +16079,7 @@
       };
       _friendIdForPoolKey = new WeakSet();
       friendIdForPoolKey_fn = function(poolKey) {
-        const asId = carrierIdFromPublicKey(poolKey);
+        const asId = carrierIdFromPublicKey2(poolKey);
         if (__privateGet(this, _friends).has(asId))
           return asId;
         for (const [friendId, dhtPk] of __privateGet(this, _friendDhtKeys)) {
@@ -13747,7 +16090,7 @@
       };
       _handleTcpDatagram = new WeakSet();
       handleTcpDatagram_fn = function(friendKey, payload) {
-        const poolId = carrierIdFromPublicKey(friendKey);
+        const poolId = carrierIdFromPublicKey2(friendKey);
         const friendId = __privateMethod(this, _friendIdForPoolKey, friendIdForPoolKey_fn).call(this, friendKey);
         let session = __privateGet(this, _friendSessions).get(friendId);
         if (!session) {
@@ -13772,7 +16115,7 @@
       _onDatagram = new WeakMap();
       _handleOnionDhtPk = new WeakSet();
       handleOnionDhtPk_fn = function(senderPublicKey, payload) {
-        const senderId = carrierIdFromPublicKey(senderPublicKey);
+        const senderId = carrierIdFromPublicKey2(senderPublicKey);
         if (payload.length < 8 + 32) {
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `onion dhtpk payload too short from ${senderId}: len=${payload.length}`);
           return;
@@ -13785,7 +16128,7 @@
         if (extraNodes.length === 0 && __privateGet(this, _keyPair2) && extra.length > 24 + 16) {
           const nonce = extra.slice(0, 24);
           const encrypted = extra.slice(24);
-          const openedBySender = import_tweetnacl13.default.box.open(encrypted, nonce, senderPublicKey, __privateGet(this, _keyPair2).secretKey);
+          const openedBySender = import_tweetnacl15.default.box.open(encrypted, nonce, senderPublicKey, __privateGet(this, _keyPair2).secretKey);
           if (openedBySender) {
             const decryptedNodes = parsePackedNodes(openedBySender);
             if (decryptedNodes.length > 0) {
@@ -13794,7 +16137,7 @@
             }
           }
           if (extraNodes.length === 0) {
-            const openedByDhtPk = import_tweetnacl13.default.box.open(encrypted, nonce, friendDhtPublicKey, __privateGet(this, _keyPair2).secretKey);
+            const openedByDhtPk = import_tweetnacl15.default.box.open(encrypted, nonce, friendDhtPublicKey, __privateGet(this, _keyPair2).secretKey);
             if (openedByDhtPk) {
               const decryptedNodes = parsePackedNodes(openedByDhtPk);
               if (decryptedNodes.length > 0) {
@@ -13833,7 +16176,7 @@
           __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend ${senderId} accepted (proof: dhtpk_update); will stop re-sending friend request`);
         }
-        const friendDhtId = carrierIdFromPublicKey(friendDhtPublicKey);
+        const friendDhtId = carrierIdFromPublicKey2(friendDhtPublicKey);
         const knownMatch = __privateGet(this, _knownNodes).find((node) => node.pk === friendDhtId || node.pk === senderId);
         if (knownMatch) {
           __privateMethod(this, _cacheFriendRemote, cacheFriendRemote_fn).call(this, senderId, knownMatch.host, knownMatch.port, senderPublicKey, friendDhtPublicKey);
@@ -13842,7 +16185,7 @@
         if (!__privateGet(this, _friendSessions).get(senderId)?.established) {
           __privateGet(this, _cookieRetryCount).delete(senderId);
         }
-        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dhtpk_update friend=${senderId} noReplay=${noReplay.toString()} dhtpk=${carrierIdFromPublicKey(friendDhtPublicKey)} extraLen=${extra.length} extraNodes=${extraNodes.length} extraPreviewHex=${extraPreview}`);
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dhtpk_update friend=${senderId} noReplay=${noReplay.toString()} dhtpk=${carrierIdFromPublicKey2(friendDhtPublicKey)} extraLen=${extra.length} extraNodes=${extraNodes.length} extraPreviewHex=${extraPreview}`);
         if (extraNodes.length > 0) {
           for (const candidate of extraNodes) {
             if (candidate.isTcp) {
@@ -13890,7 +16233,7 @@
         } catch {
           return;
         }
-        const userid = carrierIdFromPublicKey(senderPublicKey);
+        const userid = carrierIdFromPublicKey2(senderPublicKey);
         if (__privateGet(this, _friends).has(userid)) {
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend request from existing friend ${userid} treated as reconnection signal`);
           void __privateMethod(this, _initiateSession, initiateSession_fn).call(this, userid).catch((error) => {
@@ -13905,7 +16248,7 @@
           pubkey: userid,
           userid,
           nospam,
-          address: carrierAddressFromPublicKey(senderPublicKey, nospam),
+          address: carrierAddressFromPublicKey2(senderPublicKey, nospam),
           name,
           description,
           hello
@@ -14003,7 +16346,7 @@
         if (!__privateGet(this, _keyPair2)) {
           throw new Error("Peer is not started");
         }
-        const routeKey = `routes:${carrierIdFromPublicKey(friendPublicKey)}`;
+        const routeKey = `routes:${carrierIdFromPublicKey2(friendPublicKey)}`;
         if (!userInitiated) {
           const misses = __privateGet(this, _onionLookupMisses).get(routeKey) ?? 0;
           const budget = Math.min(DHT_PK_ANNOUNCE_COOLDOWN_MS * Math.max(1, misses), ONION_LOOKUP_MAX_BACKOFF_MS);
@@ -14054,7 +16397,7 @@
         };
         const bootstrapIdSet = new Set(__privateGet(this, _opts3).bootstrapNodes.map((n) => `${n.host}:${n.port}`));
         const queue = dedupeNodes(__privateGet(this, _knownNodes).length > 0 ? __privateGet(this, _knownNodes) : __privateGet(this, _opts3).bootstrapNodes).filter((n) => !__privateMethod(this, _isNodeBlacklisted, isNodeBlacklisted_fn).call(this, `${n.host}:${n.port}`)).sort(byDistance);
-        const friendId = carrierIdFromPublicKey(friendPublicKey);
+        const friendId = carrierIdFromPublicKey2(friendPublicKey);
         const visited = /* @__PURE__ */ new Set();
         let attempts = 0;
         const maxAttempts = MAX_FRIEND_ROUTE_ATTEMPTS;
@@ -14152,7 +16495,7 @@
         if (!__privateGet(this, _keyPair2)) {
           return false;
         }
-        const targetId = carrierIdFromPublicKey(searchPublicKey);
+        const targetId = carrierIdFromPublicKey2(searchPublicKey);
         const budgetKey = `${friendId}:${targetId}`;
         const lastLookup = __privateGet(this, _onionLookupCooldown).get(budgetKey) ?? 0;
         const sinceLast = Date.now() - lastLookup;
@@ -14510,7 +16853,7 @@
                 let friendRealPk = session.friendRealPublicKey;
                 if (!friendRealPk && friend.address) {
                   try {
-                    friendRealPk = parseCarrierAddress(friend.address).publicKey;
+                    friendRealPk = parseCarrierAddress2(friend.address).publicKey;
                   } catch {
                   }
                 }
@@ -14551,7 +16894,7 @@
             let friendRealPk = session?.friendRealPublicKey;
             if (!friendRealPk && friend.address) {
               try {
-                friendRealPk = parseCarrierAddress(friend.address).publicKey;
+                friendRealPk = parseCarrierAddress2(friend.address).publicKey;
               } catch {
               }
             }
@@ -15584,7 +17927,7 @@
             return [...sameLan, ...publicCandidates, ...otherPrivate].slice(0, 8);
           }
         }
-        const dhtId = session?.friendDhtPublicKey ? carrierIdFromPublicKey(session.friendDhtPublicKey) : void 0;
+        const dhtId = session?.friendDhtPublicKey ? carrierIdFromPublicKey2(session.friendDhtPublicKey) : void 0;
         for (const node of __privateGet(this, _knownNodes)) {
           if (node.pk !== friendId && (!dhtId || node.pk !== dhtId)) {
             continue;
@@ -15618,7 +17961,7 @@
         let friendRealPk = session?.friendRealPublicKey;
         if (!friendRealPk && friend.address) {
           try {
-            friendRealPk = parseCarrierAddress(friend.address).publicKey;
+            friendRealPk = parseCarrierAddress2(friend.address).publicKey;
           } catch (error) {
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `initiate session: parse address failed for ${friendId}: ${error.message}`);
             return false;
@@ -15885,7 +18228,7 @@
       friendByDhtPk_fn = function(dhtPkBase58) {
         for (const [friendId, session] of __privateGet(this, _friendSessions).entries()) {
           const dpk = session.friendDhtPublicKey;
-          if (dpk && carrierIdFromPublicKey(dpk) === dhtPkBase58) {
+          if (dpk && carrierIdFromPublicKey2(dpk) === dhtPkBase58) {
             return { friendId, realPk: session.friendRealPublicKey ?? dpk };
           }
         }
@@ -15898,7 +18241,7 @@
         const decoded = decodeDhtRpc(packet, __privateGet(this, _keyPair2).secretKey);
         if (!decoded)
           return;
-        const senderId = carrierIdFromPublicKey(decoded.senderPublicKey);
+        const senderId = carrierIdFromPublicKey2(decoded.senderPublicKey);
         if (remote.port > 0 && !__privateMethod(this, _remoteIsTcp, remoteIsTcp_fn).call(this, remote)) {
           this.addKnownNodes([{ host: remote.address, port: remote.port, pk: senderId, isTcp: false }]);
           __privateMethod(this, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn).call(this, decoded.senderPublicKey, senderId, remote.address, remote.port);
@@ -16009,7 +18352,7 @@
         const current = session.friendDhtPublicKey;
         if (current && Buffer2.from(current).equals(Buffer2.from(senderDhtPk)))
           return;
-        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dht_key_refreshed friend=${friendId} via=${key2} old=${current ? carrierIdFromPublicKey(current) : "none"} new=${senderId}`);
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dht_key_refreshed friend=${friendId} via=${key2} old=${current ? carrierIdFromPublicKey2(current) : "none"} new=${senderId}`);
         __privateMethod(this, _cacheFriendRemote, cacheFriendRemote_fn).call(this, friendId, host2, port, void 0, senderDhtPk);
         __privateGet(this, _cookieRetryCount).delete(friendId);
         void __privateMethod(this, _initiateSession, initiateSession_fn).call(this, friendId).catch(() => void 0);
@@ -16128,7 +18471,7 @@
       sendOnionDhtPk_fn = async function(friendRealPublicKey) {
         if (!__privateGet(this, _keyPair2))
           return false;
-        const friendId = carrierIdFromPublicKey(friendRealPublicKey);
+        const friendId = carrierIdFromPublicKey2(friendRealPublicKey);
         const routes = await __privateMethod(this, _discoverFriendRoutes, discoverFriendRoutes_fn).call(this, friendRealPublicKey).catch(() => []);
         if (routes.length === 0) {
           const failures = (__privateGet(this, _dhtPkConsecutiveFailures).get(friendId) ?? 0) + 1;
@@ -16409,38 +18752,51 @@
         const wrapped = concatBytes([Uint8Array.of(105, 118, 101, 103), packet]);
         await __privateGet(this, _udp).send(Buffer2.from(wrapped), node.host, node.port);
       };
+      _sendOnionOverRelays = new WeakSet();
+      sendOnionOverRelays_fn = function(nodeB, nodeC, nodeD, payloadForNodeD) {
+        if (!__privateGet(this, _tcpRelays) || __privateGet(this, _tcpRelays).connectedCount() === 0)
+          return;
+        try {
+          const tcpPacket = createOnionRequest0Tcp({
+            nodeBHost: nodeB.host,
+            nodeBPort: nodeB.port,
+            nodeBPublicKey: nodeB.publicKey,
+            nodeCHost: nodeC.host,
+            nodeCPort: nodeC.port,
+            nodeCPublicKey: nodeC.publicKey,
+            nodeDHost: nodeD.host,
+            nodeDPort: nodeD.port,
+            payloadForNodeD
+          });
+          const sent = __privateGet(this, _tcpRelays).sendOnionRequest(tcpPacket);
+          if (sent > 0) {
+            __privateSet(this, _diagTcpOnionSent, __privateGet(this, _diagTcpOnionSent) + 1);
+            __privateMethod(this, _debugVerboseLog, debugVerboseLog_fn).call(this, `tcp onion request sent via ${sent} relay(s) to ${nodeD.host}:${nodeD.port}`);
+          }
+        } catch {
+        }
+      };
       _sendThroughOnionPath = new WeakSet();
       sendThroughOnionPath_fn = async function(payloadForNodeD, nodeD, pathOffset = 0, forcedPath) {
+        const udpUsable = (__privateGet(this, _udp)?.localPort() ?? 0) > 0;
         const path = forcedPath === "direct" ? void 0 : forcedPath ?? __privateMethod(this, _selectOnionPath, selectOnionPath_fn).call(this, nodeD, pathOffset);
         if (!path) {
-          if (__privateGet(this, _tcpRelays) && __privateGet(this, _tcpRelays).connectedCount() > 0) {
-            const hops = __privateMethod(this, _selectTcpOnionHops, selectTcpOnionHops_fn).call(this, nodeD, pathOffset);
-            if (hops) {
-              try {
-                const tcpPacket = createOnionRequest0Tcp({
-                  nodeBHost: hops.nodeB.host,
-                  nodeBPort: hops.nodeB.port,
-                  nodeBPublicKey: hops.nodeB.publicKey,
-                  nodeCHost: hops.nodeC.host,
-                  nodeCPort: hops.nodeC.port,
-                  nodeCPublicKey: hops.nodeC.publicKey,
-                  nodeDHost: nodeD.host,
-                  nodeDPort: nodeD.port,
-                  payloadForNodeD
-                });
-                const sent = __privateGet(this, _tcpRelays).sendOnionRequest(tcpPacket);
-                if (sent > 0) {
-                  __privateSet(this, _diagTcpOnionSent, __privateGet(this, _diagTcpOnionSent) + 1);
-                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `no 3-hop path for ${nodeD.host}:${nodeD.port} \u2014 relayed 2-hop onion via ${sent} relay(s) (B=${hops.nodeB.host} C=${hops.nodeC.host})`);
-                  return "direct";
-                }
-              } catch {
-              }
-            }
+          const hops = __privateGet(this, _tcpRelays) && __privateGet(this, _tcpRelays).connectedCount() > 0 ? __privateMethod(this, _selectTcpOnionHops, selectTcpOnionHops_fn).call(this, nodeD, pathOffset) : void 0;
+          if (hops) {
+            __privateMethod(this, _sendOnionOverRelays, sendOnionOverRelays_fn).call(this, hops.nodeB, hops.nodeC, nodeD, payloadForNodeD);
+            return "direct";
+          }
+          if (!udpUsable) {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `no route for ${nodeD.host}:${nodeD.port} \u2014 no relay hops and no UDP`);
+            return "direct";
           }
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `no onion path for ${nodeD.host}:${nodeD.port}, sending direct`);
           await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, payloadForNodeD, nodeD);
           return "direct";
+        }
+        if (!udpUsable) {
+          __privateMethod(this, _sendOnionOverRelays, sendOnionOverRelays_fn).call(this, path.nodeB, path.nodeC, nodeD, payloadForNodeD);
+          return path;
         }
         __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `sending onion initial via ${path.nodeA.node.host}:${path.nodeA.node.port} to ${nodeD.host}:${nodeD.port}`);
         const packet = createOnionRequest0({
@@ -16755,6 +19111,571 @@
     }
   });
 
+  // node_modules/@decentnetwork/peer/dist/compat/tcp-relay.js
+  var tcp_relay_exports = {};
+  __export(tcp_relay_exports, {
+    TCP_PACKET_CONNECTION_NOTIFICATION: () => TCP_PACKET_CONNECTION_NOTIFICATION2,
+    TCP_PACKET_DISCONNECT_NOTIFICATION: () => TCP_PACKET_DISCONNECT_NOTIFICATION2,
+    TCP_PACKET_ONION_REQUEST: () => TCP_PACKET_ONION_REQUEST2,
+    TCP_PACKET_ONION_RESPONSE: () => TCP_PACKET_ONION_RESPONSE2,
+    TCP_PACKET_OOB_RECV: () => TCP_PACKET_OOB_RECV2,
+    TCP_PACKET_OOB_SEND: () => TCP_PACKET_OOB_SEND2,
+    TCP_PACKET_PING: () => TCP_PACKET_PING2,
+    TCP_PACKET_PONG: () => TCP_PACKET_PONG2,
+    TCP_PACKET_ROUTING_REQUEST: () => TCP_PACKET_ROUTING_REQUEST2,
+    TCP_PACKET_ROUTING_RESPONSE: () => TCP_PACKET_ROUTING_RESPONSE2,
+    TcpRelayClient: () => TcpRelayClient2
+  });
+  var import_tweetnacl17, KEY_SIZE6, NONCE_SIZE8, MAC_SIZE6, RELAY_SEND_BUFFER_CAP2, TCP_HANDSHAKE_PLAIN_SIZE2, TCP_CLIENT_HANDSHAKE_SIZE2, TCP_SERVER_HANDSHAKE_SIZE2, TCP_PACKET_ROUTING_REQUEST2, TCP_PACKET_ROUTING_RESPONSE2, TCP_PACKET_CONNECTION_NOTIFICATION2, TCP_PACKET_DISCONNECT_NOTIFICATION2, TCP_PACKET_PING2, TCP_PACKET_PONG2, TCP_PACKET_OOB_SEND2, TCP_PACKET_OOB_RECV2, TCP_PACKET_ONION_REQUEST2, TCP_PACKET_ONION_RESPONSE2, MAX_PACKET_SIZE2, CARRIER_TCP_MAGIC2, _opts4, _socket3, _state2, _debug5, _tempKeyPair2, _sentNonce2, _recvNonce2, _sessionKey2, _rxBuf2, _cidByFriend2, _friendByCid2, _routesRequested2, _buildHandshake2, buildHandshake_fn2, _processHandshakeResponse2, processHandshakeResponse_fn2, _onData4, onData_fn3, _decryptFrame2, decryptFrame_fn2, _sendFrame2, sendFrame_fn2, _dispatch2, dispatch_fn2, _close2, close_fn2, _log3, log_fn3, TcpRelayClient2;
+  var init_tcp_relay2 = __esm({
+    "node_modules/@decentnetwork/peer/dist/compat/tcp-relay.js"() {
+      init_buffer_global();
+      init_process_global();
+      import_tweetnacl17 = __toESM(require_nacl_fast2());
+      init_node_net();
+      init_node_events();
+      init_bytes();
+      init_net_crypto();
+      KEY_SIZE6 = 32;
+      NONCE_SIZE8 = 24;
+      MAC_SIZE6 = 16;
+      RELAY_SEND_BUFFER_CAP2 = 64 * 1024;
+      TCP_HANDSHAKE_PLAIN_SIZE2 = KEY_SIZE6 + NONCE_SIZE8;
+      TCP_CLIENT_HANDSHAKE_SIZE2 = KEY_SIZE6 + NONCE_SIZE8 + TCP_HANDSHAKE_PLAIN_SIZE2 + MAC_SIZE6;
+      TCP_SERVER_HANDSHAKE_SIZE2 = NONCE_SIZE8 + TCP_HANDSHAKE_PLAIN_SIZE2 + MAC_SIZE6;
+      TCP_PACKET_ROUTING_REQUEST2 = 0;
+      TCP_PACKET_ROUTING_RESPONSE2 = 1;
+      TCP_PACKET_CONNECTION_NOTIFICATION2 = 2;
+      TCP_PACKET_DISCONNECT_NOTIFICATION2 = 3;
+      TCP_PACKET_PING2 = 4;
+      TCP_PACKET_PONG2 = 5;
+      TCP_PACKET_OOB_SEND2 = 6;
+      TCP_PACKET_OOB_RECV2 = 7;
+      TCP_PACKET_ONION_REQUEST2 = 8;
+      TCP_PACKET_ONION_RESPONSE2 = 9;
+      MAX_PACKET_SIZE2 = 2048;
+      CARRIER_TCP_MAGIC2 = Uint8Array.of(105, 118, 101, 103);
+      TcpRelayClient2 = class extends EventEmitter {
+        // hex(friend pubkey)
+        constructor(opts) {
+          super();
+          /**
+           * Construct the 128-byte client handshake (toxcore TCP_client.c::generate_handshake).
+           * Layout:
+           *   [self_dht_pubkey (32)] [nonce (24)] [box(plain) (72)]
+           * where plain = [temp_pubkey (32)] [sent_nonce (24)] encrypted with
+           * shared(serverPublicKey, selfSecretKey) using the random nonce.
+           */
+          __privateAdd(this, _buildHandshake2);
+          /**
+           * Decrypt the 96-byte server handshake response (toxcore TCP_client.c::handle_handshake).
+           * Layout:
+           *   [nonce (24)] [box(plain) (72)]
+           * plain = [server_temp_pubkey (32)] [recv_nonce (24)]
+           * Sets #recvNonce and derives the session key for the encrypted stream.
+           */
+          __privateAdd(this, _processHandshakeResponse2);
+          /**
+           * Frame parser for everything after the handshake. Each frame is
+           *   [4-byte 'iveg' magic][2-byte BE length][secretbox-encrypted body]
+           * Bodies may straddle TCP read chunks — buffer until a complete frame
+           * is available, then dispatch.
+           */
+          __privateAdd(this, _onData4);
+          /** Decrypt one frame body using sessionKey + #recvNonce, then increment nonce. */
+          __privateAdd(this, _decryptFrame2);
+          /** Encrypt a payload and write it as one framed packet. */
+          __privateAdd(this, _sendFrame2);
+          /**
+           * Dispatch a decrypted packet by leading byte. The toxcore wire format
+           * uses the first byte as the packet type; values 0-9 are control
+           * packets (see TCP_PACKET_* constants), and values 16+ are data
+           * forwarded between routed peers — the byte itself is the connection_id.
+           */
+          __privateAdd(this, _dispatch2);
+          __privateAdd(this, _close2);
+          __privateAdd(this, _log3);
+          __privateAdd(this, _opts4, void 0);
+          __privateAdd(this, _socket3, void 0);
+          __privateAdd(this, _state2, "disconnected");
+          __privateAdd(this, _debug5, process.env.DECENT_DEBUG === "1");
+          // Crypto state derived during handshake.
+          __privateAdd(this, _tempKeyPair2, void 0);
+          __privateAdd(this, _sentNonce2, void 0);
+          // TX nonce — increments per outbound encrypted frame
+          __privateAdd(this, _recvNonce2, void 0);
+          // RX nonce — increments per inbound encrypted frame
+          __privateAdd(this, _sessionKey2, void 0);
+          // box.before(server_temp_pk, our_temp_sk), used as secretbox key
+          // RX buffer for the framed encrypted stream.
+          __privateAdd(this, _rxBuf2, Buffer2.alloc(0));
+          // Routing state — the relay assigns one connection_id per friend we
+          // requested routing for, in [16, 255]. Map both ways so we can:
+          //   - resolve inbound DATA(connection_id) to friend pubkey
+          //   - resolve outbound sendToFriend(pubkey) to a connection_id
+          __privateAdd(this, _cidByFriend2, /* @__PURE__ */ new Map());
+          // hex(friend pubkey) -> cid
+          __privateAdd(this, _friendByCid2, /* @__PURE__ */ new Map());
+          // cid -> raw friend pubkey
+          // Friends whose routing we've requested but the relay hasn't yet
+          // sent CONNECTION_NOTIFICATION for. We dedupe re-requests via this set.
+          __privateAdd(this, _routesRequested2, /* @__PURE__ */ new Set());
+          if (opts.serverPublicKey.length !== KEY_SIZE6) {
+            throw new Error(`relay server public key must be ${KEY_SIZE6} bytes`);
+          }
+          __privateSet(this, _opts4, opts);
+        }
+        state() {
+          return __privateGet(this, _state2);
+        }
+        /**
+         * Open the TCP connection and perform the handshake. Resolves once the
+         * relay is in "connected" state (handshake response decrypted, session
+         * keys derived). Rejects on any failure during connect or handshake.
+         */
+        async connect(timeoutMs = 1e4) {
+          if (__privateGet(this, _state2) !== "disconnected" && __privateGet(this, _state2) !== "closed") {
+            throw new Error(`relay already ${__privateGet(this, _state2)}`);
+          }
+          __privateSet(this, _state2, "connecting");
+          __privateMethod(this, _log3, log_fn3).call(this, `connecting to ${__privateGet(this, _opts4).host}:${__privateGet(this, _opts4).port}`);
+          return new Promise((resolve2, reject) => {
+            const sock = connect({ host: __privateGet(this, _opts4).host, port: __privateGet(this, _opts4).port });
+            __privateSet(this, _socket3, sock);
+            let settled = false;
+            const fail = (reason) => {
+              if (settled)
+                return;
+              settled = true;
+              __privateMethod(this, _close2, close_fn2).call(this, reason);
+              reject(new Error(reason));
+            };
+            const ok = () => {
+              if (settled)
+                return;
+              settled = true;
+              resolve2();
+            };
+            const connectTimer = setTimeout(() => fail(`connect timeout after ${timeoutMs}ms`), timeoutMs);
+            sock.once("error", (err) => {
+              clearTimeout(connectTimer);
+              fail(`socket error: ${err.message}`);
+            });
+            sock.once("close", () => {
+              clearTimeout(connectTimer);
+              if (!settled)
+                fail("socket closed before handshake completed");
+              else
+                __privateMethod(this, _close2, close_fn2).call(this, "socket closed");
+            });
+            sock.once("connect", () => {
+              clearTimeout(connectTimer);
+              try {
+                const handshake = __privateMethod(this, _buildHandshake2, buildHandshake_fn2).call(this);
+                sock.write(handshake);
+                __privateSet(this, _state2, "handshake-sent");
+                __privateMethod(this, _log3, log_fn3).call(this, `handshake sent (${handshake.length} bytes), waiting for server response`);
+              } catch (err) {
+                fail(`handshake build failed: ${err.message}`);
+                return;
+              }
+              let handshakeBuf = Buffer2.alloc(0);
+              const onHandshakeData = (chunk) => {
+                handshakeBuf = Buffer2.concat([handshakeBuf, chunk]);
+                if (handshakeBuf.length < TCP_SERVER_HANDSHAKE_SIZE2) {
+                  return;
+                }
+                const hs = handshakeBuf.subarray(0, TCP_SERVER_HANDSHAKE_SIZE2);
+                const remainder = handshakeBuf.subarray(TCP_SERVER_HANDSHAKE_SIZE2);
+                sock.removeListener("data", onHandshakeData);
+                try {
+                  __privateMethod(this, _processHandshakeResponse2, processHandshakeResponse_fn2).call(this, hs);
+                } catch (err) {
+                  fail(`handshake response decrypt failed: ${err.message}`);
+                  return;
+                }
+                __privateSet(this, _state2, "connected");
+                __privateMethod(this, _log3, log_fn3).call(this, `handshake complete; session ready`);
+                sock.on("data", (next) => __privateMethod(this, _onData4, onData_fn3).call(this, next));
+                if (remainder.length > 0) {
+                  __privateMethod(this, _onData4, onData_fn3).call(this, remainder);
+                }
+                this.emit("open");
+                ok();
+              };
+              sock.on("data", onHandshakeData);
+            });
+          });
+        }
+        /**
+         * Send ROUTING_REQUEST so the relay starts watching for `friendPublicKey`.
+         * Idempotent — calling twice with the same key is a no-op (the relay
+         * would otherwise allocate a duplicate cid). Use `forgetRoute` to
+         * forcibly re-request.
+         */
+        requestRoute(friendPublicKey) {
+          if (friendPublicKey.length !== KEY_SIZE6)
+            return false;
+          const friendHex = Buffer2.from(friendPublicKey).toString("hex");
+          if (__privateGet(this, _routesRequested2).has(friendHex) || __privateGet(this, _cidByFriend2).has(friendHex)) {
+            return true;
+          }
+          __privateGet(this, _routesRequested2).add(friendHex);
+          return __privateMethod(this, _sendFrame2, sendFrame_fn2).call(this, concatBytes([Uint8Array.of(TCP_PACKET_ROUTING_REQUEST2), friendPublicKey]));
+        }
+        /** Returns true if we've received a CONNECTION_NOTIFICATION for this friend. */
+        hasFriendOnline(friendPublicKey) {
+          if (friendPublicKey.length !== KEY_SIZE6)
+            return false;
+          return __privateGet(this, _cidByFriend2).has(Buffer2.from(friendPublicKey).toString("hex"));
+        }
+        /** Returns true if we've sent a ROUTING_REQUEST for this friend (regardless of online state). */
+        hasRequestedRoute(friendPublicKey) {
+          if (friendPublicKey.length !== KEY_SIZE6)
+            return false;
+          const friendHex = Buffer2.from(friendPublicKey).toString("hex");
+          return __privateGet(this, _routesRequested2).has(friendHex) || __privateGet(this, _cidByFriend2).has(friendHex);
+        }
+        /**
+         * Send a DATA payload to `friendPublicKey` over this relay. Returns
+         * false if the friend hasn't been routed (no ROUTING_RESPONSE yet) or
+         * if the relay says they're offline. Caller should treat false as
+         * "try another transport".
+         */
+        sendToFriend(friendPublicKey, payload, droppable = false) {
+          if (friendPublicKey.length !== KEY_SIZE6)
+            return false;
+          const cid = __privateGet(this, _cidByFriend2).get(Buffer2.from(friendPublicKey).toString("hex"));
+          if (cid === void 0)
+            return false;
+          return this.sendData(cid, payload, droppable);
+        }
+        /** Send a PING; relay echoes it as PONG. ping_id is opaque 8 bytes. */
+        sendPing() {
+          const pingId = randomBytes2(8);
+          return __privateMethod(this, _sendFrame2, sendFrame_fn2).call(this, concatBytes([Uint8Array.of(TCP_PACKET_PING2), pingId]));
+        }
+        /**
+         * Send an onion request THROUGH this relay (toxcore TCP_client.c::
+         * send_onion_request). `packet` is a create_onion_packet_tcp payload
+         * (createOnionRequest0Tcp) — the relay acts as onion node A, forwards it to
+         * node B over UDP, and routes the onion response back to us over this TCP
+         * connection as TCP_PACKET_ONION_RESPONSE (surfaced via the "onionResponse"
+         * event). This is the NAT-resilient announce / friend-lookup path.
+         */
+        sendOnionRequest(packet) {
+          if (packet.length === 0)
+            return false;
+          return __privateMethod(this, _sendFrame2, sendFrame_fn2).call(this, concatBytes([Uint8Array.of(TCP_PACKET_ONION_REQUEST2), packet]));
+        }
+        /** Send DATA payload to the friend at `connectionId`. */
+        sendData(connectionId, payload, droppable = false) {
+          if (connectionId < 16 || connectionId > 255)
+            return false;
+          if (payload.length === 0)
+            return false;
+          return __privateMethod(this, _sendFrame2, sendFrame_fn2).call(this, concatBytes([Uint8Array.of(connectionId), payload]), droppable);
+        }
+        /** Send OOB_SEND (used for delivering friend requests via TCP relay). */
+        sendOob(receiverPublicKey, payload) {
+          if (receiverPublicKey.length !== KEY_SIZE6)
+            return false;
+          return __privateMethod(this, _sendFrame2, sendFrame_fn2).call(this, concatBytes([Uint8Array.of(TCP_PACKET_OOB_SEND2), receiverPublicKey, payload]));
+        }
+        close(reason = "explicit close") {
+          __privateMethod(this, _close2, close_fn2).call(this, reason);
+        }
+        // Strongly-typed event helpers so callers get autocompletion.
+        on(event, listener) {
+          return super.on(event, listener);
+        }
+        once(event, listener) {
+          return super.once(event, listener);
+        }
+        off(event, listener) {
+          return super.off(event, listener);
+        }
+      };
+      _opts4 = new WeakMap();
+      _socket3 = new WeakMap();
+      _state2 = new WeakMap();
+      _debug5 = new WeakMap();
+      _tempKeyPair2 = new WeakMap();
+      _sentNonce2 = new WeakMap();
+      _recvNonce2 = new WeakMap();
+      _sessionKey2 = new WeakMap();
+      _rxBuf2 = new WeakMap();
+      _cidByFriend2 = new WeakMap();
+      _friendByCid2 = new WeakMap();
+      _routesRequested2 = new WeakMap();
+      _buildHandshake2 = new WeakSet();
+      buildHandshake_fn2 = function() {
+        __privateSet(this, _tempKeyPair2, (() => {
+          const kp = import_tweetnacl17.default.box.keyPair();
+          return { publicKey: kp.publicKey, secretKey: kp.secretKey };
+        })());
+        __privateSet(this, _sentNonce2, randomBytes2(NONCE_SIZE8));
+        const plain = concatBytes([__privateGet(this, _tempKeyPair2).publicKey, __privateGet(this, _sentNonce2)]);
+        const handshakeNonce = randomBytes2(NONCE_SIZE8);
+        const sharedKey2 = import_tweetnacl17.default.box.before(__privateGet(this, _opts4).serverPublicKey, __privateGet(this, _opts4).selfKeyPair.secretKey);
+        const encrypted = import_tweetnacl17.default.box.after(plain, handshakeNonce, sharedKey2);
+        return concatBytes([__privateGet(this, _opts4).selfKeyPair.publicKey, handshakeNonce, encrypted]);
+      };
+      _processHandshakeResponse2 = new WeakSet();
+      processHandshakeResponse_fn2 = function(hs) {
+        if (hs.length !== TCP_SERVER_HANDSHAKE_SIZE2) {
+          throw new Error(`handshake response must be ${TCP_SERVER_HANDSHAKE_SIZE2} bytes`);
+        }
+        const nonce = hs.subarray(0, NONCE_SIZE8);
+        const cipher = hs.subarray(NONCE_SIZE8);
+        const sharedKey2 = import_tweetnacl17.default.box.before(__privateGet(this, _opts4).serverPublicKey, __privateGet(this, _opts4).selfKeyPair.secretKey);
+        const plain = import_tweetnacl17.default.box.open.after(cipher, nonce, sharedKey2);
+        if (!plain || plain.length !== TCP_HANDSHAKE_PLAIN_SIZE2) {
+          throw new Error("handshake response decrypt failed");
+        }
+        const serverTempPub = plain.subarray(0, KEY_SIZE6);
+        const recvNonce = plain.subarray(KEY_SIZE6, KEY_SIZE6 + NONCE_SIZE8);
+        if (!__privateGet(this, _tempKeyPair2)) {
+          throw new Error("no temp keypair set");
+        }
+        __privateSet(this, _sessionKey2, import_tweetnacl17.default.box.before(serverTempPub, __privateGet(this, _tempKeyPair2).secretKey));
+        __privateSet(this, _recvNonce2, new Uint8Array(recvNonce));
+        __privateGet(this, _tempKeyPair2).secretKey.fill(0);
+      };
+      _onData4 = new WeakSet();
+      onData_fn3 = function(chunk) {
+        __privateSet(this, _rxBuf2, __privateGet(this, _rxBuf2).length === 0 ? chunk : Buffer2.concat([__privateGet(this, _rxBuf2), chunk]));
+        while (__privateGet(this, _rxBuf2).length >= 4 + 2) {
+          if (__privateGet(this, _rxBuf2)[0] !== CARRIER_TCP_MAGIC2[0] || __privateGet(this, _rxBuf2)[1] !== CARRIER_TCP_MAGIC2[1] || __privateGet(this, _rxBuf2)[2] !== CARRIER_TCP_MAGIC2[2] || __privateGet(this, _rxBuf2)[3] !== CARRIER_TCP_MAGIC2[3]) {
+            __privateMethod(this, _close2, close_fn2).call(this, "missing/invalid iveg magic on TCP frame");
+            return;
+          }
+          const frameLen = __privateGet(this, _rxBuf2).readUInt16BE(4);
+          if (frameLen === 0 || frameLen > MAX_PACKET_SIZE2) {
+            __privateMethod(this, _close2, close_fn2).call(this, `invalid frame length ${frameLen}`);
+            return;
+          }
+          if (__privateGet(this, _rxBuf2).length < 4 + 2 + frameLen) {
+            return;
+          }
+          const cipher = __privateGet(this, _rxBuf2).subarray(4 + 2, 4 + 2 + frameLen);
+          __privateSet(this, _rxBuf2, __privateGet(this, _rxBuf2).subarray(4 + 2 + frameLen));
+          const plain = __privateMethod(this, _decryptFrame2, decryptFrame_fn2).call(this, cipher);
+          if (!plain) {
+            __privateMethod(this, _close2, close_fn2).call(this, "frame decrypt failed");
+            return;
+          }
+          __privateMethod(this, _dispatch2, dispatch_fn2).call(this, plain);
+        }
+      };
+      _decryptFrame2 = new WeakSet();
+      decryptFrame_fn2 = function(cipher) {
+        if (!__privateGet(this, _sessionKey2) || !__privateGet(this, _recvNonce2))
+          return void 0;
+        const opened = import_tweetnacl17.default.secretbox.open(cipher, __privateGet(this, _recvNonce2), __privateGet(this, _sessionKey2));
+        if (!opened)
+          return void 0;
+        incrementNonce(__privateGet(this, _recvNonce2));
+        return opened;
+      };
+      _sendFrame2 = new WeakSet();
+      sendFrame_fn2 = function(payload, droppable = false) {
+        if (__privateGet(this, _state2) !== "connected" || !__privateGet(this, _sessionKey2) || !__privateGet(this, _sentNonce2) || !__privateGet(this, _socket3)) {
+          return false;
+        }
+        if (payload.length === 0 || payload.length > MAX_PACKET_SIZE2 - MAC_SIZE6) {
+          return false;
+        }
+        if (droppable && __privateGet(this, _socket3).writableLength > RELAY_SEND_BUFFER_CAP2) {
+          return false;
+        }
+        const cipher = import_tweetnacl17.default.secretbox(payload, __privateGet(this, _sentNonce2), __privateGet(this, _sessionKey2));
+        incrementNonce(__privateGet(this, _sentNonce2));
+        const frame = Buffer2.alloc(4 + 2 + cipher.length);
+        frame.set(CARRIER_TCP_MAGIC2, 0);
+        frame.writeUInt16BE(cipher.length, 4);
+        frame.set(cipher, 4 + 2);
+        return __privateGet(this, _socket3).write(frame);
+      };
+      _dispatch2 = new WeakSet();
+      dispatch_fn2 = function(plain) {
+        if (plain.length === 0)
+          return;
+        const type2 = plain[0];
+        const body2 = plain.subarray(1);
+        switch (type2) {
+          case TCP_PACKET_ROUTING_RESPONSE2: {
+            if (body2.length < 1 + KEY_SIZE6)
+              return;
+            const connectionId = body2[0];
+            const friendKey = body2.subarray(1, 1 + KEY_SIZE6);
+            if (connectionId !== 0) {
+              const friendHex = Buffer2.from(friendKey).toString("hex");
+              __privateGet(this, _cidByFriend2).set(friendHex, connectionId);
+              __privateGet(this, _friendByCid2).set(connectionId, new Uint8Array(friendKey));
+            }
+            this.emit("routing", connectionId, friendKey);
+            return;
+          }
+          case TCP_PACKET_CONNECTION_NOTIFICATION2: {
+            if (body2.length < 1)
+              return;
+            const cid = body2[0];
+            const friendKey = __privateGet(this, _friendByCid2).get(cid);
+            if (friendKey) {
+              this.emit("friendOnline", friendKey);
+            }
+            return;
+          }
+          case TCP_PACKET_DISCONNECT_NOTIFICATION2: {
+            if (body2.length < 1)
+              return;
+            const cid = body2[0];
+            const friendKey = __privateGet(this, _friendByCid2).get(cid);
+            if (friendKey) {
+              this.emit("friendOffline", friendKey);
+            }
+            return;
+          }
+          case TCP_PACKET_PING2: {
+            if (body2.length < 8)
+              return;
+            const pingId = body2.subarray(0, 8);
+            __privateMethod(this, _sendFrame2, sendFrame_fn2).call(this, concatBytes([Uint8Array.of(TCP_PACKET_PONG2), pingId]));
+            return;
+          }
+          case TCP_PACKET_PONG2: {
+            if (body2.length < 8)
+              return;
+            let v = 0n;
+            for (let i = 0; i < 8; i++)
+              v = v << 8n | BigInt(body2[i]);
+            this.emit("pong", v);
+            return;
+          }
+          case TCP_PACKET_OOB_RECV2: {
+            if (body2.length < KEY_SIZE6)
+              return;
+            const sender = body2.subarray(0, KEY_SIZE6);
+            const payload = body2.subarray(KEY_SIZE6);
+            this.emit("oob", sender, payload);
+            return;
+          }
+          case TCP_PACKET_ONION_RESPONSE2: {
+            if (body2.length === 0)
+              return;
+            this.emit("onionResponse", new Uint8Array(body2));
+            return;
+          }
+          default: {
+            if (type2 >= 16) {
+              const friendKey = __privateGet(this, _friendByCid2).get(type2);
+              if (friendKey) {
+                this.emit("peerData", friendKey, body2);
+              }
+              return;
+            }
+          }
+        }
+      };
+      _close2 = new WeakSet();
+      close_fn2 = function(reason) {
+        if (__privateGet(this, _state2) === "closed")
+          return;
+        __privateSet(this, _state2, "closed");
+        __privateMethod(this, _log3, log_fn3).call(this, `closing: ${reason}`);
+        if (__privateGet(this, _socket3)) {
+          try {
+            __privateGet(this, _socket3).destroy();
+          } catch {
+          }
+          __privateSet(this, _socket3, void 0);
+        }
+        if (__privateGet(this, _sentNonce2))
+          __privateGet(this, _sentNonce2).fill(0);
+        if (__privateGet(this, _sessionKey2))
+          __privateGet(this, _sessionKey2).fill(0);
+        __privateSet(this, _sentNonce2, void 0);
+        __privateSet(this, _recvNonce2, void 0);
+        __privateSet(this, _sessionKey2, void 0);
+        __privateSet(this, _tempKeyPair2, void 0);
+        this.emit("close", reason);
+      };
+      _log3 = new WeakSet();
+      log_fn3 = function(message) {
+        if (!__privateGet(this, _debug5))
+          return;
+        const label = __privateGet(this, _opts4).label ? `:${__privateGet(this, _opts4).label}` : "";
+        console.log(`[peer-debug:tcp-relay${label}] ${__privateGet(this, _opts4).host}:${__privateGet(this, _opts4).port} ${message}`);
+      };
+    }
+  });
+
+  // node_modules/@decentnetwork/peer/dist/utils/base58.js
+  var base58_exports = {};
+  __export(base58_exports, {
+    base58ToBytes: () => base58ToBytes2,
+    bytesToBase58: () => bytesToBase582
+  });
+  function base58ToBytes2(value) {
+    if (!value) {
+      throw new Error("base58 value is required");
+    }
+    let num = 0n;
+    for (const char of value) {
+      const digit = indexes2.get(char);
+      if (digit === void 0) {
+        throw new Error(`invalid base58 character: ${char}`);
+      }
+      num = num * BASE2 + digit;
+    }
+    const bytes = [];
+    while (num > 0n) {
+      bytes.push(Number(num & 0xffn));
+      num >>= 8n;
+    }
+    bytes.reverse();
+    for (const char of value) {
+      if (char !== "1") {
+        break;
+      }
+      bytes.unshift(0);
+    }
+    return Uint8Array.from(bytes);
+  }
+  function bytesToBase582(bytes) {
+    if (!bytes.length) {
+      return "";
+    }
+    let num = 0n;
+    for (const byte of bytes) {
+      num = (num << 8n) + BigInt(byte);
+    }
+    let encoded = "";
+    while (num > 0n) {
+      const rem = Number(num % BASE2);
+      encoded = ALPHABET2[rem] + encoded;
+      num /= BASE2;
+    }
+    for (const byte of bytes) {
+      if (byte !== 0) {
+        break;
+      }
+      encoded = "1" + encoded;
+    }
+    return encoded || "1";
+  }
+  var ALPHABET2, BASE2, indexes2;
+  var init_base582 = __esm({
+    "node_modules/@decentnetwork/peer/dist/utils/base58.js"() {
+      init_buffer_global();
+      init_process_global();
+      ALPHABET2 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      BASE2 = BigInt(58);
+      indexes2 = new Map([...ALPHABET2].map((char, index) => [char, BigInt(index)]));
+    }
+  });
+
   // src/web-entry.js
   init_buffer_global();
   init_process_global();
@@ -16763,9 +19684,113 @@
   init_buffer_global();
   init_process_global();
   var import_tweetnacl3 = __toESM(require_nacl_fast(), 1);
-  init_address();
-  init_sign();
-  init_bytes();
+
+  // node_modules/@decentnetwork/peer/dist/compat/address.js
+  init_buffer_global();
+  init_process_global();
+  init_base58();
+  var CARRIER_PUBLIC_KEY_SIZE = 32;
+  var CARRIER_NOSPAM_SIZE = 4;
+  var CARRIER_ADDRESS_CHECKSUM_SIZE = 2;
+  var CARRIER_ADDRESS_SIZE = CARRIER_PUBLIC_KEY_SIZE + CARRIER_NOSPAM_SIZE + CARRIER_ADDRESS_CHECKSUM_SIZE;
+  function carrierAddressFromPublicKey(publicKey, nospam = 0) {
+    if (publicKey.length !== CARRIER_PUBLIC_KEY_SIZE) {
+      throw new Error(`Carrier public key must be ${CARRIER_PUBLIC_KEY_SIZE} bytes`);
+    }
+    const address = new Uint8Array(CARRIER_ADDRESS_SIZE);
+    address.set(publicKey, 0);
+    writeUint32LE(address, CARRIER_PUBLIC_KEY_SIZE, nospam);
+    writeUint16LE(address, CARRIER_PUBLIC_KEY_SIZE + CARRIER_NOSPAM_SIZE, addressChecksum(address.subarray(0, -2)));
+    return bytesToBase58(address);
+  }
+  function parseCarrierAddress(address) {
+    const bytes = base58ToBytes(address);
+    if (bytes.length !== CARRIER_ADDRESS_SIZE) {
+      throw new Error(`Carrier address must decode to ${CARRIER_ADDRESS_SIZE} bytes`);
+    }
+    const actual = readUint16LE(bytes, CARRIER_PUBLIC_KEY_SIZE + CARRIER_NOSPAM_SIZE);
+    const expected = addressChecksum(bytes.subarray(0, -2));
+    if (actual !== expected) {
+      throw new Error("Carrier address checksum mismatch");
+    }
+    return {
+      publicKey: bytes.slice(0, CARRIER_PUBLIC_KEY_SIZE),
+      nospam: readUint32LE(bytes, CARRIER_PUBLIC_KEY_SIZE),
+      checksum: actual
+    };
+  }
+  function carrierIdFromAddress(address) {
+    return bytesToBase58(parseCarrierAddress(address).publicKey);
+  }
+  function carrierIdFromPublicKey(publicKey) {
+    if (publicKey.length !== CARRIER_PUBLIC_KEY_SIZE) {
+      throw new Error(`Carrier public key must be ${CARRIER_PUBLIC_KEY_SIZE} bytes`);
+    }
+    return bytesToBase58(publicKey);
+  }
+  function addressChecksum(bytes) {
+    const checksum = [0, 0];
+    for (let i = 0; i < bytes.length; i++) {
+      checksum[i % 2] ^= bytes[i];
+    }
+    return checksum[0] | checksum[1] << 8;
+  }
+  function writeUint16LE(bytes, offset, value) {
+    bytes[offset] = value & 255;
+    bytes[offset + 1] = value >>> 8 & 255;
+  }
+  function readUint16LE(bytes, offset) {
+    return bytes[offset] | bytes[offset + 1] << 8;
+  }
+  function writeUint32LE(bytes, offset, value) {
+    if (!Number.isInteger(value) || value < 0 || value > 4294967295) {
+      throw new Error("Carrier nospam must be a uint32");
+    }
+    bytes[offset] = value & 255;
+    bytes[offset + 1] = value >>> 8 & 255;
+    bytes[offset + 2] = value >>> 16 & 255;
+    bytes[offset + 3] = value >>> 24 & 255;
+  }
+  function readUint32LE(bytes, offset) {
+    return (bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16 | bytes[offset + 3] << 24) >>> 0;
+  }
+
+  // node_modules/@decentnetwork/peer/dist/crypto/sign.js
+  init_buffer_global();
+  init_process_global();
+  var import_curve25519_js = __toESM(require_lib());
+  var import_tweetnacl2 = __toESM(require_nacl_fast2());
+  function signDetached(secretKey, message) {
+    if (secretKey.length !== import_tweetnacl2.default.box.secretKeyLength) {
+      throw new Error(`secretKey must be ${import_tweetnacl2.default.box.secretKeyLength} bytes`);
+    }
+    const random = import_tweetnacl2.default.randomBytes(64);
+    return (0, import_curve25519_js.sign)(secretKey, message, random);
+  }
+
+  // node_modules/@decentnetwork/peer/dist/utils/bytes.js
+  init_buffer_global();
+  init_process_global();
+  init_node_crypto();
+  function bytesToHex2(bytes) {
+    return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  function hexToBytes2(hex2) {
+    if (hex2.length % 2 !== 0) {
+      throw new Error("hex string must have an even length");
+    }
+    const bytes = new Uint8Array(hex2.length / 2);
+    for (let i = 0; i < bytes.length; i++) {
+      const value = Number.parseInt(hex2.slice(i * 2, i * 2 + 2), 16);
+      if (Number.isNaN(value)) {
+        throw new Error("invalid hex string");
+      }
+      bytes[i] = value;
+    }
+    return bytes;
+  }
+
+  // src/identity.js
   var KEYFILE_FORMAT = "decent-peer-tox-keypair-v1";
   function createIdentity() {
     const kp = import_tweetnacl3.default.box.keyPair();
@@ -16807,9 +19832,6 @@ ${origin}
 ${ts}`);
     return signDetached(keyPair.secretKey, message);
   }
-
-  // src/web-entry.js
-  init_bytes();
 
   // src/store.js
   init_buffer_global();
@@ -17312,14 +20334,18 @@ ${ts}`);
   init_buffer_global();
   init_process_global();
   init_peer();
-  init_address();
-  init_sign();
-  init_bytes();
 
   // src/express-client.js
   init_buffer_global();
   init_process_global();
-  init_express();
+
+  // node_modules/@decentnetwork/peer/dist/compat/express.js
+  init_buffer_global();
+  init_process_global();
+  init_flatbuffers();
+  var import_tweetnacl16 = __toESM(require_nacl_fast2());
+
+  // src/express-client.js
   function normalizeExpressNodes(entries) {
     return (entries || []).map((e) => ({
       host: e.ipv4 ?? e.host,
@@ -19161,8 +22187,8 @@ ${ts}`);
      * client into an actual Carrier peer.
      */
     async testRelay(host2 = "144.202.113.167", port = 33445) {
-      const { TcpRelayClient: TcpRelayClient2 } = await Promise.resolve().then(() => (init_tcp_relay(), tcp_relay_exports));
-      const { base58ToBytes: base58ToBytes2 } = await Promise.resolve().then(() => (init_base58(), base58_exports));
+      const { TcpRelayClient: TcpRelayClient3 } = await Promise.resolve().then(() => (init_tcp_relay2(), tcp_relay_exports));
+      const { base58ToBytes: base58ToBytes3 } = await Promise.resolve().then(() => (init_base582(), base58_exports));
       const cfg = await (await fetch("https://beagle.chat/assets/bgservers.json")).json();
       const entry = (cfg.bootstrapNodes ?? []).find((n) => n.ipv4 === host2);
       if (!entry)
@@ -19170,10 +22196,10 @@ ${ts}`);
       const t0 = Date.now();
       let client;
       try {
-        client = new TcpRelayClient2({
+        client = new TcpRelayClient3({
           host: host2,
           port,
-          serverPublicKey: base58ToBytes2(entry.publicKey),
+          serverPublicKey: base58ToBytes3(entry.publicKey),
           selfKeyPair: this.keyPair,
           label: `${host2}:${port}`
         });
