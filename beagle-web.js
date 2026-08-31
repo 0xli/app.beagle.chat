@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.157","ui":"0.2.2","builtAt":"2026-08-31T03:27:20.271Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.158","ui":"0.2.2","builtAt":"2026-08-31T03:57:04.453Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -12940,20 +12940,45 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.157","ui":"0.2.2","builtAt":"2026-08-31
         lastFriendRequestDispatch() {
           return __privateGet(this, _lastFriendRequestDispatch);
         }
-        async acceptFriendRequest(pubkey) {
+        /**
+         * Accept a friend request.
+         *
+         * `#pendingFriendRequests` is an in-memory cache, not the authority on what
+         * was asked. A host that remembers requests across a restart — beagle-web
+         * keeps them in IndexedDB, because a request usually arrives while the tab is
+         * closed — is doing the right thing, and refusing it here made every restored
+         * card permanently un-acceptable: click Accept, the SDK throws "no pending
+         * friend request", the card comes back, and the button reads as dead. That is
+         * the whole of the reported "Accept does not respond" on app.beagle.chat.
+         *
+         * Accepting is the host's decision. Take it, and let the host pass back what
+         * it remembered so the friend does not arrive nameless — anything missing is
+         * filled in by the userinfo exchange once the session comes up.
+         */
+        async acceptFriendRequest(pubkey, opts) {
           const request = __privateGet(this, _pendingFriendRequests).get(pubkey);
-          if (!request) {
-            throw new Error("No pending friend request from this peer");
+          if (!request && !opts) {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `accepting ${pubkey} with no cached request and no details from the host`);
           }
+          let key2;
+          try {
+            key2 = base58ToBytes(pubkey);
+          } catch {
+            throw new Error(`Not a valid peer key: ${pubkey}`);
+          }
+          if (key2.length !== 32) {
+            throw new Error(`Not a valid peer key: ${pubkey}`);
+          }
+          const nospam = request?.nospam ?? opts?.nospam ?? 0;
           __privateGet(this, _pendingFriendRequests).delete(pubkey);
           __privateGet(this, _friends).set(pubkey, {
             pubkey,
-            userid: request.userid,
-            address: request.address,
-            nospam: request.nospam,
-            name: request.name,
-            description: request.description,
-            hello: request.hello,
+            userid: request?.userid ?? pubkey,
+            address: request?.address ?? opts?.address ?? carrierAddressFromPublicKey(key2, nospam),
+            nospam,
+            name: request?.name ?? opts?.name ?? "",
+            description: request?.description ?? opts?.description ?? "",
+            hello: request?.hello ?? opts?.hello ?? "",
             status: "offline",
             acceptedAt: Date.now()
           });
@@ -17619,6 +17644,8 @@ ${ts}`);
             name: req.name || "",
             descr: req.description || "",
             hello: req.hello || "",
+            address: req.address || "",
+            nospam: req.nospam,
             ts: Date.now()
           });
           await savePending();
@@ -18032,7 +18059,13 @@ ${ts}`);
             return fail("no such pending request");
           const [entry] = pending.splice(idx, 1);
           try {
-            await peer.acceptFriendRequest(req.userid);
+            await peer.acceptFriendRequest(req.userid, {
+              name: entry.name,
+              description: entry.descr,
+              hello: entry.hello,
+              address: entry.address,
+              nospam: entry.nospam
+            });
           } catch (err) {
             pending.splice(idx, 0, entry);
             return fail(String(err?.message || err));
