@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.159","ui":"0.2.2","builtAt":"2026-08-31T04:22:21.675Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.2","builtAt":"2026-08-31T05:42:57.391Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -8553,7 +8553,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.159","ui":"0.2.2","builtAt":"2026-08-31
     const length = table.bb.__vector_len(table.bb_pos + offset);
     return table.bb.bytes().slice(vector, vector + length);
   }
-  var import_tweetnacl10, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _callbacks, _debug, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
+  var import_tweetnacl10, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _health, _callbacks, _debug, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
   var init_express = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/express.js"() {
       init_buffer_global();
@@ -8578,6 +8578,9 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.159","ui":"0.2.2","builtAt":"2026-08-31
           __privateAdd(this, _selfUserId, void 0);
           __privateAdd(this, _selfAddress, void 0);
           __privateAdd(this, _currNode, 0);
+          /** Per-node reachability, so an unreachable relay is a reportable FACT and
+           *  not just noise in the browser's network tab. Keyed "host:port". */
+          __privateAdd(this, _health, /* @__PURE__ */ new Map());
           __privateAdd(this, _callbacks, void 0);
           // Own gate, and env-only until now — so in a browser this client was mute
           // whatever the peer's debug setting was. That is why a stalled pull looked
@@ -8618,19 +8621,45 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.159","ui":"0.2.2","builtAt":"2026-08-31
           const friendEncrypted = encrypt(friendSharedKey, carrierPacket);
           await __privateMethod(this, _postEncrypted, postEncrypted_fn).call(this, friendUserId, friendEncrypted);
         }
+        /** Reachability of each configured relay, for diag. */
+        health() {
+          return __privateGet(this, _nodes2).map((n) => {
+            const id = `${n.host}:${n.port}`;
+            const h = __privateGet(this, _health).get(id);
+            return { node: id, fails: h?.fails ?? 0, lastError: h?.lastError ?? "", lastOkMs: h?.lastOkMs ?? 0 };
+          });
+        }
         async pullOnce() {
           __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${__privateGet(this, _nodes2).length} node(s)`);
           if (!__privateGet(this, _nodes2).length) {
             return;
           }
+          const now = Date.now();
           for (const node of __privateGet(this, _nodes2)) {
+            const id = `${node.host}:${node.port}`;
+            const h = __privateGet(this, _health).get(id) ?? { fails: 0, lastError: "", lastOkMs: 0, nextTryMs: 0 };
+            if (h.fails > 0 && now < h.nextTryMs)
+              continue;
             let body2;
             try {
               body2 = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
             } catch (error) {
-              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${node.host}:${node.port} failed: ${error?.message ?? error}`);
+              const msg = error?.message ?? String(error);
+              h.fails += 1;
+              h.lastError = msg;
+              h.nextTryMs = now + Math.min(12e4, 5e3 * 2 ** Math.min(5, h.fails - 1));
+              __privateGet(this, _health).set(id, h);
+              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${id} failed (${h.fails} in a row): ${msg}`);
+              if (h.fails === 1 || h.fails % 10 === 0) {
+                __privateGet(this, _callbacks).onNodeUnreachable?.(id, msg, h.fails);
+              }
               continue;
             }
+            if (h.fails > 0) {
+              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${id} recovered after ${h.fails} failure(s)`);
+              __privateGet(this, _callbacks).onNodeRecovered?.(id, h.fails);
+            }
+            __privateGet(this, _health).set(id, { fails: 0, lastError: "", lastOkMs: now, nextTryMs: 0 });
             const messages = parseExpressResponseFrames(body2);
             if (messages.length === 0) {
               __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${body2.length} byte(s) from ${node.host} parsed to 0 frames`);
@@ -8689,6 +8718,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.159","ui":"0.2.2","builtAt":"2026-08-31
       _selfUserId = new WeakMap();
       _selfAddress = new WeakMap();
       _currNode = new WeakMap();
+      _health = new WeakMap();
       _callbacks = new WeakMap();
       _debug = new WeakMap();
       _postEncrypted = new WeakSet();
@@ -12511,6 +12541,20 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.159","ui":"0.2.2","builtAt":"2026-08-31
                 },
                 onOfflineFriendMessage: (fromUserId, packet) => {
                   __privateMethod(this, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn).call(this, fromUserId, packet);
+                },
+                // Offline mail dying is not a detail to keep in a debug log. Friend
+                // requests and anything sent while the session is down travel this
+                // way; when the relay is unreachable they do not arrive and nothing
+                // anywhere says why. Observed on a real machine 2026-08-31: a VPN
+                // held the default route, the browser refused every relay fetch with
+                // ERR_INTERNET_DISCONNECTED while its relay WebSockets kept working,
+                // so the peer looked healthy and online and silently received no
+                // offline mail at all.
+                onNodeUnreachable: (node, error, fails) => {
+                  __privateGet(this, _events).emit("expressUnreachable", { node, error, consecutiveFailures: fails });
+                },
+                onNodeRecovered: (node, afterFailures) => {
+                  __privateGet(this, _events).emit("expressRecovered", { node, afterFailures });
                 }
               }
             }));
@@ -13103,6 +13147,22 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.159","ui":"0.2.2","builtAt":"2026-08-31
         }
         waitForFriendConnected(pubkey, timeoutMs = 3e4) {
           return __privateMethod(this, _waitForFriendConnected, waitForFriendConnected_fn).call(this, pubkey, timeoutMs);
+        }
+        /**
+         * Reachability of each configured express relay: consecutive failures, the
+         * last error, and when it last answered.
+         *
+         * Offline mail is how a friend request reaches someone who is not connected,
+         * and how any message sent to an offline peer travels. When the relay cannot
+         * be reached none of that arrives, and until this existed the only trace was
+         * a failed request in the browser's network tab — indistinguishable, from
+         * inside the application, from an empty inbox.
+         */
+        expressHealth() {
+          return __privateGet(this, _express)?.health() ?? [];
+        }
+        onExpressUnreachable(cb) {
+          __privateGet(this, _events).on("expressUnreachable", cb);
         }
         onFriendRequest(cb) {
           __privateGet(this, _events).on("friendRequest", cb);
@@ -17657,6 +17717,13 @@ ${ts}`);
         }
       })();
     });
+    peer.onExpressUnreachable?.((e) => {
+      onEvent?.({ type: "express-unreachable", node: e.node, error: e.error, fails: e.consecutiveFailures });
+      try {
+        console.warn("[beagle] offline mail relay " + e.node + " unreachable (" + e.consecutiveFailures + " in a row): " + e.error + " \u2014 friend requests and messages sent while a peer is offline will NOT arrive until this clears.");
+      } catch {
+      }
+    });
     peer.onText((msg) => {
       confirm(msg.pubkey);
       if (msg.text && msg.text.length > 4096) {
@@ -17993,6 +18060,10 @@ ${ts}`);
             // Zero here means the SDK built no express client at all, which is
             // indistinguishable from a healthy-but-empty inbox without it.
             expressNodeCount: expressNodes.length,
+            // ...and whether those nodes actually ANSWER. A count above zero
+            // still says nothing about reachability, which is how a tab with a
+            // completely dead inbox looked healthy.
+            express: peer.expressHealth ? peer.expressHealth() : [],
             dht: dht(),
             friends: await friendList(),
             // What the peer will actually put in a friend-request packet and push
