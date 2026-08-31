@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31T06:21:55.682Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31T06:34:16.485Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -17885,6 +17885,16 @@ ${ts}`);
     });
     const dec2 = new TextDecoder();
     const callSignals = [];
+    const callWaiters = /* @__PURE__ */ new Set();
+    const wakeCallWaiters = () => {
+      for (const w of [...callWaiters]) {
+        callWaiters.delete(w);
+        try {
+          w();
+        } catch {
+        }
+      }
+    };
     let callSeq = 0;
     const CHUNK_TTL_MS = 6e4;
     const chunkBuf = /* @__PURE__ */ new Map();
@@ -17944,6 +17954,7 @@ ${ts}`);
       callSignals.push({ seq: ++callSeq, pubkey: evt.pubkey, userid: evt.pubkey, data });
       if (callSignals.length > 256)
         callSignals.splice(0, callSignals.length - 256);
+      wakeCallWaiters();
       onEvent?.({ type: "call-signal", userid: evt.pubkey });
     };
     peer.onInvite(onInvite);
@@ -18314,6 +18325,19 @@ ${ts}`);
         }
         case "call-poll": {
           const since = Number(req.since) || 0;
+          if (!callSignals.some((s) => s.seq > since)) {
+            await new Promise((res) => {
+              const timer = setTimeout(() => {
+                callWaiters.delete(wake);
+                res();
+              }, 2e4);
+              const wake = () => {
+                clearTimeout(timer);
+                res();
+              };
+              callWaiters.add(wake);
+            });
+          }
           const signals = callSignals.filter((s) => s.seq > since);
           const cursor = signals.length ? signals[signals.length - 1].seq : since;
           return ok({ signals: signals.map((s) => ({ userid: s.userid, pubkey: s.pubkey, data: s.data })), cursor });
