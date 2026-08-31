@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.163","ui":"0.2.5","builtAt":"2026-08-31T09:27:41.987Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.5","builtAt":"2026-08-31T17:03:40.250Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -13142,6 +13142,8 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.163","ui":"0.2.5","builtAt":"2026-08-31
           if (outcome.via === "offline")
             return { delivery: "offline" };
           if (outcome.endPacketNumber === void 0)
+            return { delivery: "accepted" };
+          if (text.length === 0)
             return { delivery: "accepted" };
           const acked = await __privateMethod(this, _awaitTransportAck, awaitTransportAck_fn).call(this, pubkey, outcome.endPacketNumber, TEXT_TRANSPORT_ACK_TIMEOUT_MS);
           if (!acked) {
