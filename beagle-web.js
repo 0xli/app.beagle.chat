@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31T06:34:16.485Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.163","ui":"0.2.4","builtAt":"2026-08-31T08:42:19.910Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -10152,6 +10152,8 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
          * (some toxcore peers echo our address back inside DHT-PK extras).
          */
         localPort() {
+          if (process.env.DECENT_FAULT_NO_UDP === "1")
+            return 0;
           try {
             const addr = __privateGet(this, _socket2)?.address();
             if (addr && typeof addr === "object" && "port" in addr) {
@@ -11287,7 +11289,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
-  var import_tweetnacl14, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
+  var import_tweetnacl14, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_TRANSPORT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _persistInFlight, _persistPending, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
   var init_peer = __esm({
     "node_modules/@decentnetwork/peer/dist/peer.js"() {
       init_buffer_global();
@@ -11390,6 +11392,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
       PEER_PKG_VERSION = "0.1.112";
       TEXT_ACK_PREFIX = "DNPACK1:";
       TEXT_ACK_TIMEOUT_MS = readEnvInt("DECENT_TEXT_ACK_TIMEOUT_MS", 3e5);
+      TEXT_TRANSPORT_ACK_TIMEOUT_MS = readEnvInt("DECENT_TEXT_TRANSPORT_ACK_TIMEOUT_MS", 2e4);
       TEXT_ACK_RETRY_MS = readEnvInt("DECENT_TEXT_ACK_RETRY_MS", 5e3);
       TEXT_AUTO_ACK_TIMEOUT_MS = readEnvInt("DECENT_TEXT_AUTO_ACK_TIMEOUT_MS", 15e3);
       PACKET_ID_REQUEST = 1;
@@ -11739,6 +11742,8 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
           __privateAdd(this, _runSelfAnnounce);
           __privateAdd(this, _loadPersistedFriends);
           __privateAdd(this, _persistFriends);
+          /** Remove temp files left by a previous run that was killed mid-write. */
+          __privateAdd(this, _sweepStaleFriendTemps);
           __privateAdd(this, _opts3, void 0);
           __privateAdd(this, _events, new EventEmitter());
           /** While negotiating a non-LAN file, temporarily stop sending this friend
@@ -11976,6 +11981,9 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
           __privateAdd(this, _greetingSentTo, /* @__PURE__ */ new Set());
           __privateAdd(this, _selfAnnouncePromise, void 0);
           __privateAdd(this, _selfAnnounceRunCount, 0);
+          /** Serialises friend-store writes; see #persistFriends. */
+          __privateAdd(this, _persistInFlight, false);
+          __privateAdd(this, _persistPending, void 0);
           // Bumped when the watchdog abandons a run. The abandoned run is still alive
           // and would otherwise keep writing #announceRouteUsed underneath the round
           // that replaced it — and step2 rejects a ping_id whose route changed, so
@@ -13098,15 +13106,48 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
           }
           return existed;
         }
+        /**
+         * Send a text message, and say what actually became of it.
+         *
+         *   "acked"    the far side confirmed. For a JS peer that is an app-level
+         *              ACK — their application parsed it. For a native peer it is
+         *              toxcore's own reliable-packet acknowledgement: the bytes are
+         *              on their device. Both are real evidence.
+         *   "accepted" handed to a live session, never confirmed within the window.
+         *              Probably delivered. NOT proven.
+         *   "offline"  posted to an express relay for later collection.
+         *
+         * The native path used to resolve as soon as #sendTextPlain handed the bytes
+         * to the transport, and hosts read that resolve as success — so a message to
+         * an iPhone or an Android showed a tick whether or not it ever arrived. That
+         * was fixed for JS peers long ago, by waiting for their app-level ACK, and
+         * the phone path was left behind. sendInlineFile already waits for the
+         * transport ACK on exactly this path; sendText did not. Two standards in one
+         * file.
+         *
+         * Deliberately does NOT throw when unconfirmed. A throw is how hosts decide
+         * to re-queue, and re-sending a message that did arrive is how the same
+         * picture turns up twice on a phone — which is a worse bug than a tick that
+         * is one shade too confident. Report the uncertainty; let the host show it.
+         */
         async sendText(pubkey, text) {
           if (text.length > 0 && !text.startsWith(TEXT_ACK_PREFIX) && __privateMethod(this, _shouldRequireTextAck, shouldRequireTextAck_fn).call(this, pubkey)) {
             await this.sendTextUntilAck(pubkey, text, {
               timeoutMs: TEXT_AUTO_ACK_TIMEOUT_MS,
               retryIntervalMs: Math.min(TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS)
             });
-            return;
+            return { delivery: "acked" };
           }
-          await __privateMethod(this, _sendTextPlain, sendTextPlain_fn).call(this, pubkey, text);
+          const outcome = await __privateMethod(this, _sendTextPlain, sendTextPlain_fn).call(this, pubkey, text);
+          if (outcome.via === "offline")
+            return { delivery: "offline" };
+          if (outcome.endPacketNumber === void 0)
+            return { delivery: "accepted" };
+          const acked = await __privateMethod(this, _awaitTransportAck, awaitTransportAck_fn).call(this, pubkey, outcome.endPacketNumber, TEXT_TRANSPORT_ACK_TIMEOUT_MS);
+          if (!acked) {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `text to ${pubkey}: transport ACK not seen within ${TEXT_TRANSPORT_ACK_TIMEOUT_MS}ms \u2014 reporting unconfirmed`);
+          }
+          return { delivery: acked ? "acked" : "accepted" };
         }
         /**
          * Send text and keep retransmitting until the peer explicitly ACKs it.
@@ -13598,6 +13639,8 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
       _greetingSentTo = new WeakMap();
       _selfAnnouncePromise = new WeakMap();
       _selfAnnounceRunCount = new WeakMap();
+      _persistInFlight = new WeakMap();
+      _persistPending = new WeakMap();
       _selfAnnounceEpoch = new WeakMap();
       _selfAnnouncePauseDepth = new WeakMap();
       _started = new WeakMap();
@@ -16938,6 +16981,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
         if (!__privateGet(this, _friendStoreFile)) {
           return;
         }
+        void __privateMethod(this, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn).call(this);
         try {
           const raw = await readFile(__privateGet(this, _friendStoreFile), "utf8");
           const parsed = JSON.parse(raw);
@@ -16991,10 +17035,49 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.160","ui":"0.2.3","builtAt":"2026-08-31
         }
         const file = __privateGet(this, _friendStoreFile);
         const payload = JSON.stringify([...__privateGet(this, _friends).values()], null, 2);
-        const tmp = `${file}.tmp.${process.pid}.${__privateWrapper(this, _persistSeq)._++}`;
-        void mkdir(dirname(file), { recursive: true }).then(() => writeFile(tmp, payload, "utf8")).then(() => rename(tmp, file)).catch((error) => {
-          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `persist friends failed: ${error.message}`);
-        });
+        __privateSet(this, _persistPending, payload);
+        if (__privateGet(this, _persistInFlight))
+          return;
+        __privateSet(this, _persistInFlight, true);
+        const flush = async () => {
+          while (__privateGet(this, _persistPending) !== void 0) {
+            const body2 = __privateGet(this, _persistPending);
+            __privateSet(this, _persistPending, void 0);
+            const tmp = `${file}.tmp.${process.pid}.${__privateWrapper(this, _persistSeq)._++}`;
+            try {
+              await mkdir(dirname(file), { recursive: true });
+              await writeFile(tmp, body2, "utf8");
+              await rename(tmp, file);
+            } catch (error) {
+              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `persist friends failed: ${error.message}`);
+              await unlink(tmp).catch(() => void 0);
+            }
+          }
+          __privateSet(this, _persistInFlight, false);
+        };
+        void flush();
+      };
+      _sweepStaleFriendTemps = new WeakSet();
+      sweepStaleFriendTemps_fn = async function() {
+        const file = __privateGet(this, _friendStoreFile);
+        if (!file)
+          return;
+        try {
+          const dir = dirname(file);
+          const prefix = `${basename(file)}.tmp.`;
+          const names = await readdir(dir);
+          let removed = 0;
+          for (const name of names) {
+            if (!name.startsWith(prefix))
+              continue;
+            await unlink(join(dir, name)).then(() => {
+              removed += 1;
+            }).catch(() => void 0);
+          }
+          if (removed > 0)
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `swept ${removed} stale friend-store temp file(s)`);
+        } catch {
+        }
       };
       Peer = _Peer;
       VIRTUAL_IFACE_RE = /^(utun|tun|tap|wg|tailscale|zt|ham|agentnet|awdl|llw|gif|stf|bridge|br-|virbr|cni|flannel|weave|kube|vnet|vnic|vmnet|veth|docker)/i;
@@ -17755,10 +17838,14 @@ ${ts}`);
         if (skipId != null && m.id === skipId)
           continue;
         try {
-          await peer.sendText(uid, m.text);
+          const r = await peer.sendText(uid, m.text);
           confirm(uid);
-          await updateMessage(m.id, { status: "sent" });
-          onEvent?.({ type: "message-sent", userid: uid, id: m.id });
+          await updateMessage(m.id, {
+            status: "sent",
+            confirmed: !r || r.delivery === "acked",
+            via: r && r.delivery === "offline" ? "offline" : "online"
+          });
+          onEvent?.({ type: "message-sent", userid: uid, id: m.id, delivery: r && r.delivery });
         } catch (err) {
           await updateMessage(m.id, { status: "queued" });
           return false;
@@ -18213,9 +18300,13 @@ ${ts}`);
               return;
             }
             try {
-              await peer.sendText(req.userid, req.text);
+              const r = await peer.sendText(req.userid, req.text);
               confirm(req.userid);
-              await updateMessage(msg.id, { status: "sent" });
+              await updateMessage(msg.id, {
+                status: "sent",
+                confirmed: !r || r.delivery === "acked",
+                via: r && r.delivery === "offline" ? "offline" : "online"
+              });
             } catch (err) {
               await updateMessage(msg.id, { status: "queued", error: String(err?.message || err) });
               onEvent?.({ type: "message-queued", userid: req.userid, error: String(err?.message || err) });

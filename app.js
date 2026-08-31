@@ -1574,7 +1574,7 @@
         },
         /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 11, stroke: 2.2, color: "var(--faint)" }),
         /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--faint)" } }, m.status === "sending" ? T.sendingMsg || "sending" : T.queued || "queued")
-      ) : mine && m.status && /* @__PURE__ */ React.createElement(Icon, { name: "checkCheck", size: 12, stroke: 2.2, color: m.status === "read" ? "var(--accent)" : "var(--faint)" })))
+      ) : mine && m.status === "sent" && m.confirmed === false ? /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, stroke: 2.2, color: "var(--faint)", title: T.sentUnconfirmed || "sent \u2014 not confirmed by the peer" }) : mine && m.status && /* @__PURE__ */ React.createElement(Icon, { name: "checkCheck", size: 12, stroke: 2.2, color: m.status === "read" ? "var(--accent)" : "var(--faint)" })))
     );
   }
   function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread }) {
