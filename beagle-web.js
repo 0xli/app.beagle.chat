@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-08T18:14:37.063Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-08T18:27:14.157Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -17579,15 +17579,18 @@ ${ts}`);
     });
   }
   var idb = async (store, mode, fn, timeoutMs) => {
+    const budget = timeoutMs ?? TX_TIMEOUT_MS;
+    const deadline = Date.now() + budget;
+    const left = () => Math.max(50, deadline - Date.now());
     let db;
     try {
-      db = await withTimeout(openDB(), timeoutMs ?? OPEN_TIMEOUT_MS);
+      db = await withTimeout(openDB(), Math.min(left(), OPEN_TIMEOUT_MS));
     } catch (err) {
       if (err)
         err.stage = "open";
       throw err;
     }
-    return tx(db, store, mode, fn, timeoutMs);
+    return tx(db, store, mode, fn, left());
   };
   var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile"]);
   var mirror = (key2, value) => {

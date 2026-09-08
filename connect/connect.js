@@ -4919,15 +4919,18 @@ ${nonce2}`);
     });
   }
   var idb = async (store, mode, fn, timeoutMs) => {
+    const budget = timeoutMs ?? TX_TIMEOUT_MS;
+    const deadline = Date.now() + budget;
+    const left = () => Math.max(50, deadline - Date.now());
     let db;
     try {
-      db = await withTimeout(openDB(), timeoutMs ?? OPEN_TIMEOUT_MS);
+      db = await withTimeout(openDB(), Math.min(left(), OPEN_TIMEOUT_MS));
     } catch (err) {
       if (err)
         err.stage = "open";
       throw err;
     }
-    return tx(db, store, mode, fn, timeoutMs);
+    return tx(db, store, mode, fn, left());
   };
   var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile"]);
   var mirror = (key, value) => {
