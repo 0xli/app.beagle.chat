@@ -4531,14 +4531,172 @@ ${nonce2}`);
     return signDetached(keyPair.secretKey, message);
   }
 
+  // src/store-ls.js
+  var PREFIX = "beagle-web:";
+  var BACKEND_KEY = `${PREFIX}backend`;
+  var KV = `${PREFIX}kv:`;
+  var FRIENDS = `${PREFIX}friends`;
+  var MSGS = `${PREFIX}messages:`;
+  var SEQ = `${PREFIX}msgseq`;
+  var MAX_MSGS_PER_PEER = 500;
+  var MAX_BLOB_BYTES = 256 * 1024;
+  function available() {
+    try {
+      const probe = `${PREFIX}probe`;
+      localStorage.setItem(probe, "1");
+      localStorage.removeItem(probe);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  var b64 = (u8) => {
+    let s = "";
+    for (let i = 0; i < u8.length; i += 32768)
+      s += String.fromCharCode(...u8.subarray(i, i + 32768));
+    return btoa(s);
+  };
+  var unb64 = (s) => {
+    const bin = atob(s);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++)
+      u8[i] = bin.charCodeAt(i);
+    return u8;
+  };
+  function encode(value) {
+    if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
+      const u8 = value instanceof ArrayBuffer ? new Uint8Array(value) : value;
+      if (u8.byteLength > MAX_BLOB_BYTES) {
+        const err = new Error(`too large for localStorage (${u8.byteLength} bytes)`);
+        err.name = "QuotaExceededError";
+        throw err;
+      }
+      return JSON.stringify({ __u8: b64(u8) });
+    }
+    return JSON.stringify({ v: value ?? null });
+  }
+  function decode(raw) {
+    if (raw == null)
+      return void 0;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return void 0;
+    }
+    if (parsed && typeof parsed === "object" && typeof parsed.__u8 === "string") {
+      try {
+        return unb64(parsed.__u8);
+      } catch {
+        return void 0;
+      }
+    }
+    return parsed && typeof parsed === "object" && "v" in parsed ? parsed.v ?? void 0 : void 0;
+  }
+  var isQuota = (err) => err && (err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22);
+  function ourKeys(prefix = PREFIX) {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix))
+        keys.push(k);
+    }
+    return keys;
+  }
+  function evict() {
+    const files = ourKeys(`${KV}file:`);
+    if (files.length) {
+      for (const k of files)
+        localStorage.removeItem(k);
+      return true;
+    }
+    let freed = false;
+    for (const k of ourKeys(MSGS)) {
+      const list = decode(localStorage.getItem(k));
+      if (!Array.isArray(list) || list.length < 2)
+        continue;
+      const kept = list.slice(Math.ceil(list.length / 2));
+      try {
+        localStorage.setItem(k, encode(kept));
+        freed = true;
+      } catch {
+        localStorage.removeItem(k);
+        freed = true;
+      }
+    }
+    return freed;
+  }
+  function put(key, value) {
+    const raw = encode(value);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        localStorage.setItem(key, raw);
+        return;
+      } catch (err) {
+        if (!isQuota(err) || attempt > 8 || !evict())
+          throw err;
+      }
+    }
+  }
+  var get = (key) => decode(localStorage.getItem(key));
+  var kvGet = (key) => get(KV + key);
+  var kvPut = (key, value) => put(KV + key, value);
+  function listFriends() {
+    const all = get(FRIENDS);
+    return all ? Object.values(all) : [];
+  }
+  function putFriends(list) {
+    const all = {};
+    for (const f of list || [])
+      if (f && f.userid)
+        all[f.userid] = f;
+    put(FRIENDS, all);
+  }
+  var threadKey = (peer) => MSGS + peer;
+  var thread = (peer) => {
+    const list = get(threadKey(peer));
+    return Array.isArray(list) ? list : [];
+  };
+  var peers = () => ourKeys(MSGS).map((k) => k.slice(MSGS.length));
+  function appendMessage(msg) {
+    const seq = (Number(get(SEQ)) || 0) + 1;
+    const id = `ls-${seq}`;
+    const list = thread(msg.peer);
+    list.push({ ...msg, id });
+    if (list.length > MAX_MSGS_PER_PEER)
+      list.splice(0, list.length - MAX_MSGS_PER_PEER);
+    put(threadKey(msg.peer), list);
+    put(SEQ, seq);
+    return id;
+  }
+  function latch() {
+    try {
+      localStorage.setItem(BACKEND_KEY, "ls");
+    } catch {
+    }
+  }
+  function latched() {
+    try {
+      return localStorage.getItem(BACKEND_KEY) === "ls";
+    } catch {
+      return false;
+    }
+  }
+  function unlatch() {
+    try {
+      localStorage.removeItem(BACKEND_KEY);
+    } catch {
+    }
+  }
+
   // src/store.js
   var DB_NAME = "beagle-web";
   var DB_VERSION = 2;
-  var KV = "kv";
-  var FRIENDS = "friends";
+  var KV2 = "kv";
+  var FRIENDS2 = "friends";
   var MESSAGES = "messages";
   var dbPromise = null;
-  var STORES = [KV, FRIENDS, MESSAGES];
+  var STORES = [KV2, FRIENDS2, MESSAGES];
   var missingStores = (db) => STORES.filter((n) => !db.objectStoreNames.contains(n));
   function recreate() {
     return new Promise((resolve, reject) => {
@@ -4556,10 +4714,14 @@ ${nonce2}`);
     if (dbPromise)
       return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined" || !indexedDB) {
+        reject(new Error("IndexedDB unavailable"));
+        return;
+      }
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       const timer = setTimeout(
-        () => reject(new Error("IndexedDB open did not settle in 10s")),
-        1e4
+        () => reject(new Error(`IndexedDB open did not settle in ${OPEN_TIMEOUT_MS}ms`)),
+        OPEN_TIMEOUT_MS
       );
       const finish = (fn, v) => {
         clearTimeout(timer);
@@ -4568,10 +4730,10 @@ ${nonce2}`);
       req.onblocked = () => finish(reject, new Error("IndexedDB open blocked by another tab"));
       req.onupgradeneeded = () => {
         const db = req.result;
-        if (!db.objectStoreNames.contains(KV))
-          db.createObjectStore(KV);
-        if (!db.objectStoreNames.contains(FRIENDS))
-          db.createObjectStore(FRIENDS, { keyPath: "userid" });
+        if (!db.objectStoreNames.contains(KV2))
+          db.createObjectStore(KV2);
+        if (!db.objectStoreNames.contains(FRIENDS2))
+          db.createObjectStore(FRIENDS2, { keyPath: "userid" });
         if (!db.objectStoreNames.contains(MESSAGES)) {
           const s = db.createObjectStore(MESSAGES, { keyPath: "id", autoIncrement: true });
           s.createIndex("peer_ts", ["peer", "ts"]);
@@ -4600,25 +4762,133 @@ ${nonce2}`);
   }
   var TX_TIMEOUT_MS = 4e3;
   var BOOT_TIMEOUT_MS = 1500;
-  var storageWedged = (() => {
+  var OPEN_TIMEOUT_MS = 1500;
+  var MIGRATE_TIMEOUT_MS = 2e3;
+  var forced = (() => {
     try {
-      return new URLSearchParams(location.search).get("nostore") === "1";
+      const qs2 = new URLSearchParams(location.search);
+      if (qs2.get("nostore") === "1")
+        return "mem";
+      if (qs2.get("storage") === "ls")
+        return "ls";
+      if (qs2.get("storage") === "idb")
+        return "idb";
+      return null;
     } catch {
-      return false;
+      return null;
     }
   })();
+  var lsUsable = available();
+  var backend = (() => {
+    if (forced === "mem")
+      return "mem";
+    if (forced === "ls")
+      return lsUsable ? "ls" : "mem";
+    if (forced === "idb") {
+      if (lsUsable)
+        unlatch();
+      return "idb";
+    }
+    if (lsUsable && latched())
+      return "ls";
+    return "idb";
+  })();
   function isStorageWedged() {
-    return storageWedged;
+    return backend === "mem";
+  }
+  function isStorageLocal() {
+    return backend === "ls";
   }
   var memKv = /* @__PURE__ */ new Map();
-  async function withStore(op, fallback) {
-    if (storageWedged)
-      return fallback();
+  var migration = null;
+  function degrade(err) {
+    if (backend !== "idb")
+      return;
+    backend = lsUsable ? "ls" : "mem";
+    if (backend === "ls") {
+      latch();
+      if (err?.stage !== "open") {
+        migration = withTimeout(migrate(err), MIGRATE_TIMEOUT_MS).catch(() => {
+        });
+      }
+    }
     try {
-      return await op();
+      dbPromise?.then?.((db) => db.close?.(), () => {
+      });
+    } catch {
+    }
+  }
+  async function migrate(cause) {
+    const db = await withTimeout(openDB(), BOOT_TIMEOUT_MS).catch(() => null);
+    if (!db)
+      return;
+    const copied = { kv: 0, friends: 0, messages: 0 };
+    try {
+      const keys = await tx(db, KV2, "readonly", (s) => s.getAllKeys(), BOOT_TIMEOUT_MS) || [];
+      for (const k of keys) {
+        if (kvGet(k) !== void 0)
+          continue;
+        const v = await tx(db, KV2, "readonly", (s) => s.get(k), BOOT_TIMEOUT_MS);
+        if (v === void 0)
+          continue;
+        try {
+          kvPut(k, v);
+          copied.kv++;
+        } catch {
+        }
+      }
+    } catch {
+    }
+    try {
+      if (!listFriends().length) {
+        const friends = await tx(db, FRIENDS2, "readonly", (s) => s.getAll(), BOOT_TIMEOUT_MS) || [];
+        if (friends.length) {
+          putFriends(friends);
+          copied.friends = friends.length;
+        }
+      }
+    } catch {
+    }
+    try {
+      if (!peers().length) {
+        const msgs = await tx(db, MESSAGES, "readonly", (s) => s.getAll(), BOOT_TIMEOUT_MS) || [];
+        for (const m of msgs.slice(-MAX_MSGS_PER_PEER * 8)) {
+          try {
+            appendMessage(m);
+            copied.messages++;
+          } catch {
+            break;
+          }
+        }
+      }
+    } catch {
+    }
+    console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
+  }
+  var withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`storage did not settle in ${ms}ms`)), ms))
+  ]);
+  async function withStore(idbOp, lsOp, memOp) {
+    if (backend === "mem")
+      return memOp();
+    if (backend === "ls")
+      return runLs(lsOp, memOp);
+    try {
+      return await idbOp();
     } catch (err) {
-      storageWedged = true;
-      return fallback();
+      degrade(err);
+      if (backend === "ls")
+        return runLs(lsOp, memOp);
+      return memOp();
+    }
+  }
+  async function runLs(lsOp, memOp) {
+    try {
+      return lsOp();
+    } catch (err) {
+      console.warn("beagle-web: localStorage write refused", err?.message || err);
+      return memOp();
     }
   }
   function tx(db, store, mode, fn, timeoutMs = TX_TIMEOUT_MS) {
@@ -4648,26 +4918,52 @@ ${nonce2}`);
       t.oncomplete = () => settle(resolve, req && req.result);
     });
   }
-  async function kvGet(key, { timeoutMs } = {}) {
+  var idb = async (store, mode, fn, timeoutMs) => {
+    let db;
+    try {
+      db = await withTimeout(openDB(), timeoutMs ?? OPEN_TIMEOUT_MS);
+    } catch (err) {
+      if (err)
+        err.stage = "open";
+      throw err;
+    }
+    return tx(db, store, mode, fn, timeoutMs);
+  };
+  var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile"]);
+  var mirror = (key, value) => {
+    if (backend === "mem" || !lsUsable || !MIRRORED.has(key))
+      return;
+    try {
+      kvPut(key, value);
+    } catch {
+    }
+  };
+  async function kvGet2(key, { timeoutMs } = {}) {
     return withStore(
-      async () => tx(await openDB(), KV, "readonly", (s) => s.get(key), timeoutMs),
+      async () => {
+        const v = await idb(KV2, "readonly", (s) => s.get(key), timeoutMs);
+        if (v === void 0 && lsUsable && MIRRORED.has(key))
+          return kvGet(key);
+        return v;
+      },
+      () => kvGet(key),
       () => memKv.get(key)
     );
   }
   async function kvGetSafe(key, fallback = null, onFail) {
-    if (storageWedged)
-      return fallback;
     try {
-      return await kvGet(key, { timeoutMs: BOOT_TIMEOUT_MS }) ?? fallback;
+      return await kvGet2(key, { timeoutMs: BOOT_TIMEOUT_MS }) ?? fallback;
     } catch (err) {
-      storageWedged = true;
+      degrade(err);
       onFail?.(err);
       return fallback;
     }
   }
-  async function kvPut(key, value, { timeoutMs } = {}) {
+  async function kvPut2(key, value, { timeoutMs } = {}) {
+    mirror(key, value);
     return withStore(
-      async () => tx(await openDB(), KV, "readwrite", (s) => s.put(value, key), timeoutMs),
+      async () => idb(KV2, "readwrite", (s) => s.put(value, key), timeoutMs),
+      () => kvPut(key, value),
       () => {
         memKv.set(key, value);
       }
@@ -4837,9 +5133,21 @@ ${nonce2}`);
   var profile = null;
   function showNoStorage() {
     const zh = (navigator.language || "").toLowerCase().startsWith("zh");
-    fail(zh ? "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u4E3A\u672C\u7AD9\u4FDD\u5B58\u6570\u636E(Safari \u65E0\u75D5\u6216\u5DF2\u6E05\u9664\u7F51\u7AD9\u6570\u636E)\u3002\u5728\u8FD9\u91CC\u521B\u5EFA\u7684\u8EAB\u4EFD\u4F1A\u968F\u7A97\u53E3\u4E00\u8D77\u6D88\u5931,\u5DF2\u6709\u7684\u8EAB\u4EFD\u4E5F\u8BFB\u4E0D\u51FA\u6765 \u2014\u2014 \u6240\u4EE5\u8FD9\u91CC\u4E0D\u80FD\u7B7E\u540D\u3002\u8BF7\u6253\u5F00 Beagle \u5904\u7406,\u6216\u5B89\u88C5\u684C\u9762\u7248\u3002" : "This browser is not storing data for this site (Safari private mode, or site data cleared). An identity created here would vanish with this window, and an existing one cannot be read \u2014 so nothing can be signed. Open Beagle to sort it out, or install the desktop app.");
+    fail(zh ? "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u5B8C\u5168\u6CA1\u6709\u4E3A\u672C\u7AD9\u4FDD\u5B58\u6570\u636E(\u53EF\u80FD\u5C4F\u853D\u4E86\u5168\u90E8 Cookie \u4E0E\u7F51\u7AD9\u6570\u636E)\u3002\u5728\u8FD9\u91CC\u521B\u5EFA\u7684\u8EAB\u4EFD\u4F1A\u968F\u7A97\u53E3\u4E00\u8D77\u6D88\u5931,\u5DF2\u6709\u7684\u8EAB\u4EFD\u4E5F\u8BFB\u4E0D\u51FA\u6765 \u2014\u2014 \u6240\u4EE5\u8FD9\u91CC\u4E0D\u80FD\u7B7E\u540D\u3002\u8BF7\u6253\u5F00 Beagle \u5904\u7406,\u6216\u5B89\u88C5\u684C\u9762\u7248\u3002" : "This browser is storing nothing at all for this site (all cookies and site data blocked). An identity created here would vanish with this window, and an existing one cannot be read \u2014 so nothing can be signed. Open Beagle to sort it out, or install the desktop app.");
     $("open").hidden = false;
     $("approve").hidden = true;
+  }
+  function noteLocalStorage() {
+    if (!isStorageLocal())
+      return;
+    const zh = (navigator.language || "").toLowerCase().startsWith("zh");
+    const note = $("note");
+    if (!note || note.dataset.storageNote)
+      return;
+    note.dataset.storageNote = "1";
+    const line = document.createElement("span");
+    line.textContent = zh ? " \u8FD9\u4E2A\u6D4F\u89C8\u5668\u628A\u4F60\u7684\u8EAB\u4EFD\u4FDD\u5B58\u5728\u672C\u5730\u5B58\u50A8\u91CC\u3002\u65E0\u75D5\u7A97\u53E3\u5173\u95ED\u540E\u5B83\u4F1A\u6D88\u5931 \u2014\u2014 \u60F3\u957F\u671F\u4FDD\u7559,\u8BF7\u5728 Beagle \u91CC\u5BFC\u51FA\u5BC6\u94A5\u5907\u4EFD\u3002" : " This browser keeps your identity in local storage. A private window forgets it when you close the window \u2014 to keep it, export your key backup from Beagle.";
+    note.appendChild(line);
   }
   function showFirstRun() {
     const zh = (navigator.language || "").toLowerCase().startsWith("zh");
@@ -4885,13 +5193,14 @@ ${nonce2}`);
       go.textContent = zh ? "\u521B\u5EFA\u4E2D\u2026" : "Creating\u2026";
       try {
         const kp = createIdentity();
-        await kvPut("identity", exportIdentity(kp));
-        await kvPut("profile", { name, punkId, onboarded: true });
+        await kvPut2("identity", exportIdentity(kp));
+        await kvPut2("profile", { name, punkId, onboarded: true });
         if (isStorageWedged()) {
           showNoStorage();
           $("firstRun").hidden = true;
           return;
         }
+        noteLocalStorage();
         identity = kp;
         profile = { name, punkId };
         const { userid } = describeIdentity(kp);
@@ -4925,10 +5234,12 @@ ${nonce2}`);
           showNoStorage();
           return;
         }
+        noteLocalStorage();
         showFirstRun();
         return;
       }
       identity = importIdentity(stored);
+      noteLocalStorage();
       profile = await kvGetSafe("profile", null);
       const { userid } = describeIdentity(identity);
       $("userid").textContent = userid;

@@ -26,16 +26,27 @@
     json: "application/json"
   };
   var mimeFor = (name) => MIME[(String(name || "").split(".").pop() || "").toLowerCase()] || "application/octet-stream";
+  var DB_TIMEOUT_MS = 1500;
+  var deadline = (ms) => new Promise((resolve) => setTimeout(() => resolve(null), ms));
   function openDB() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME);
+    return new Promise((resolve) => {
+      let req;
+      try {
+        req = indexedDB.open(DB_NAME);
+      } catch {
+        resolve(null);
+        return;
+      }
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
     });
   }
   async function getFile(name) {
-    const db = await openDB();
-    return new Promise((resolve) => {
+    const db = await Promise.race([openDB(), deadline(DB_TIMEOUT_MS)]);
+    if (!db || !db.objectStoreNames.contains(KV))
+      return null;
+    const read = new Promise((resolve) => {
       let store;
       try {
         store = db.transaction(KV, "readonly").objectStore(KV);
@@ -47,6 +58,7 @@
       g.onsuccess = () => resolve(g.result || null);
       g.onerror = () => resolve(null);
     });
+    return Promise.race([read, deadline(DB_TIMEOUT_MS)]);
   }
   self.addEventListener("install", () => self.skipWaiting());
   self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));

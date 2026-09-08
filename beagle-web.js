@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-08-31T17:30:07.784Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-08T18:14:37.063Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -89,8 +89,8 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-08-31
       out[i] = parseInt(hex2.substr(i * 2, 2), 16);
     return out;
   }
-  function b64ToBytes(b64) {
-    const bin = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
+  function b64ToBytes(b642) {
+    const bin = atob(b642.replace(/-/g, "+").replace(/_/g, "/"));
     const out = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++)
       out[i] = bin.charCodeAt(i);
@@ -100,8 +100,8 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-08-31
     let bin = "";
     for (let i = 0; i < u8.length; i++)
       bin += String.fromCharCode(u8[i]);
-    const b64 = btoa(bin);
-    return url ? b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : b64;
+    const b642 = btoa(bin);
+    return url ? b642.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : b642;
   }
   function from(x, encoding) {
     if (typeof x === "string") {
@@ -17152,13 +17152,209 @@ ${ts}`);
   // src/store.js
   init_buffer_global();
   init_process_global();
+
+  // src/store-ls.js
+  init_buffer_global();
+  init_process_global();
+  var PREFIX = "beagle-web:";
+  var BACKEND_KEY = `${PREFIX}backend`;
+  var KV = `${PREFIX}kv:`;
+  var FRIENDS = `${PREFIX}friends`;
+  var MSGS = `${PREFIX}messages:`;
+  var SEQ = `${PREFIX}msgseq`;
+  var MAX_MSGS_PER_PEER = 500;
+  var MAX_BLOB_BYTES = 256 * 1024;
+  function available() {
+    try {
+      const probe = `${PREFIX}probe`;
+      localStorage.setItem(probe, "1");
+      localStorage.removeItem(probe);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  var b64 = (u8) => {
+    let s = "";
+    for (let i = 0; i < u8.length; i += 32768)
+      s += String.fromCharCode(...u8.subarray(i, i + 32768));
+    return btoa(s);
+  };
+  var unb64 = (s) => {
+    const bin = atob(s);
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++)
+      u8[i] = bin.charCodeAt(i);
+    return u8;
+  };
+  function encode(value) {
+    if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
+      const u8 = value instanceof ArrayBuffer ? new Uint8Array(value) : value;
+      if (u8.byteLength > MAX_BLOB_BYTES) {
+        const err = new Error(`too large for localStorage (${u8.byteLength} bytes)`);
+        err.name = "QuotaExceededError";
+        throw err;
+      }
+      return JSON.stringify({ __u8: b64(u8) });
+    }
+    return JSON.stringify({ v: value ?? null });
+  }
+  function decode(raw) {
+    if (raw == null)
+      return void 0;
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return void 0;
+    }
+    if (parsed && typeof parsed === "object" && typeof parsed.__u8 === "string") {
+      try {
+        return unb64(parsed.__u8);
+      } catch {
+        return void 0;
+      }
+    }
+    return parsed && typeof parsed === "object" && "v" in parsed ? parsed.v ?? void 0 : void 0;
+  }
+  var isQuota = (err) => err && (err.name === "QuotaExceededError" || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22);
+  function ourKeys(prefix = PREFIX) {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix))
+        keys.push(k);
+    }
+    return keys;
+  }
+  function evict() {
+    const files = ourKeys(`${KV}file:`);
+    if (files.length) {
+      for (const k of files)
+        localStorage.removeItem(k);
+      return true;
+    }
+    let freed = false;
+    for (const k of ourKeys(MSGS)) {
+      const list = decode(localStorage.getItem(k));
+      if (!Array.isArray(list) || list.length < 2)
+        continue;
+      const kept = list.slice(Math.ceil(list.length / 2));
+      try {
+        localStorage.setItem(k, encode(kept));
+        freed = true;
+      } catch {
+        localStorage.removeItem(k);
+        freed = true;
+      }
+    }
+    return freed;
+  }
+  function put(key2, value) {
+    const raw = encode(value);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        localStorage.setItem(key2, raw);
+        return;
+      } catch (err) {
+        if (!isQuota(err) || attempt > 8 || !evict())
+          throw err;
+      }
+    }
+  }
+  var get = (key2) => decode(localStorage.getItem(key2));
+  var kvGet = (key2) => get(KV + key2);
+  var kvPut = (key2, value) => put(KV + key2, value);
+  function listFriends() {
+    const all = get(FRIENDS);
+    return all ? Object.values(all) : [];
+  }
+  function putFriends(list) {
+    const all = {};
+    for (const f of list || [])
+      if (f && f.userid)
+        all[f.userid] = f;
+    put(FRIENDS, all);
+  }
+  var threadKey = (peer) => MSGS + peer;
+  var thread = (peer) => {
+    const list = get(threadKey(peer));
+    return Array.isArray(list) ? list : [];
+  };
+  var peers = () => ourKeys(MSGS).map((k) => k.slice(MSGS.length));
+  function appendMessage(msg) {
+    const seq = (Number(get(SEQ)) || 0) + 1;
+    const id = `ls-${seq}`;
+    const list = thread(msg.peer);
+    list.push({ ...msg, id });
+    if (list.length > MAX_MSGS_PER_PEER)
+      list.splice(0, list.length - MAX_MSGS_PER_PEER);
+    put(threadKey(msg.peer), list);
+    put(SEQ, seq);
+    return id;
+  }
+  function historyFor(peer, limit = 200) {
+    return thread(peer).slice(-limit);
+  }
+  function allMessages() {
+    const all = [];
+    for (const p of peers())
+      all.push(...thread(p));
+    return all;
+  }
+  function updateMessage(id, patch) {
+    for (const p of peers()) {
+      const list = thread(p);
+      const i = list.findIndex((m2) => m2.id === id);
+      if (i < 0)
+        continue;
+      const m = list[i];
+      Object.assign(m, patch);
+      if (patch.file && m.file)
+        m.file = { ...m.file, ...patch.file };
+      put(threadKey(p), list);
+      return;
+    }
+  }
+  function markRead(peer) {
+    const list = thread(peer);
+    let changed = false;
+    for (const m of list)
+      if (m.dir === "in" && !m.read) {
+        m.read = true;
+        changed = true;
+      }
+    if (changed)
+      put(threadKey(peer), list);
+  }
+  function latch() {
+    try {
+      localStorage.setItem(BACKEND_KEY, "ls");
+    } catch {
+    }
+  }
+  function latched() {
+    try {
+      return localStorage.getItem(BACKEND_KEY) === "ls";
+    } catch {
+      return false;
+    }
+  }
+  function unlatch() {
+    try {
+      localStorage.removeItem(BACKEND_KEY);
+    } catch {
+    }
+  }
+
+  // src/store.js
   var DB_NAME = "beagle-web";
   var DB_VERSION = 2;
-  var KV = "kv";
-  var FRIENDS = "friends";
+  var KV2 = "kv";
+  var FRIENDS2 = "friends";
   var MESSAGES = "messages";
   var dbPromise = null;
-  var STORES = [KV, FRIENDS, MESSAGES];
+  var STORES = [KV2, FRIENDS2, MESSAGES];
   var missingStores = (db) => STORES.filter((n) => !db.objectStoreNames.contains(n));
   function recreate() {
     return new Promise((resolve2, reject) => {
@@ -17176,10 +17372,14 @@ ${ts}`);
     if (dbPromise)
       return dbPromise;
     dbPromise = new Promise((resolve2, reject) => {
+      if (typeof indexedDB === "undefined" || !indexedDB) {
+        reject(new Error("IndexedDB unavailable"));
+        return;
+      }
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       const timer = setTimeout(
-        () => reject(new Error("IndexedDB open did not settle in 10s")),
-        1e4
+        () => reject(new Error(`IndexedDB open did not settle in ${OPEN_TIMEOUT_MS}ms`)),
+        OPEN_TIMEOUT_MS
       );
       const finish = (fn, v) => {
         clearTimeout(timer);
@@ -17188,10 +17388,10 @@ ${ts}`);
       req.onblocked = () => finish(reject, new Error("IndexedDB open blocked by another tab"));
       req.onupgradeneeded = () => {
         const db = req.result;
-        if (!db.objectStoreNames.contains(KV))
-          db.createObjectStore(KV);
-        if (!db.objectStoreNames.contains(FRIENDS))
-          db.createObjectStore(FRIENDS, { keyPath: "userid" });
+        if (!db.objectStoreNames.contains(KV2))
+          db.createObjectStore(KV2);
+        if (!db.objectStoreNames.contains(FRIENDS2))
+          db.createObjectStore(FRIENDS2, { keyPath: "userid" });
         if (!db.objectStoreNames.contains(MESSAGES)) {
           const s = db.createObjectStore(MESSAGES, { keyPath: "id", autoIncrement: true });
           s.createIndex("peer_ts", ["peer", "ts"]);
@@ -17220,24 +17420,135 @@ ${ts}`);
   }
   var TX_TIMEOUT_MS = 4e3;
   var BOOT_TIMEOUT_MS = 1500;
-  var storageWedged = (() => {
+  var OPEN_TIMEOUT_MS = 1500;
+  var MIGRATE_TIMEOUT_MS = 2e3;
+  var forced = (() => {
     try {
-      return new URLSearchParams(location.search).get("nostore") === "1";
+      const qs = new URLSearchParams(location.search);
+      if (qs.get("nostore") === "1")
+        return "mem";
+      if (qs.get("storage") === "ls")
+        return "ls";
+      if (qs.get("storage") === "idb")
+        return "idb";
+      return null;
     } catch {
-      return false;
+      return null;
     }
   })();
+  var lsUsable = available();
+  var backend = (() => {
+    if (forced === "mem")
+      return "mem";
+    if (forced === "ls")
+      return lsUsable ? "ls" : "mem";
+    if (forced === "idb") {
+      if (lsUsable)
+        unlatch();
+      return "idb";
+    }
+    if (lsUsable && latched())
+      return "ls";
+    return "idb";
+  })();
+  function storageMode() {
+    return backend;
+  }
+  function isStorageWedged() {
+    return backend === "mem";
+  }
   var memKv = /* @__PURE__ */ new Map();
   var memMsgs = [];
   var memSeq = 1;
-  async function withStore(op, fallback) {
-    if (storageWedged)
-      return fallback();
+  var migration = null;
+  function degrade(err) {
+    if (backend !== "idb")
+      return;
+    backend = lsUsable ? "ls" : "mem";
+    if (backend === "ls") {
+      latch();
+      if (err?.stage !== "open") {
+        migration = withTimeout(migrate(err), MIGRATE_TIMEOUT_MS).catch(() => {
+        });
+      }
+    }
     try {
-      return await op();
+      dbPromise?.then?.((db) => db.close?.(), () => {
+      });
+    } catch {
+    }
+  }
+  async function migrate(cause) {
+    const db = await withTimeout(openDB(), BOOT_TIMEOUT_MS).catch(() => null);
+    if (!db)
+      return;
+    const copied = { kv: 0, friends: 0, messages: 0 };
+    try {
+      const keys = await tx(db, KV2, "readonly", (s) => s.getAllKeys(), BOOT_TIMEOUT_MS) || [];
+      for (const k of keys) {
+        if (kvGet(k) !== void 0)
+          continue;
+        const v = await tx(db, KV2, "readonly", (s) => s.get(k), BOOT_TIMEOUT_MS);
+        if (v === void 0)
+          continue;
+        try {
+          kvPut(k, v);
+          copied.kv++;
+        } catch {
+        }
+      }
+    } catch {
+    }
+    try {
+      if (!listFriends().length) {
+        const friends = await tx(db, FRIENDS2, "readonly", (s) => s.getAll(), BOOT_TIMEOUT_MS) || [];
+        if (friends.length) {
+          putFriends(friends);
+          copied.friends = friends.length;
+        }
+      }
+    } catch {
+    }
+    try {
+      if (!peers().length) {
+        const msgs = await tx(db, MESSAGES, "readonly", (s) => s.getAll(), BOOT_TIMEOUT_MS) || [];
+        for (const m of msgs.slice(-MAX_MSGS_PER_PEER * 8)) {
+          try {
+            appendMessage(m);
+            copied.messages++;
+          } catch {
+            break;
+          }
+        }
+      }
+    } catch {
+    }
+    console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
+  }
+  var withTimeout = (promise, ms) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`storage did not settle in ${ms}ms`)), ms))
+  ]);
+  async function withStore(idbOp, lsOp, memOp) {
+    if (backend === "mem")
+      return memOp();
+    if (backend === "ls")
+      return runLs(lsOp, memOp);
+    try {
+      return await idbOp();
     } catch (err) {
-      storageWedged = true;
-      return fallback();
+      degrade(err);
+      if (backend === "ls")
+        return runLs(lsOp, memOp);
+      return memOp();
+    }
+  }
+  async function runLs(lsOp, memOp) {
+    try {
+      return lsOp();
+    } catch (err) {
+      console.warn("beagle-web: localStorage write refused", err?.message || err);
+      return memOp();
     }
   }
   function tx(db, store, mode, fn, timeoutMs = TX_TIMEOUT_MS) {
@@ -17267,80 +17578,96 @@ ${ts}`);
       t.oncomplete = () => settle(resolve2, req && req.result);
     });
   }
-  async function kvGet(key2, { timeoutMs } = {}) {
+  var idb = async (store, mode, fn, timeoutMs) => {
+    let db;
+    try {
+      db = await withTimeout(openDB(), timeoutMs ?? OPEN_TIMEOUT_MS);
+    } catch (err) {
+      if (err)
+        err.stage = "open";
+      throw err;
+    }
+    return tx(db, store, mode, fn, timeoutMs);
+  };
+  var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile"]);
+  var mirror = (key2, value) => {
+    if (backend === "mem" || !lsUsable || !MIRRORED.has(key2))
+      return;
+    try {
+      kvPut(key2, value);
+    } catch {
+    }
+  };
+  async function kvGet2(key2, { timeoutMs } = {}) {
     return withStore(
-      async () => tx(await openDB(), KV, "readonly", (s) => s.get(key2), timeoutMs),
+      async () => {
+        const v = await idb(KV2, "readonly", (s) => s.get(key2), timeoutMs);
+        if (v === void 0 && lsUsable && MIRRORED.has(key2))
+          return kvGet(key2);
+        return v;
+      },
+      () => kvGet(key2),
       () => memKv.get(key2)
     );
   }
   async function kvGetSafe(key2, fallback = null, onFail) {
-    if (storageWedged)
-      return fallback;
     try {
-      return await kvGet(key2, { timeoutMs: BOOT_TIMEOUT_MS }) ?? fallback;
+      return await kvGet2(key2, { timeoutMs: BOOT_TIMEOUT_MS }) ?? fallback;
     } catch (err) {
-      storageWedged = true;
+      degrade(err);
       onFail?.(err);
       return fallback;
     }
   }
-  async function kvPut(key2, value, { timeoutMs } = {}) {
+  async function kvPut2(key2, value, { timeoutMs } = {}) {
+    mirror(key2, value);
     return withStore(
-      async () => tx(await openDB(), KV, "readwrite", (s) => s.put(value, key2), timeoutMs),
+      async () => idb(KV2, "readwrite", (s) => s.put(value, key2), timeoutMs),
+      () => kvPut(key2, value),
       () => {
         memKv.set(key2, value);
       }
     );
   }
-  async function listFriends() {
-    try {
-      const db = await openDB();
-      return await tx(db, FRIENDS, "readonly", (s) => s.getAll()) || [];
-    } catch {
-      storageWedged = true;
-      return [];
-    }
+  async function listFriends2() {
+    return withStore(
+      async () => await idb(FRIENDS2, "readonly", (s) => s.getAll()) || [],
+      () => listFriends(),
+      () => []
+    );
   }
-  async function appendMessage(msg) {
-    if (!storageWedged) {
-      try {
-        return await tx(await openDB(), MESSAGES, "readwrite", (s) => s.add(msg));
-      } catch {
-        storageWedged = true;
+  async function appendMessage2(msg) {
+    return withStore(
+      async () => idb(MESSAGES, "readwrite", (s) => s.add(msg)),
+      () => appendMessage(msg),
+      () => {
+        const id = `mem-${memSeq++}`;
+        memMsgs.push({ ...msg, id });
+        if (memMsgs.length > 5e3)
+          memMsgs.splice(0, memMsgs.length - 5e3);
+        return id;
       }
-    }
-    const id = `mem-${memSeq++}`;
-    memMsgs.push({ ...msg, id });
-    if (memMsgs.length > 5e3)
-      memMsgs.splice(0, memMsgs.length - 5e3);
-    return id;
+    );
   }
-  async function historyFor(peer, limit = 200) {
-    if (storageWedged) {
-      return memMsgs.filter((m) => m.peer === peer).slice(-limit);
-    }
-    try {
-      const db = await openDB();
-      const all = await tx(db, MESSAGES, "readonly", (s) => s.index("peer_ts").getAll(IDBKeyRange.bound([peer, 0], [peer, Number.MAX_SAFE_INTEGER])));
-      return (all || []).slice(-limit);
-    } catch {
-      storageWedged = true;
-      return [];
-    }
+  async function historyFor2(peer, limit = 200) {
+    return withStore(
+      async () => {
+        const all = await idb(MESSAGES, "readonly", (s) => s.index("peer_ts").getAll(IDBKeyRange.bound([peer, 0], [peer, Number.MAX_SAFE_INTEGER])));
+        return (all || []).slice(-limit);
+      },
+      () => historyFor(peer, limit),
+      () => memMsgs.filter((m) => m.peer === peer).slice(-limit)
+    );
+  }
+  async function allMessages2() {
+    return withStore(
+      async () => await idb(MESSAGES, "readonly", (s) => s.getAll()) || [],
+      () => allMessages(),
+      () => memMsgs
+    );
   }
   async function messageStats() {
-    let all = storageWedged ? memMsgs : void 0;
-    try {
-      if (all === void 0) {
-        const db = await openDB();
-        all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
-      }
-    } catch {
-      storageWedged = true;
-      all = null;
-    }
-    if (all === null)
-      all = memMsgs;
+    const all = await allMessages2();
     const byPeer = /* @__PURE__ */ new Map();
     for (const m of all || []) {
       let e = byPeer.get(m.peer);
@@ -17358,102 +17685,79 @@ ${ts}`);
   }
   async function queuedOutgoing(peer) {
     try {
-      const all = await historyFor(peer, 1e3);
+      const all = await historyFor2(peer, 1e3);
       return (all || []).filter((m) => m.dir === "out" && !m.file && (m.status === "queued" || m.status === "sending"));
     } catch {
       return [];
     }
   }
   async function queuedPeers() {
-    try {
-      const db = await openDB();
-      const all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
-      const peers = /* @__PURE__ */ new Set();
-      for (const m of all || []) {
-        if (m.dir === "out" && !m.file && (m.status === "queued" || m.status === "sending"))
-          peers.add(m.peer);
-      }
-      return [...peers];
-    } catch {
-      storageWedged = true;
-      return [];
+    const all = await allMessages2();
+    const peers2 = /* @__PURE__ */ new Set();
+    for (const m of all || []) {
+      if (m.dir === "out" && !m.file && (m.status === "queued" || m.status === "sending"))
+        peers2.add(m.peer);
     }
+    return [...peers2];
   }
   async function usedFileNames() {
-    let all;
-    try {
-      const db = await openDB();
-      all = await tx(db, MESSAGES, "readonly", (s) => s.getAll());
-    } catch {
-      storageWedged = true;
-      return /* @__PURE__ */ new Set();
-    }
+    const all = await allMessages2();
     const names = /* @__PURE__ */ new Set();
     for (const m of all || [])
       if (m.file?.name)
         names.add(m.file.name);
     return names;
   }
-  async function updateMessage(id, patch) {
-    if (storageWedged) {
-      const m = memMsgs.find((x) => x.id === id);
-      if (m) {
-        Object.assign(m, patch);
-        if (patch.file && m.file)
-          m.file = { ...m.file, ...patch.file };
-      }
-      return;
-    }
-    const db = await openDB().catch(() => null);
-    if (!db) {
-      storageWedged = true;
-      return;
-    }
-    await tx(db, MESSAGES, "readwrite", (s) => {
-      const g = s.get(id);
-      g.onsuccess = () => {
-        const v = g.result;
-        if (!v)
-          return;
-        Object.assign(v, patch);
-        if (patch.file && v.file)
-          v.file = { ...v.file, ...patch.file };
-        s.put(v);
-      };
-      return g;
-    }).catch(() => {
-      storageWedged = true;
-    });
+  async function updateMessage2(id, patch) {
+    const patchLocal = (m) => {
+      if (!m)
+        return;
+      Object.assign(m, patch);
+      if (patch.file && m.file)
+        m.file = { ...m.file, ...patch.file };
+    };
+    return withStore(
+      async () => idb(MESSAGES, "readwrite", (s) => {
+        const g = s.get(id);
+        g.onsuccess = () => {
+          const v = g.result;
+          if (!v)
+            return;
+          patchLocal(v);
+          s.put(v);
+        };
+        return g;
+      }),
+      () => updateMessage(id, patch),
+      () => patchLocal(memMsgs.find((x) => x.id === id))
+    );
   }
-  async function markRead(peer) {
-    if (storageWedged) {
-      for (const m of memMsgs)
-        if (m.peer === peer && m.dir === "in")
-          m.read = true;
-      return;
-    }
-    const db = await openDB().catch(() => null);
-    if (!db) {
-      storageWedged = true;
-      return;
-    }
-    await tx(db, MESSAGES, "readwrite", (s) => {
-      const req = s.index("peer_ts").openCursor(
-        IDBKeyRange.bound([peer, 0], [peer, Number.MAX_SAFE_INTEGER])
-      );
-      req.onsuccess = () => {
-        const cur = req.result;
-        if (!cur)
-          return;
-        const v = cur.value;
-        if (v.dir === "in" && !v.read) {
-          v.read = true;
-          cur.update(v);
-        }
-        cur.continue();
-      };
-      return req;
-    });
+  async function markRead2(peer) {
+    return withStore(
+      async () => idb(MESSAGES, "readwrite", (s) => {
+        const req = s.index("peer_ts").openCursor(
+          IDBKeyRange.bound([peer, 0], [peer, Number.MAX_SAFE_INTEGER])
+        );
+        req.onsuccess = () => {
+          const cur = req.result;
+          if (!cur)
+            return;
+          const v = cur.value;
+          if (v.dir === "in" && !v.read) {
+            v.read = true;
+            cur.update(v);
+          }
+          cur.continue();
+        };
+        return req;
+      }),
+      () => markRead(peer),
+      () => {
+        for (const m of memMsgs)
+          if (m.peer === peer && m.dir === "in")
+            m.read = true;
+      }
+    );
   }
   async function requestPersistence() {
     if (!navigator.storage?.persist)
@@ -17712,7 +18016,7 @@ ${ts}`);
           if (!k.includes(".tmp."))
             obj[k] = v;
         try {
-          await kvPut(VFS_KEY, obj);
+          await kvPut2(VFS_KEY, obj);
         } catch {
         }
       }, 400);
@@ -17724,15 +18028,15 @@ ${ts}`);
     let autoAccept = await kvGetSafe(AUTOACCEPT_KEY, false) ?? false;
     let pending = await kvGetSafe(PENDING_KEY, null) || [];
     const aliases = await kvGetSafe(ALIAS_KEY, null) || {};
-    const savePending = () => kvPut(PENDING_KEY, pending);
-    const saveAliases = () => kvPut(ALIAS_KEY, aliases);
+    const savePending = () => kvPut2(PENDING_KEY, pending);
+    const saveAliases = () => kvPut2(ALIAS_KEY, aliases);
     async function recordMessage(peer2, dir, text, via, file, status) {
       const msg = { peer: peer2, dir, text, via, ts: Date.now(), read: dir === "out" };
       if (status)
         msg.status = status;
       if (file)
         msg.file = file;
-      const id = await appendMessage(msg);
+      const id = await appendMessage2(msg);
       msg.id = id;
       onEvent?.({ type: "message", msg });
       return msg;
@@ -17842,14 +18146,14 @@ ${ts}`);
         try {
           const r = await peer.sendText(uid, m.text);
           confirm(uid);
-          await updateMessage(m.id, {
+          await updateMessage2(m.id, {
             status: "sent",
             confirmed: !r || r.delivery === "acked",
             via: r && r.delivery === "offline" ? "offline" : "online"
           });
           onEvent?.({ type: "message-sent", userid: uid, id: m.id, delivery: r && r.delivery });
         } catch (err) {
-          await updateMessage(m.id, { status: "queued" });
+          await updateMessage2(m.id, { status: "queued" });
           return false;
         }
       }
@@ -17872,7 +18176,7 @@ ${ts}`);
     } catch {
     }
     const sendingMsgByFileId = /* @__PURE__ */ new Map();
-    const loadFile = async (name) => fileBytes.get(name) ?? await kvGet(`file:${name}`) ?? null;
+    const loadFile = async (name) => fileBytes.get(name) ?? await kvGet2(`file:${name}`) ?? null;
     const uniqueName = (name) => {
       if (!takenNames.has(name)) {
         takenNames.add(name);
@@ -17892,7 +18196,7 @@ ${ts}`);
     const stashFile = async (name, data) => {
       fileBytes.set(name, data);
       try {
-        await kvPut(`file:${name}`, data);
+        await kvPut2(`file:${name}`, data);
       } catch (err) {
         onEvent?.({ type: "file-persist-skip", name, error: String(err?.message || err) });
       }
@@ -17923,7 +18227,7 @@ ${ts}`);
       }
       const id = sendingMsgByFileId.get(p.fileId);
       if (id != null)
-        void updateMessage(id, { file: { sent: p.received, status: "sending" } });
+        void updateMessage2(id, { file: { sent: p.received, status: "sending" } });
     });
     peer.onFileCancel?.((p) => {
       onEvent?.({ type: "file-cancelled", userid: p.friendId, sending: !!p.sending });
@@ -17933,7 +18237,7 @@ ${ts}`);
       if (p.sending) {
         const id = sendingMsgByFileId.get(p.fileId);
         if (id != null) {
-          void updateMessage(id, { file: { status: "sent", sent: p.size } });
+          void updateMessage2(id, { file: { status: "sent", sent: p.size } });
           sendingMsgByFileId.delete(p.fileId);
         }
         onEvent?.({ type: "file-sent", userid: p.friendId, name: p.name });
@@ -18068,7 +18372,7 @@ ${ts}`);
         return;
       confirmed.add(uid);
       outgoing.delete(uid);
-      void kvPut(CONFIRMED_KEY, [...confirmed]).catch(() => {
+      void kvPut2(CONFIRMED_KEY, [...confirmed]).catch(() => {
       });
       onEvent?.({ type: "friend-confirmed", userid: uid });
     };
@@ -18215,7 +18519,7 @@ ${ts}`);
             profile.avatarDataUrl = req.avatarDataUrl || null;
           if (req.onboarded !== void 0)
             profile.onboarded = !!req.onboarded;
-          await kvPut(PROFILE_KEY, profile);
+          await kvPut2(PROFILE_KEY, profile);
           try {
             peer.setUserInfo({ name: profile.name, description: profile.description, punkId: profile.punkId ?? null });
           } catch {
@@ -18272,7 +18576,7 @@ ${ts}`);
         }
         case "friends-autoaccept":
           autoAccept = !!req.enabled;
-          await kvPut(AUTOACCEPT_KEY, autoAccept);
+          await kvPut2(AUTOACCEPT_KEY, autoAccept);
           return ok({ enabled: autoAccept });
         case "friends-list":
           return ok({ friends: await friendList() });
@@ -18297,20 +18601,20 @@ ${ts}`);
           const job = prev.then(async () => {
             const drained = await flushOutbox(req.userid, msg.id).catch(() => false);
             if (!drained) {
-              await updateMessage(msg.id, { status: "queued" });
+              await updateMessage2(msg.id, { status: "queued" });
               onEvent?.({ type: "message-queued", userid: req.userid });
               return;
             }
             try {
               const r = await peer.sendText(req.userid, req.text);
               confirm(req.userid);
-              await updateMessage(msg.id, {
+              await updateMessage2(msg.id, {
                 status: "sent",
                 confirmed: !r || r.delivery === "acked",
                 via: r && r.delivery === "offline" ? "offline" : "online"
               });
             } catch (err) {
-              await updateMessage(msg.id, { status: "queued", error: String(err?.message || err) });
+              await updateMessage2(msg.id, { status: "queued", error: String(err?.message || err) });
               onEvent?.({ type: "message-queued", userid: req.userid, error: String(err?.message || err) });
             }
           });
@@ -18321,17 +18625,17 @@ ${ts}`);
         case "chat-retry": {
           if (req.id == null || !req.userid || typeof req.text !== "string")
             return fail("chat-retry requires id, userid and text");
-          await updateMessage(req.id, { status: "sending", error: null });
-          void peer.sendText(req.userid, req.text).then(() => updateMessage(req.id, { status: "sent" })).catch((err) => updateMessage(req.id, { status: "queued", error: String(err?.message || err) }));
+          await updateMessage2(req.id, { status: "sending", error: null });
+          void peer.sendText(req.userid, req.text).then(() => updateMessage2(req.id, { status: "sent" })).catch((err) => updateMessage2(req.id, { status: "queued", error: String(err?.message || err) }));
           return ok({ id: req.id, status: "sending" });
         }
         case "chat-history":
-          return ok({ messages: await historyFor(req.userid, req.limit ?? 200) });
+          return ok({ messages: await historyFor2(req.userid, req.limit ?? 200) });
         case "chat-log-local":
           return ok(await recordMessage(req.userid, req.dir === "out" ? "out" : "in", req.text ?? "", "local"));
         case "chat-mark-read":
           if (req.userid)
-            await markRead(req.userid);
+            await markRead2(req.userid);
           return ok({ userid: req.userid });
         case "file-send": {
           if (!req.userid || !req.data)
@@ -18934,22 +19238,22 @@ ${ts}`);
           me.hasIdentity = !!identity;
           me.ephemeral = !!identity?.ephemeral || storageOk?.() === false;
           me.readOnly = true;
-          const peers = fromOwner?.peers ?? [];
-          return p === "/api/state" ? json({ me, friends: peers, pending: [], readOnly: true, locked: true }) : json({ me, peers, requests: fromOwner?.requests ?? [], exits: [], activeExit: null, readOnly: true, locked: true });
+          const peers2 = fromOwner?.peers ?? [];
+          return p === "/api/state" ? json({ me, friends: peers2, pending: [], readOnly: true, locked: true }) : json({ me, peers: peers2, requests: fromOwner?.requests ?? [], exits: [], activeExit: null, readOnly: true, locked: true });
         }
         case "GET /api/friends-list": {
           const fromOwner = await askOwner?.("desktop");
           if (fromOwner?.peers)
             return json({ friends: fromOwner.peers });
           const ens = await ensNames();
-          const stored = (await listFriends()).filter((f) => f.status !== "removed");
+          const stored = (await listFriends2()).filter((f) => f.status !== "removed");
           return json({ friends: stored.map((f) => peerFrom({ ...f, status: "offline" }, ens)) });
         }
         case "GET /api/chat-history": {
           const peer = url.searchParams.get("peer") || void 0;
           if (!peer)
             return json({ chats: {} });
-          return json({ chats: { [peer]: await historyFor(peer, 500) } });
+          return json({ chats: { [peer]: await historyFor2(peer, 500) } });
         }
         case "GET /api/punk-list": {
           const type2 = (url.searchParams.get("type") || "any").toLowerCase().replace(/[^a-z]/g, "") || "any";
@@ -18971,7 +19275,7 @@ ${ts}`);
       }
     };
   }
-  function createApiRouter(backend, getProfile) {
+  function createApiRouter(backend2, getProfile) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
       const url = new URL(path, location.origin);
@@ -18987,7 +19291,7 @@ ${ts}`);
           body2 = {};
         }
       }
-      const call2 = (op, extra = {}) => backend.call({ op, ...extra });
+      const call2 = (op, extra = {}) => backend2.call({ op, ...extra });
       const punkOne = /^\/api\/punk\/(\d{1,5})$/.exec(p);
       if (method === "GET" && punkOne) {
         try {
@@ -19012,7 +19316,7 @@ ${ts}`);
           ]);
           const profile = getProfile();
           const me = meFrom(diag.data, profile, diag.data?.autoAccept, ens);
-          const peers = (flist.data?.friends ?? []).filter((f) => f.status !== "removed").map((f) => peerFrom(f, ens));
+          const peers2 = (flist.data?.friends ?? []).filter((f) => f.status !== "removed").map((f) => peerFrom(f, ens));
           const requests = (pend.data?.pending ?? []).map((r, i) => {
             const dir = ens.byUserid.get(r.userid);
             const who = r.name || dir?.name || "";
@@ -19032,7 +19336,7 @@ ${ts}`);
               ts: r.ts
             };
           });
-          return p === "/api/state" ? json({ me, friends: peers, pending: requests }) : json({ me, peers, requests, exits: [], activeExit: null });
+          return p === "/api/state" ? json({ me, friends: peers2, pending: requests }) : json({ me, peers: peers2, requests, exits: [], activeExit: null });
         }
         case "GET /api/friends-list": {
           const [r, ens] = await Promise.all([call2("friends-list"), ensNames()]);
@@ -19278,6 +19582,7 @@ ${ts}`);
   var PROFILE_KEY2 = "profile";
   var ACTION_CHANNEL = "beagle-web-actions";
   var ACTION_BOOT_WAIT_MS = 25e3;
+  globalThis.__BEAGLE_STORAGE__ = storageMode;
   var resolveReady;
   var ready = new Promise((r) => {
     resolveReady = r;
@@ -19303,7 +19608,7 @@ ${ts}`);
   var app = {
     events: [],
     async boot() {
-      this.storageOk = true;
+      this.storageOk = !isStorageWedged();
       const noteStorageFail = (err) => {
         if (!this.storageOk)
           return;
@@ -19395,17 +19700,17 @@ ${ts}`);
       };
       const startBackendOnce = (kp) => createBackendC({
         keyPair: kp,
-        ephemeral: this.storageOk === false,
+        ephemeral: isStorageWedged(),
         profile,
         // one shared record — see createEarlyRouter
         onEvent: (e) => {
           this.events.push(e);
           this.onEvent?.(e);
         }
-      }).then((backend) => {
-        this.backend = backend;
-        this.routers.full = createApiRouter(backend, () => backend.profile());
-        backend.call({ op: "set-profile", name: profile.name, description: profile.description }).catch(() => {
+      }).then((backend2) => {
+        this.backend = backend2;
+        this.routers.full = createApiRouter(backend2, () => backend2.profile());
+        backend2.call({ op: "set-profile", name: profile.name, description: profile.description }).catch(() => {
         });
         try {
           performance.mark("beagle:peer-ready");
@@ -19419,9 +19724,9 @@ ${ts}`);
         if (this.identity)
           return this.identity;
         const kp = createIdentity();
-        let ephemeral = false;
+        let ephemeral = isStorageWedged();
         try {
-          await kvPut(IDENTITY_KEY, exportIdentity(kp), { timeoutMs: BOOT_TIMEOUT_MS });
+          await kvPut2(IDENTITY_KEY, exportIdentity(kp), { timeoutMs: BOOT_TIMEOUT_MS });
         } catch (err) {
           ephemeral = true;
           this.storageOk = false;
@@ -19438,9 +19743,9 @@ ${ts}`);
         this.routers.early = createEarlyRouter({
           getIdentity: () => this.identity,
           profile,
-          persist: (p) => kvPut(PROFILE_KEY2, p, { timeoutMs: BOOT_TIMEOUT_MS }),
+          persist: (p) => kvPut2(PROFILE_KEY2, p, { timeoutMs: BOOT_TIMEOUT_MS }),
           createIdentity: () => this.mintIdentity(),
-          storageOk: () => this.storageOk !== false
+          storageOk: () => this.storageOk !== false && !isStorageWedged()
         });
         if (this.keyPair)
           profileLoaded.then(() => startBackend(this.keyPair));
@@ -19455,7 +19760,8 @@ ${ts}`);
     status() {
       return {
         identity: this.identity,
-        storageOk: this.storageOk !== false,
+        storageOk: this.storageOk !== false && !isStorageWedged(),
+        storage: storageMode(),
         // Did the relay path ever actually work? `opened` counts bridge sockets,
         // `upstream` counts the ones where the TCP relay behind the bridge
         // connected. opened>0 with upstream=0 is the signature of a browser or
@@ -19495,7 +19801,7 @@ ${ts}`);
       this.routers.early = createReadOnlyRouter({
         getIdentity: () => this.identity,
         profile: this.profile,
-        storageOk: () => this.storageOk !== false,
+        storageOk: () => this.storageOk !== false && !isStorageWedged(),
         askOwner: (what) => this.askOwner(what)
       });
       this.lock.waitForLock?.();
@@ -19626,7 +19932,7 @@ ${ts}`);
      *  coherent client and is cheap on a page that boots in seconds. */
     async importBlob(parsed) {
       const kp = importIdentity(parsed);
-      await kvPut(IDENTITY_KEY, exportIdentity(kp), { timeoutMs: BOOT_TIMEOUT_MS });
+      await kvPut2(IDENTITY_KEY, exportIdentity(kp), { timeoutMs: BOOT_TIMEOUT_MS });
       return describeIdentity(kp);
     },
     /**

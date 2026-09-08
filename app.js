@@ -5335,7 +5335,7 @@ ${peer.address}`
       h1Busy: "Pick a name while we set up your key.",
       b1Busy: "No email, no password, no server \u2014 the key is being generated in this tab and stays on this device. It will be done before you finish typing.",
       helpBusy: "Keep typing \u2014 this finishes on its own.",
-      ephemeral: "This browser will not let Beagle save anything, so this identity lasts until you close the tab. Private browsing, or a wedged storage layer \u2014 quitting and reopening the browser usually clears it.",
+      ephemeral: "This browser is storing nothing for Beagle, so this identity lasts until you close the tab. Usually all cookies and site data are blocked \u2014 allowing them for this site fixes it. Export your key backup if you want to keep this identity.",
       failed: "Could not create the key here:"
     },
     zh: {
@@ -5382,7 +5382,7 @@ ${peer.address}`
       h1Busy: "\u5148\u53D6\u4E2A\u540D\u5B57\uFF0C\u5BC6\u94A5\u8FD9\u8FB9\u540C\u65F6\u5728\u751F\u6210\u3002",
       b1Busy: "\u4E0D\u7528\u90AE\u7BB1\u3001\u4E0D\u7528\u5BC6\u7801\u3001\u4E0D\u7528\u670D\u52A1\u5668 \u2014\u2014 \u5BC6\u94A5\u5C31\u5728\u8FD9\u4E2A\u6807\u7B7E\u9875\u91CC\u751F\u6210\uFF0C\u53EA\u7559\u5728\u8FD9\u53F0\u8BBE\u5907\u4E0A\u3002\u4F60\u540D\u5B57\u8FD8\u6CA1\u6253\u5B8C\u5B83\u5C31\u597D\u4E86\u3002",
       helpBusy: "\u7EE7\u7EED\u8F93\u5165\u5C31\u597D\uFF0C\u8FD9\u4E2A\u4F1A\u81EA\u5DF1\u5B8C\u6210\u3002",
-      ephemeral: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u4E0D\u8BA9 Beagle \u4FDD\u5B58\u4EFB\u4F55\u6570\u636E\uFF0C\u6240\u4EE5\u8FD9\u4E2A\u8EAB\u4EFD\u53EA\u5728\u672C\u6807\u7B7E\u9875\u6709\u6548\uFF0C\u5173\u6389\u5C31\u6CA1\u4E86\u3002\u901A\u5E38\u662F\u9690\u79C1\u6A21\u5F0F\uFF0C\u6216\u8005\u6D4F\u89C8\u5668\u7684\u5B58\u50A8\u5361\u4F4F\u4E86 \u2014\u2014 \u9000\u51FA\u5E76\u91CD\u5F00\u6D4F\u89C8\u5668\u4E00\u822C\u80FD\u6062\u590D\u3002",
+      ephemeral: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u5B8C\u5168\u6CA1\u6709\u4E3A Beagle \u4FDD\u5B58\u6570\u636E\uFF0C\u6240\u4EE5\u8FD9\u4E2A\u8EAB\u4EFD\u53EA\u5728\u672C\u6807\u7B7E\u9875\u6709\u6548\uFF0C\u5173\u6389\u5C31\u6CA1\u4E86\u3002\u901A\u5E38\u662F\u5C4F\u853D\u4E86\u5168\u90E8 Cookie \u548C\u7F51\u7AD9\u6570\u636E \u2014\u2014 \u4E3A\u672C\u7AD9\u653E\u884C\u5373\u53EF\u3002\u60F3\u4FDD\u7559\u8FD9\u4E2A\u8EAB\u4EFD\uFF0C\u8BF7\u5BFC\u51FA\u5BC6\u94A5\u5907\u4EFD\u3002",
       failed: "\u65E0\u6CD5\u5728\u8FD9\u91CC\u751F\u6210\u5BC6\u94A5\uFF1A"
     }
   };
@@ -5889,22 +5889,44 @@ ${peer.address}`
       return "safari";
     return "other";
   }
+  function dkStorageMode() {
+    var _a;
+    try {
+      return ((_a = globalThis.__BEAGLE_STORAGE__) == null ? void 0 : _a.call(globalThis)) || "idb";
+    } catch (e) {
+      return "idb";
+    }
+  }
   var DK_BROWSER_T = {
     en: {
       edge: "Edge is less tested than Chrome and Firefox. If messages stay queued or friend requests do not arrive, reload once first \u2014 an old cached build is the usual cause \u2014 then try Chrome or Firefox.",
       safari: "Safari support is incomplete. If the app misbehaves, Chrome or Firefox works.",
       other: "This browser is untested. Beagle Web is developed against Chrome and Firefox.",
+      // Shown wherever the localStorage backend took over — which on Safari is
+      // every visit. It replaces the browser notice rather than adding to it:
+      // the storage model is the specific thing that differs here, and saying it
+      // is more use than "support is incomplete".
+      localStore: "This browser keeps Beagle in local storage rather than a database: your identity and recent messages are saved, older history and stored files are not. A private window forgets everything when you close it \u2014 export your key backup to keep this identity.",
       dismiss: "dismiss"
     },
     zh: {
       edge: "Edge \u7684\u6D4B\u8BD5\u4E0D\u5982 Chrome \u548C Firefox \u5145\u5206\u3002\u5982\u679C\u6D88\u606F\u4E00\u76F4\u6392\u961F\u6216\u6536\u4E0D\u5230\u597D\u53CB\u8BF7\u6C42\uFF0C\u5148\u5237\u65B0\u4E00\u6B21 \u2014\u2014 \u901A\u5E38\u662F\u7F13\u5B58\u4E86\u65E7\u7248\u672C \u2014\u2014 \u518D\u4E0D\u884C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
       safari: "Safari \u7684\u652F\u6301\u8FD8\u4E0D\u5B8C\u6574\u3002\u5982\u679C\u51FA\u73B0\u5F02\u5E38\uFF0C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
       other: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u6D4B\u8BD5\u8FC7\u3002Beagle \u7F51\u9875\u7248\u662F\u9488\u5BF9 Chrome \u548C Firefox \u5F00\u53D1\u7684\u3002",
+      localStore: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u7528 local storage \u4FDD\u5B58 Beagle\uFF0C\u800C\u4E0D\u662F\u6570\u636E\u5E93\uFF1A\u8EAB\u4EFD\u548C\u8FD1\u671F\u6D88\u606F\u4F1A\u4FDD\u7559\uFF0C\u66F4\u65E9\u7684\u8BB0\u5F55\u548C\u6536\u5230\u7684\u6587\u4EF6\u4E0D\u4F1A\u3002\u65E0\u75D5\u7A97\u53E3\u5173\u95ED\u540E\u5168\u90E8\u6E05\u7A7A \u2014\u2014 \u60F3\u4FDD\u7559\u8EAB\u4EFD\uFF0C\u8BF7\u5BFC\u51FA\u5BC6\u94A5\u5907\u4EFD\u3002",
       dismiss: "\u77E5\u9053\u4E86"
     }
   };
   function DkBrowserNotice2({ lang }) {
-    const kind = React.useMemo(dkBrowser, []);
+    const browser = React.useMemo(dkBrowser, []);
+    const [store, setStore] = React.useState(() => dkStorageMode());
+    React.useEffect(() => {
+      if (store !== "idb")
+        return void 0;
+      const t = setTimeout(() => setStore(dkStorageMode()), 2500);
+      return () => clearTimeout(t);
+    }, [store]);
+    const kind = store === "ls" ? "localStore" : browser;
     const W = DK_BROWSER_T[lang === "zh" ? "zh" : "en"];
     const key = "dk-browser-notice-" + kind;
     const [hidden, setHidden] = React.useState(() => {
