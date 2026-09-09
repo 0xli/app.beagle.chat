@@ -5920,7 +5920,6 @@ ${peer.address}`
   var DK_BROWSER_T = {
     en: {
       edge: "Edge is less tested than Chrome and Firefox. If messages stay queued or friend requests do not arrive, reload once first \u2014 an old cached build is the usual cause \u2014 then try Chrome or Firefox.",
-      safari: "Safari support is incomplete. If the app misbehaves, Chrome or Firefox works.",
       other: "This browser is untested. Beagle Web is developed against Chrome and Firefox.",
       // Shown wherever the localStorage backend took over — which on Safari is
       // every visit. It replaces the browser notice rather than adding to it:
@@ -5931,7 +5930,6 @@ ${peer.address}`
     },
     zh: {
       edge: "Edge \u7684\u6D4B\u8BD5\u4E0D\u5982 Chrome \u548C Firefox \u5145\u5206\u3002\u5982\u679C\u6D88\u606F\u4E00\u76F4\u6392\u961F\u6216\u6536\u4E0D\u5230\u597D\u53CB\u8BF7\u6C42\uFF0C\u5148\u5237\u65B0\u4E00\u6B21 \u2014\u2014 \u901A\u5E38\u662F\u7F13\u5B58\u4E86\u65E7\u7248\u672C \u2014\u2014 \u518D\u4E0D\u884C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
-      safari: "Safari \u7684\u652F\u6301\u8FD8\u4E0D\u5B8C\u6574\u3002\u5982\u679C\u51FA\u73B0\u5F02\u5E38\uFF0C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
       other: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u6D4B\u8BD5\u8FC7\u3002Beagle \u7F51\u9875\u7248\u662F\u9488\u5BF9 Chrome \u548C Firefox \u5F00\u53D1\u7684\u3002",
       localStore: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u7528 local storage \u4FDD\u5B58 Beagle\uFF0C\u800C\u4E0D\u662F\u6570\u636E\u5E93\uFF1A\u8EAB\u4EFD\u548C\u8FD1\u671F\u6D88\u606F\u4F1A\u4FDD\u7559\uFF0C\u66F4\u65E9\u7684\u8BB0\u5F55\u548C\u6536\u5230\u7684\u6587\u4EF6\u4E0D\u4F1A\u3002\u65E0\u75D5\u7A97\u53E3\u5173\u95ED\u540E\u5168\u90E8\u6E05\u7A7A \u2014\u2014 \u60F3\u4FDD\u7559\u8EAB\u4EFD\uFF0C\u8BF7\u5BFC\u51FA\u5BC6\u94A5\u5907\u4EFD\u3002",
       dismiss: "\u77E5\u9053\u4E86"
@@ -5959,7 +5957,7 @@ ${peer.address}`
     React.useEffect(() => {
       obInstallCss();
     }, []);
-    if (kind === "chrome" || kind === "firefox" || hidden)
+    if (kind === "chrome" || kind === "firefox" || kind === "safari" || hidden)
       return null;
     const msg = W[kind] || W.other;
     return /* @__PURE__ */ React.createElement("div", { style: {
