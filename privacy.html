@@ -17,6 +17,10 @@
 
   Self-contained: no external stylesheet, no font, no image, no script. A
   privacy page that phones a third party to render itself is not one.
+
+  A flat file rather than privacy/index.html: im.beagle.chat serves no
+  directory index, so /privacy/ is 404 there while /privacy/index.html is 200.
+  One path that works on every host beats a prettier one that does not.
 -->
 <style>
   :root{

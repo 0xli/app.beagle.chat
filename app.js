@@ -5755,7 +5755,7 @@ ${peer.address}`
       "a",
       {
         className: "ob-mut",
-        href: "/privacy",
+        href: "/privacy.html",
         target: "_blank",
         rel: "noopener",
         style: { fontSize: 13, textDecoration: "none" }
