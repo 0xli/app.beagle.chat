@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Beagle.Chat</title>
+<!--
+  Self-contained on purpose. The page this was recovered from lived in a
+  subdirectory of the old beagle.chat site and pulled in ../css/bootstrap.3.3.7,
+  ../css/callus-common.css and ../image/eth-icon.png. None of those exist on
+  app.beagle.chat — and none exist on beagle.chat any more either; all three
+  404 — so every one of them would have been a broken reference here, leaving
+  an unstyled document with a missing image and a back-link to nowhere.
+  Everything it needs is now in this one file, and the palette is the app's own.
+-->
+<style>
+  :root{
+    --bg:#0b0b0f; --elev:#0e0e13; --field:#121218; --hair:#1b1b22; --border:#23232c;
+    --text:#f4f2fa; --text2:#c9c6d6; --muted:#8d8b9a; --faint:#6f6d7d; --accent:#7c5cff;
+    --ui:'IBM Plex Sans','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--ui);
+    font-size:15px;line-height:1.65;-webkit-text-size-adjust:100%}
+  a{color:#9b83ff;text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  header{position:sticky;top:0;z-index:10;background:rgba(11,11,15,.92);
+    backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--hair)}
+  .bar{max-width:760px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:12px}
+  .mark{width:18px;height:18px;border-radius:5px;background:var(--accent);flex-shrink:0}
+  .brand{font-family:var(--mono);font-size:13px;color:var(--text2)}
+  .spacer{flex:1}
+  .crumb{font-family:var(--mono);font-size:12px;color:var(--faint);white-space:nowrap}
+
+  main{max-width:760px;margin:0 auto;padding:44px 20px 80px}
+  h1{font-size:34px;line-height:1.15;letter-spacing:-.02em;font-weight:600;margin:0 0 6px}
+  .sub{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 34px}
+  h2{font-size:19px;font-weight:600;margin:38px 0 12px;letter-spacing:-.01em}
+  p{color:var(--text2);margin:0 0 14px}
+  ul{margin:0 0 14px;padding-left:22px;color:var(--text2)}
+  li{margin:0 0 8px}
+  li::marker{color:var(--faint)}
+  .card{background:var(--field);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;margin:0 0 14px}
+  .card ul{margin:0;padding-left:20px}
+  .card li{margin:0 0 8px}
+  .card li:last-child{margin-bottom:0}
+  .card b{color:var(--text);font-weight:600}
+  footer{border-top:1px solid var(--hair);margin-top:52px;padding-top:22px;
+    font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  /* The old page was desktop-only; this one is not. */
+  @media (max-width:560px){
+    main{padding:30px 18px 60px}
+    h1{font-size:27px}
+    .crumb{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <a href="/" style="display:flex;align-items:center;gap:9px">
+      <span class="mark"></span>
+      <span class="brand">beagle.chat</span>
+    </a>
+    <span class="spacer"></span>
+    <span class="crumb">Privacy Policy</span>
+  </div>
+</header>
+
+<main>
+  <h1>Privacy Policy</h1>
+  <p class="sub">Beagle.Chat</p>
+
+  <p>
+    There are many privacy and security related concerns and problems with today's
+    most used instant messenger and social network software:
+  </p>
+
+  <div class="card">
+    <ul>
+      <li><b>Security:</b> the platform or the hackers can get the call log or even the content.</li>
+      <li><b>Privacy:</b> a lot of spam advertising information.</li>
+      <li><b>Interconnection:</b> mostly no communication between platforms.</li>
+    </ul>
+  </div>
+
+  <p>
+    When it comes to trading and business it becomes especially important. Just as an
+    oracle plays an important role in the DeFi ecosystem, cross-chain messaging and
+    real-time communication will be more critical. In the blockchain community we still
+    use centralized messaging and social networks, such as Twitter and Facebook, to
+    communicate. It should be changed.
+  </p>
+
+  <h2>What this project is</h2>
+
+  <p>
+    This project is to build a real-time meeting and chat application based on Web3
+    technologies and infrastructure found and available in most blockchain projects,
+    such as peer-to-peer networks, smart contracts and ENS (Ethereum Name Service).
+    Beagle.chat will serve the blockchain community as a cross-chain instant messaging
+    platform. It is a real-time communication system with most of the features found in
+    today's instant messengers.
+  </p>
+
+  <p>
+    No registration is needed before using it. Anyone with a wallet address, an ENS name
+    or any DID can make use of it just by signing with the private key that belongs only
+    to them. It will not be owned or controlled by any person or organization.
+  </p>
+
+  <h2>The goals of this project</h2>
+
+  <div class="card">
+    <ul>
+      <li><b>No registration</b>, no account name and password; a DID and a signature are the way to authenticate and authorize.</li>
+      <li><b>No server</b>, no database super user; the service is powered by nodes run by miners, and all data is encrypted.</li>
+      <li><b>No spam.</b></li>
+    </ul>
+  </div>
+
+  <footer>
+    beagle.chat — <a href="/">open the app</a>
+  </footer>
+</main>
+
+</body>
+</html>
