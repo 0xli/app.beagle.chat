@@ -6,10 +6,16 @@
 <title>Privacy — Beagle</title>
 <meta name="description" content="What Beagle stores on your device, what it sends, and who can see it — in the browser, on iPhone and Android, on the desktop and in the CLI.">
 <!--
-  What Beagle does with your data, stated plainly, for every version of it:
-  browser tab, iPhone, Android, desktop and CLI. The design is the same in all
-  of them — the key is made on the device and stays there — so this page is one
-  document rather than five.
+  What Beagle does with your data, stated plainly, however you run it: the app
+  on a phone, the desktop app or CLI on a computer, or a browser tab on either.
+  The design is the same in all of them — the key is made on the device and
+  stays there — so this page is one document rather than five.
+
+  A browser tab is a WAY of running it on your phone or computer, not a device
+  of its own, and not a temporary one: what it stores survives closing the tab.
+  An earlier draft listed "a browser tab" alongside iPhone and macOS as if it
+  were a platform, which invited exactly the wrong question — does my data die
+  with the tab? It does not, and the page now says so rather than implying it.
 
   Keep it true. If an app starts doing something this page does not say, this
   page is wrong.
@@ -110,16 +116,17 @@
   <p class="updated">Last updated 10 September 2026 · beagle.chat</p>
 
   <p class="lede">
-    Beagle is the same program wherever you run it — a peer that talks to other
-    peers. There is no account to create and no server holding your messages,
-    because there is nowhere for one to be held: your key is made on the device
-    in front of you and stays there. This page says what is kept on that device,
-    what leaves it, and who can see what.
+    Beagle runs on your phone and on your computer — as an app you install, or in
+    a browser tab if you would rather install nothing. It is the same program
+    either way: a peer that talks to other peers. There is no account to create
+    and no server holding your messages, because there is nowhere for one to be
+    held — your key is made on the device in front of you and stays there. This
+    page says what is kept on that device, what leaves it, and who can see what.
   </p>
 
   <div class="apps">
-    <span>a browser tab</span><span>iPhone</span><span>Android</span>
-    <span>macOS</span><span>Windows</span><span>Linux</span><span>command line</span>
+    <span>iPhone</span><span>Android</span><span>macOS</span>
+    <span>Windows</span><span>Linux</span>
   </div>
 
   <div class="card keep">
@@ -134,26 +141,26 @@
   <h2><span class="n">01</span> What stays on your device, and where</h2>
 
   <p>
-    Same data in every version — your identity, your profile, your contacts,
-    your message history and the files you have sent or received. Only the place
-    it sits differs.
+    The same things in every case — your identity, your profile, your contacts,
+    your message history and the files you have sent or received. Only where they
+    sit differs, and none of it leaves the device.
   </p>
 
   <div class="scroll">
     <table>
-      <thead><tr><th>Where you run it</th><th>Where your data lives</th></tr></thead>
+      <thead><tr><th>How you run it</th><th>Where your data lives</th></tr></thead>
       <tbody>
         <tr>
-          <td>Browser tab</td>
-          <td>Your browser's own storage for this site: IndexedDB, or <code>localStorage</code> where IndexedDB cannot be used, which is the case in Safari.</td>
+          <td>The app<br><span class="who">iPhone, Android</span></td>
+          <td>The app's own private storage on the phone, reachable by that app alone. It is there until you uninstall.</td>
         </tr>
         <tr>
-          <td>iPhone, Android</td>
-          <td>The app's own private storage on the phone, reachable by that app alone.</td>
+          <td>The desktop app,<br>or the command line<br><span class="who">macOS, Windows, Linux</span></td>
+          <td>Ordinary files in your home directory: the key at <code>~/.agentnet/carrier/keypair.json</code>, messages in <code>~/.agentnet/messages.json</code>, received files under <code>~/.agentnet/downloads/</code>. Somewhere else if you pass <code>--config-dir</code>.</td>
         </tr>
         <tr>
-          <td>macOS, Windows, Linux<br><span class="who">desktop app and CLI</span></td>
-          <td>Files in your home directory: the key at <code>~/.agentnet/carrier/keypair.json</code>, messages in <code>~/.agentnet/messages.json</code>, received files under <code>~/.agentnet/downloads/</code>. Somewhere else if you pass <code>--config-dir</code>.</td>
+          <td>A browser tab<br><span class="who">no install, any of them</span></td>
+          <td>That browser's own storage for this site, on that same device — IndexedDB, or <code>localStorage</code> where IndexedDB cannot be used, as in Safari. <b>It survives closing the tab</b>, closing the browser and restarting the machine; it is there when you come back. A private window is the exception, and says so.</td>
         </tr>
       </tbody>
     </table>
@@ -165,11 +172,16 @@
       no one holds a copy, which is the same property that keeps it private. Use
       the key backup in the app to export it before you need it.
     </p>
+    <p style="margin:0 0 10px">
+      Which means: uninstalling the app on a phone, deleting
+      <code>~/.agentnet</code> on a computer, or — in a browser — clearing this
+      site's data or closing a private window. On a desktop or the CLI the key is
+      an ordinary file, so copying it somewhere safe is enough.
+    </p>
     <p style="margin:0">
-      Which means: clearing this site's data in a browser, or a private window
-      being closed, or uninstalling the app on a phone, or deleting
-      <code>~/.agentnet</code> on a computer. On a desktop or the CLI the key is
-      an ordinary file — copying it somewhere safe is enough.
+      Ordinary use is not on that list. Closing the tab, quitting the browser,
+      closing the app, rebooting: your identity and your history are still there
+      afterwards, on that device.
     </p>
   </div>
 
