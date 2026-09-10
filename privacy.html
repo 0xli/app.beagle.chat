@@ -67,8 +67,10 @@
 
   .lede{font-size:17px;line-height:1.6;color:var(--text2);margin:0 0 22px}
   .apps{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 30px}
+  .apps{margin-bottom:10px}
   .apps span{font-family:var(--mono);font-size:12px;color:var(--text2);
     background:var(--field);border:1px solid var(--border);padding:6px 11px;border-radius:6px}
+  .doors{font-size:13.5px;color:var(--muted);margin:0 0 30px}
   .card{background:var(--field);border:1px solid var(--border);border-radius:12px;
     padding:18px 20px;margin:0 0 16px}
   .card ul{margin:0;padding-left:20px}
@@ -116,9 +118,9 @@
   <p class="updated">Last updated 10 September 2026 · beagle.chat</p>
 
   <p class="lede">
-    Beagle runs on your phone and on your computer — as an app you install, or in
-    a browser tab if you would rather install nothing. It is the same program
-    either way: a peer that talks to other peers. There is no account to create
+    Beagle runs on your phone and on your computer. You open it from the app, from
+    a browser, or from a terminal — three doors into the same program: a peer that
+    talks to other peers. There is no account to create
     and no server holding your messages, because there is nowhere for one to be
     held — your key is made on the device in front of you and stays there. This
     page says what is kept on that device, what leaves it, and who can see what.
@@ -128,6 +130,7 @@
     <span>iPhone</span><span>Android</span><span>macOS</span>
     <span>Windows</span><span>Linux</span>
   </div>
+  <p class="doors">Opened from <b>the app</b>, <b>a browser</b> or <b>a terminal</b>.</p>
 
   <div class="card keep">
     <ul>
@@ -148,18 +151,18 @@
 
   <div class="scroll">
     <table>
-      <thead><tr><th>How you run it</th><th>Where your data lives</th></tr></thead>
+      <thead><tr><th>Where you open it</th><th>Where your data lives</th></tr></thead>
       <tbody>
         <tr>
           <td>The app<br><span class="who">iPhone, Android</span></td>
           <td>The app's own private storage on the phone, reachable by that app alone. It is there until you uninstall.</td>
         </tr>
         <tr>
-          <td>The desktop app,<br>or the command line<br><span class="who">macOS, Windows, Linux</span></td>
+          <td>The app,<br>or a terminal<br><span class="who">macOS, Windows, Linux</span></td>
           <td>Ordinary files in your home directory: the key at <code>~/.agentnet/carrier/keypair.json</code>, messages in <code>~/.agentnet/messages.json</code>, received files under <code>~/.agentnet/downloads/</code>. Somewhere else if you pass <code>--config-dir</code>.</td>
         </tr>
         <tr>
-          <td>A browser tab<br><span class="who">no install, any of them</span></td>
+          <td>A browser<br><span class="who">any of them, nothing to install</span></td>
           <td>That browser's own storage for this site, on that same device — IndexedDB, or <code>localStorage</code> where IndexedDB cannot be used, as in Safari. <b>It survives closing the tab</b>, closing the browser and restarting the machine; it is there when you come back. A private window is the exception, and says so.</td>
         </tr>
       </tbody>
@@ -235,7 +238,7 @@
     cannot read it.
   </p>
 
-  <h3>On a desktop or the command line</h3>
+  <h3>In the desktop app and the terminal</h3>
   <p>
     The local interface is bound to <code>127.0.0.1</code> — your own machine, not
     the network — and “Sign in with Beagle” refuses any request that does not come
