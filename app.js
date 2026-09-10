@@ -5340,6 +5340,7 @@ ${peer.address}`
       requested: "requested",
       open: "Open Beagle",
       later: "I'll add someone later",
+      privacy: "Privacy",
       req: "FRIEND REQUEST",
       fallName: "Your name",
       fallIntro: "wants to connect",
@@ -5388,6 +5389,7 @@ ${peer.address}`
       requested: "\u5DF2\u53D1\u9001",
       open: "\u6253\u5F00 Beagle",
       later: "\u4EE5\u540E\u518D\u52A0\u8054\u7CFB\u4EBA",
+      privacy: "\u9690\u79C1\u8BF4\u660E",
       req: "\u597D\u53CB\u8BF7\u6C42",
       fallName: "\u4F60\u7684\u540D\u5B57",
       fallIntro: "\u8BF7\u6C42\u6DFB\u52A0\u4F60\u4E3A\u597D\u53CB",
@@ -5749,6 +5751,16 @@ ${peer.address}`
         onClick: () => step === 1 ? advance(obRandomName()) : finish()
       },
       step === 1 ? W.skip : W.later
+    ), /* @__PURE__ */ React.createElement(
+      "a",
+      {
+        className: "ob-mut",
+        href: "/privacy",
+        target: "_blank",
+        rel: "noopener",
+        style: { fontSize: 13, textDecoration: "none" }
+      },
+      W.privacy
     ))), /* @__PURE__ */ React.createElement("div", { className: "ob-right", style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 40, background: "radial-gradient(600px 400px at 60% 20%, #16132a 0%, #0a0a0e 70%)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 300, boxSizing: "border-box", background: OB.field, border: "1px solid #262630", borderRadius: 20, padding: 22, display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 28px 60px rgba(0,0,0,.55)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 10, letterSpacing: ".14em", color: OB.accent } }, W.req), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12 } }, /* @__PURE__ */ React.createElement(ObFace, { url: upload, punk, seed: me.userId, size: 52, radius: 12 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 17, fontWeight: 600, color: OB.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, name.trim() || W.fallName), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, intro.trim() || W.fallIntro))), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.faint, background: OB.elev, borderRadius: 8, padding: "9px 11px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, hasKey ? me.carrier : W.addrSoon), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9 } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.accent, color: OB.bg, fontSize: 13, fontWeight: 600 } }, W.accept), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, textAlign: "center", padding: 10, borderRadius: 9, background: OB.sec, color: "#a8a5b6", fontSize: 13 } }, W.ignore))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.faint, textAlign: "center", maxWidth: 300, lineHeight: 1.55 } }, step === 1 ? W.cap1 : W.cap2)));
   }
   var OB_LOCK_T = {

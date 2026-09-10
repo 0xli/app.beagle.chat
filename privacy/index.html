@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Beagle</title>
+<meta name="description" content="What Beagle Web stores, what it sends, and who can see it.">
+<!--
+  Written from the code, not from a template. Every claim below is something
+  that can be checked in this repository:
+    the device store          src/store.js, src/store-ls.js
+    what the bridge is told   src/shims/node-net.js (the `hello` frame)
+    the listing switch        src/api-router.js (profile.listed)
+    calls and file transfer   src/api-router.js (iceServers), src/ui/vendor/peer-webrtc.js
+    the other hosts           the fetch() calls in src/*.js and src/ui/index.html
+  If the code changes, this page is wrong until it changes too.
+
+  Self-contained: no external stylesheet, no font, no image, no script. A
+  privacy page that phones a third party to render itself is not one.
+-->
+<style>
+  :root{
+    --bg:#0b0b0f; --field:#121218; --hair:#1b1b22; --border:#23232c;
+    --text:#f4f2fa; --text2:#c9c6d6; --muted:#8d8b9a; --faint:#6f6d7d;
+    --accent:#7c5cff; --ok:#4ad1a5;
+    --ui:'IBM Plex Sans','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--ui);
+    font-size:15px;line-height:1.65;-webkit-text-size-adjust:100%}
+  a{color:#9b83ff;text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:.9em;color:var(--text);
+    background:var(--field);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+
+  header{position:sticky;top:0;z-index:10;background:rgba(11,11,15,.92);
+    backdrop-filter:saturate(140%) blur(8px);border-bottom:1px solid var(--hair)}
+  .bar{max-width:780px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:12px}
+  .mark{width:18px;height:18px;border-radius:5px;background:var(--accent);flex-shrink:0}
+  .brand{font-family:var(--mono);font-size:13px;color:var(--text2)}
+  .spacer{flex:1}
+  .crumb{font-family:var(--mono);font-size:12px;color:var(--faint);white-space:nowrap}
+
+  main{max-width:780px;margin:0 auto;padding:44px 20px 90px}
+  h1{font-size:36px;line-height:1.12;letter-spacing:-.02em;font-weight:600;margin:0 0 8px}
+  .updated{font-family:var(--mono);font-size:12px;color:var(--faint);margin:0 0 34px}
+  h2{font-size:20px;font-weight:600;margin:44px 0 14px;letter-spacing:-.01em;
+    display:flex;align-items:baseline;gap:10px}
+  h2 .n{font-family:var(--mono);font-size:12px;color:var(--accent);flex-shrink:0}
+  h3{font-size:15px;font-weight:600;margin:24px 0 8px;color:var(--text)}
+  p{color:var(--text2);margin:0 0 14px}
+  ul{margin:0 0 14px;padding-left:22px;color:var(--text2)}
+  li{margin:0 0 9px}
+  li::marker{color:var(--faint)}
+  b,strong{color:var(--text);font-weight:600}
+
+  .lede{font-size:17px;line-height:1.6;color:var(--text2);margin:0 0 30px}
+  .card{background:var(--field);border:1px solid var(--border);border-radius:12px;
+    padding:18px 20px;margin:0 0 16px}
+  .card ul{margin:0;padding-left:20px}
+  .card li:last-child{margin-bottom:0}
+  .keep{border-left:2px solid var(--ok)}
+  .warn{border-left:2px solid var(--accent)}
+
+  .scroll{overflow-x:auto;margin:0 0 16px;border:1px solid var(--border);border-radius:12px}
+  table{border-collapse:collapse;width:100%;min-width:520px;font-size:13.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--hair);vertical-align:top}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--faint);font-weight:500;background:var(--field)}
+  tr:last-child td{border-bottom:none}
+  td:first-child{font-family:var(--mono);font-size:12.5px;color:var(--text);white-space:nowrap}
+  td{color:var(--text2)}
+
+  footer{border-top:1px solid var(--hair);margin-top:56px;padding-top:24px;
+    font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  @media (max-width:560px){
+    main{padding:30px 18px 64px}
+    h1{font-size:28px}
+    h2{font-size:18px;margin-top:36px}
+    .lede{font-size:16px}
+    .crumb{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <a href="/" style="display:flex;align-items:center;gap:9px">
+      <span class="mark"></span><span class="brand">beagle</span>
+    </a>
+    <span class="spacer"></span>
+    <span class="crumb">Privacy</span>
+  </div>
+</header>
+
+<main>
+  <h1>Privacy</h1>
+  <p class="updated">Last updated 10 September 2026 · app.beagle.chat</p>
+
+  <p class="lede">
+    Beagle Web is a peer in a browser tab. There is no account to create and no
+    server holding your messages, because there is nowhere for one to be held —
+    your key is generated in the tab and stays there. This page says exactly
+    what is kept on your device, what leaves it, and who can see what.
+  </p>
+
+  <div class="card keep">
+    <ul>
+      <li>Your private key is generated in your browser and <b>never sent anywhere</b>.</li>
+      <li>Message and file contents are <b>encrypted end to end</b>; the servers in between carry bytes they cannot read.</li>
+      <li>There is <b>no analytics, no tracking script and no advertising</b> in this app, and it sets <b>no cookies</b>.</li>
+      <li>What is unavoidably visible is <b>metadata</b> — your IP address, and the fact that you connected. Section 3 is specific about it.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">01</span> What stays on your device</h2>
+
+  <p>
+    All of it lives in your browser's own storage for this site, in IndexedDB —
+    or in <code>localStorage</code> where IndexedDB cannot be used, which is the
+    case in Safari. None of it is uploaded.
+  </p>
+
+  <ul>
+    <li><b>Your identity</b> — the keypair that <i>is</i> your account.</li>
+    <li><b>Your profile</b> — display name, one-line description, chosen avatar.</li>
+    <li><b>Your friends</b> and the state your peer keeps about them.</li>
+    <li><b>Your message history</b>, and files you have sent or received.</li>
+  </ul>
+
+  <div class="card warn">
+    <p style="margin:0">
+      <b>Clearing this site's data destroys the identity.</b> Nothing can reissue
+      it — no one holds a copy, which is the same property that keeps it private.
+      Use the key backup in the app to export it before you clear anything, and
+      note that a private window discards everything when you close it.
+    </p>
+  </div>
+
+  <h2><span class="n">02</span> What does not exist</h2>
+
+  <ul>
+    <li>No account, no email address, no password, no phone number.</li>
+    <li>No server-side copy of your messages, your contacts or your files.</li>
+    <li>No analytics, telemetry, session recording or A/B tooling.</li>
+    <li>No cookies set by this app, and no advertising or data brokers.</li>
+    <li>No profile sold, shared or handed to anyone, because none is collected.</li>
+  </ul>
+
+  <h2><span class="n">03</span> What travels, and who sees it</h2>
+
+  <h3>Message and file content</h3>
+  <p>
+    Encrypted between you and the friend you are talking to. A browser tab cannot
+    open a raw network socket, so traffic goes through a WebSocket bridge to the
+    peer-to-peer relays. The bridge and the relays forward encrypted bytes and
+    cannot read them.
+  </p>
+
+  <h3>Metadata, which encryption does not hide</h3>
+  <p>
+    Any server you connect to sees your IP address and the time you connected.
+    That is true of the bridge, the relays, and every host in the table below.
+  </p>
+
+  <h3>What the app tells the bridge</h3>
+  <p>
+    On connecting, it announces your <b>public key</b> (your user id) and your
+    <b>Carrier address</b> — these are what let anyone reach you at all. Before
+    you create an identity, on a first visit, it announces nothing.
+  </p>
+  <p>
+    While <b>“Let people on this bridge see you”</b> is on, it also sends your
+    <b>display name</b>, <b>description</b> and <b>avatar id</b>, and you appear
+    in the bridge's list of people present, so someone with no friends yet can
+    find you. Turning it off in Profile tells the bridge not to list you. It is
+    your choice, it can be changed at any time, and it changes nothing about who
+    can message you.
+  </p>
+
+  <h3>Calls and browser-to-browser file transfer</h3>
+  <p>
+    These use WebRTC, which needs STUN servers to discover how to connect. When a
+    direct connection cannot be made, the stream is relayed by a TURN server. Both
+    see your IP address; the relayed stream stays encrypted and the relay cannot
+    read it.
+  </p>
+
+  <h2><span class="n">04</span> Other services this page contacts</h2>
+
+  <p>Each of these sees your IP address and the request itself, and nothing else.</p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Host</th><th>Why it is contacted</th><th>What it receives</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>bridge.beagle.chat<br>im.beagle.chat</td>
+          <td>The WebSocket bridge to the peer-to-peer network.</td>
+          <td>Your user id and address; your name, description and avatar id while you are listed. Message bytes it cannot read.</td>
+        </tr>
+        <tr>
+          <td>beagle.chat</td>
+          <td>The list of relays, bootstrap nodes and STUN/TURN servers to use.</td>
+          <td>The request for that file.</td>
+        </tr>
+        <tr>
+          <td>ens-gateway<wbr>.beaglechat.workers.dev</td>
+          <td>Looking up <code>*.beagles.eth</code> names and their public profiles.</td>
+          <td>The name or user id being looked up.</td>
+        </tr>
+        <tr>
+          <td>api.beagle.chat</td>
+          <td>CryptoPunk avatar details when one is shown or chosen.</td>
+          <td>The avatar id.</td>
+        </tr>
+        <tr>
+          <td>www.larvalabs.com</td>
+          <td>The avatar images themselves.</td>
+          <td>The image request.</td>
+        </tr>
+        <tr>
+          <td>points.beagle.chat</td>
+          <td>The suggestion list on the Discover tab.</td>
+          <td>The request for that list.</td>
+        </tr>
+        <tr>
+          <td>fonts.googleapis.com</td>
+          <td>The page's typeface. The app still works without it.</td>
+          <td>The font request, on load.</td>
+        </tr>
+        <tr>
+          <td>STUN / TURN servers</td>
+          <td>Making calls and direct file transfers connect.</td>
+          <td>Your IP address, and — only when relayed — an encrypted stream.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">05</span> What the people you talk to see</h2>
+  <p>
+    Your display name, description and avatar, and whatever you send them. They
+    hold their own copy of your conversation on their own device, and what they do
+    with it is up to them — as with any messenger, and as with any conversation.
+  </p>
+
+  <h2><span class="n">06</span> Changes</h2>
+  <p>
+    This page is versioned alongside the code it describes, so its history is the
+    record of what changed and when. If the app starts doing something this page
+    does not say, treat that as a bug in the app or in this page, and one worth
+    reporting.
+  </p>
+
+  <footer>
+    <a href="/">← back to Beagle</a>
+  </footer>
+</main>
+
+</body>
+</html>
