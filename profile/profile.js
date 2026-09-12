@@ -94,6 +94,7 @@
   var ENS_GATEWAY = "https://ens-gateway.beaglechat.workers.dev";
   var REF_KEY = "beagle-web:ref";
   var IDENTITY_MIRROR = "beagle-web:kv:identity";
+  var ACTION_CHANNEL = "beagle-web-actions";
   var $ = (id) => document.getElementById(id);
   var B58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
   var T = {
@@ -112,7 +113,9 @@
       notFound: "There is no page at this address.",
       notFoundHint: "A profile link looks like app.beagle.chat/<address> or app.beagle.chat/<name>.beagles.eth.",
       unknownName: (n) => `${n} is not registered on beagles.eth.`,
-      open: "Open Beagle"
+      open: "Open Beagle",
+      handed: "Opened in your Beagle tab \u2014 switch to that tab and tap Add.",
+      openHere: "Open here instead"
     },
     zh: {
       title: (n) => `${n} \xB7 Beagle`,
@@ -129,7 +132,9 @@
       notFound: "\u8FD9\u4E2A\u5730\u5740\u4E0B\u6CA1\u6709\u9875\u9762\u3002",
       notFoundHint: "\u4E2A\u4EBA\u9875\u94FE\u63A5\u957F\u8FD9\u6837\uFF1Aapp.beagle.chat/<\u5730\u5740> \u6216 app.beagle.chat/<\u540D\u5B57>.beagles.eth\u3002",
       unknownName: (n) => `${n} \u6CA1\u6709\u5728 beagles.eth \u6CE8\u518C\u3002`,
-      open: "\u6253\u5F00 Beagle"
+      open: "\u6253\u5F00 Beagle",
+      handed: "\u5DF2\u5728\u4F60\u6253\u5F00\u7684 Beagle \u6807\u7B7E\u9875\u91CC\u6253\u5F00 \u2014\u2014 \u5207\u6362\u8FC7\u53BB\uFF0C\u70B9\u300C\u6DFB\u52A0\u300D\u3002",
+      openHere: "\u5728\u8FD9\u91CC\u6253\u5F00"
     }
   };
   var lang = (() => {
@@ -360,7 +365,32 @@
       return false;
     }
   }
-  function addMe(p) {
+  function askApp(msg, resultType, timeoutMs) {
+    if (typeof BroadcastChannel === "undefined")
+      return Promise.resolve(null);
+    return new Promise((resolve) => {
+      let bc;
+      try {
+        bc = new BroadcastChannel(ACTION_CHANNEL);
+      } catch {
+        resolve(null);
+        return;
+      }
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const done = (v) => {
+        clearTimeout(timer);
+        bc.close();
+        resolve(v);
+      };
+      const timer = setTimeout(() => done(null), timeoutMs);
+      bc.onmessage = (ev) => {
+        if (ev.data?.type === resultType && ev.data.id === id)
+          done(ev.data);
+      };
+      bc.postMessage({ ...msg, id });
+    });
+  }
+  async function addMe(p) {
     if (!p.address)
       return;
     const ref = {
@@ -376,7 +406,25 @@
       localStorage.setItem(REF_KEY, JSON.stringify(ref));
     } catch {
     }
-    location.href = hasIdentityHere() ? `/#/chat?address=${encodeURIComponent(p.address)}` : "/";
+    if (!hasIdentityHere()) {
+      location.href = "/";
+      return;
+    }
+    const deep = `/#/chat?address=${encodeURIComponent(p.address)}`;
+    const add = $("add");
+    add.disabled = true;
+    const running = await askApp({ type: "state-request", what: "desktop" }, "state-result", 1e3);
+    const handed = running && await askApp({ type: "open-chat", address: p.address }, "open-chat-result", 1500);
+    add.disabled = false;
+    if (!handed?.ok) {
+      location.href = deep;
+      return;
+    }
+    $("hint").textContent = W().handed;
+    add.textContent = W().openHere;
+    add.onclick = () => {
+      location.href = deep;
+    };
   }
   function fromEns(rec) {
     const tx = rec?.texts || {};
