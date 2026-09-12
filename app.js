@@ -5945,7 +5945,7 @@ ${peer.address}`
       setFound(null);
       try {
         const r = onLocate ? await onLocate() : null;
-        setFound(!!(r && r.acknowledged));
+        setFound(r && r.switched ? null : !!(r && r.acknowledged));
       } catch (e) {
         setFound(false);
       } finally {
@@ -6224,8 +6224,24 @@ ${peer.address}`
     }
     return null;
   }
-  var bars = document.createElement("div");
-  bars.id = "host-bars";
-  document.body.appendChild(bars);
-  ReactDOM.createRoot(bars).render(/* @__PURE__ */ React.createElement(HostBars, null));
+  var hostCss = document.createElement("style");
+  hostCss.textContent = `
+  :root { --host-bar: 0px; }
+  body.has-host-bar #root > div { bottom: var(--host-bar) !important; }
+`;
+  document.head.appendChild(hostCss);
+  var hostBarsEl = document.createElement("div");
+  hostBarsEl.id = "host-bars";
+  document.body.appendChild(hostBarsEl);
+  var fitHostBars = () => {
+    const h = hostBarsEl.firstElementChild ? hostBarsEl.firstElementChild.getBoundingClientRect().height : 0;
+    document.documentElement.style.setProperty("--host-bar", `${Math.ceil(h)}px`);
+    document.body.classList.toggle("has-host-bar", h > 0);
+  };
+  try {
+    new ResizeObserver(fitHostBars).observe(hostBarsEl);
+  } catch {
+  }
+  new MutationObserver(fitHostBars).observe(hostBarsEl, { childList: true, subtree: true });
+  ReactDOM.createRoot(hostBarsEl).render(/* @__PURE__ */ React.createElement(HostBars, null));
 })();

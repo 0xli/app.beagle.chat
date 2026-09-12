@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12T19:01:29.629Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12T19:18:11.473Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -17854,7 +17854,7 @@ ${ts}`);
         } catch {
         }
         flashTab();
-        bc.postMessage({ type: "focused" });
+        bc.postMessage({ type: "focused", name: window.name || "" });
       }
     };
     function hold(lock, resolve2) {
@@ -17913,17 +17913,32 @@ ${ts}`);
         const onMsg = (ev) => {
           if (ev.data?.type === "focused") {
             bc.removeEventListener("message", onMsg);
-            resolve2(true);
+            resolve2(ev.data);
           }
         };
         bc.addEventListener("message", onMsg);
         setTimeout(() => {
           bc.removeEventListener("message", onMsg);
-          resolve2(false);
+          resolve2(null);
         }, 1200);
       });
       bc.postMessage({ type: "focus-request" });
-      return { asked: true, acknowledged: await answered };
+      const reply = await answered;
+      let switched = false;
+      if (reply?.name && reply.name !== window.name) {
+        try {
+          const w = window.open("", reply.name);
+          if (w && w !== window) {
+            try {
+              w.focus();
+            } catch {
+            }
+            switched = true;
+          }
+        } catch {
+        }
+      }
+      return { asked: true, acknowledged: !!reply, switched };
     }
     function waitForLock() {
       navigator.locks.request(LOCK, (lock) => new Promise((done) => {
@@ -19705,6 +19720,7 @@ ${ts}`);
   var PROFILE_KEY2 = "profile";
   var ACTION_CHANNEL = "beagle-web-actions";
   var ACTION_BOOT_WAIT_MS = 25e3;
+  var APP_WINDOW = "beagle-app";
   var ACTION_FORWARD_MS = ACTION_BOOT_WAIT_MS + 5e3;
   globalThis.__BEAGLE_STORAGE__ = storageMode;
   var resolveReady;
@@ -19891,6 +19907,11 @@ ${ts}`);
       this.bringUp = () => {
         if (this.routers.early)
           return;
+        try {
+          if (!window.name)
+            window.name = APP_WINDOW;
+        } catch {
+        }
         this.routers.early = createEarlyRouter({
           getIdentity: () => this.identity,
           profile,
