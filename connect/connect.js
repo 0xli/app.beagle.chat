@@ -5097,6 +5097,8 @@ ${nonce2}`);
     }
   }
   function punkUrls(punkId) {
+    if (punkId == null || punkId === "")
+      return [];
     const n = Number(punkId);
     if (!Number.isInteger(n) || n < 0 || n > 9999)
       return [];

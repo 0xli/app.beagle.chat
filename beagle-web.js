@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-11T00:37:13.715Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12T08:01:44.613Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -8946,6 +8946,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-11
               descr: p.descr || void 0,
               punk: p.punk ?? void 0,
               listed: p.listed === false ? false : void 0,
+              ref: p.ref || void 0,
               ticket: bridgeTickets.get(base) || void 0
             }));
           } catch {
@@ -18522,6 +18523,8 @@ ${ts}`);
             profile.avatarDataUrl = req.avatarDataUrl || null;
           if (req.onboarded !== void 0)
             profile.onboarded = !!req.onboarded;
+          if (req.referredBy !== void 0)
+            profile.referredBy = req.referredBy ? String(req.referredBy).slice(0, 64) : null;
           await kvPut2(PROFILE_KEY, profile);
           try {
             peer.setUserInfo({ name: profile.name, description: profile.description, punkId: profile.punkId ?? null });
@@ -19191,6 +19194,8 @@ ${ts}`);
             profile.avatarDataUrl = body2.avatarDataUrl || null;
           if (body2.onboarded !== void 0)
             profile.onboarded = !!body2.onboarded;
+          if (body2.referredBy !== void 0)
+            profile.referredBy = body2.referredBy ? String(body2.referredBy).slice(0, 64) : null;
           try {
             await persist(profile);
           } catch {
@@ -19485,7 +19490,8 @@ ${ts}`);
             description: body2.description,
             punkId: body2.punkId,
             onboarded: body2.onboarded,
-            avatarDataUrl: body2.avatarDataUrl
+            avatarDataUrl: body2.avatarDataUrl,
+            referredBy: body2.referredBy
           }));
         case "POST /api/file-send": {
           const userid = url.searchParams.get("userid");
@@ -19620,6 +19626,18 @@ ${ts}`);
       };
       const keyPair = await loadIdentity(noteStorageFail);
       this.keyPair = keyPair;
+      if (keyPair) {
+        try {
+          const raw = localStorage.getItem("beagle-web:ref");
+          if (raw) {
+            localStorage.removeItem("beagle-web:ref");
+            const ref = JSON.parse(raw);
+            if (ref?.address && !/[?&]address=/.test(location.hash))
+              location.hash = `#/chat?address=${encodeURIComponent(ref.address)}`;
+          }
+        } catch {
+        }
+      }
       this.identity = keyPair ? describeIdentity(keyPair) : null;
       this.persistence = null;
       requestPersistence().then((r) => {
@@ -19676,7 +19694,10 @@ ${ts}`);
             name: profile.name || "",
             descr: profile.description || "",
             punk: profile.punkId ?? null,
-            listed: profile.listed !== false
+            listed: profile.listed !== false,
+            // The userid that invited this one, from a profile link. The bridge
+            // records it once, on the first verified hello that carries it.
+            ref: profile.referredBy || void 0
           };
         },
         /** Detached XEdDSA over the bridge's nonce. Null when there is no

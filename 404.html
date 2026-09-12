@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Beagle</title>
+<meta name="description" content="Add me as a friend on Beagle — private chat, calls and files, no account.">
+<meta property="og:title" content="Add me on Beagle">
+<meta property="og:description" content="Private chat, calls and files between people and agents. No account — a name is all it takes.">
+<meta property="og:type" content="profile">
+<!--
+  The public profile page: https://app.beagle.chat/<address>, or /<name>.beagles.eth.
+
+  Built into public/404.html on purpose. GitHub Pages is static and serves
+  404.html for every path it has no file for, which is exactly the set of paths
+  this page exists to answer. The status code is 404; the page is real, and a
+  person following a shared link never sees the number. The dev server mirrors
+  the rule with a 200.
+
+  Nothing here boots the peer or reads the visitor's identity. It is a shop
+  window: it shows one person, and one button.
+-->
+<style>
+  :root{--bg:#0b0b0f;--field:#121218;--subtle:#15151b;--hair:#1b1b22;--border:#23232c;--bfield:#2a2a35;
+        --text:#f4f2fa;--text2:#c9c6d6;--muted:#8d8b9a;--faint:#6f6d7d;--accent:#7c5cff;--online:#4ad1a5;--bad:#e5604d;
+        --ui:'IBM Plex Sans','Noto Sans SC',ui-sans-serif,system-ui,-apple-system,sans-serif;
+        --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--text);font:15px/1.55 var(--ui);-webkit-text-size-adjust:100%;
+       display:flex;flex-direction:column;align-items:center;padding:0 16px 40px}
+  a{color:#9b83ff;text-decoration:none}
+  .top{width:100%;max-width:440px;display:flex;align-items:center;gap:9px;padding:16px 2px 6px}
+  .top .d{width:18px;height:18px;border-radius:5px;background:var(--accent)}
+  .top .b{font-family:var(--mono);font-size:13px;color:var(--text2)}
+  .top .sp{flex:1}
+  .top .lang{display:flex;gap:2px;background:var(--field);border:1px solid var(--border);border-radius:8px;padding:2px}
+  .top .lang button{border:0;background:none;color:var(--faint);font:12px var(--mono);padding:4px 9px;border-radius:6px;cursor:pointer}
+  .top .lang button.on{background:var(--accent);color:#fff}
+  .card{width:100%;max-width:440px;background:var(--field);border:1px solid var(--border);border-radius:16px;
+        padding:26px 22px 22px;margin-top:14px}
+  .face{width:96px;height:96px;border-radius:24px;background:var(--subtle);border:1px solid var(--bfield);
+        display:block;object-fit:cover;image-rendering:pixelated;margin:0 auto 14px}
+  .face.blank{image-rendering:auto}
+  .name{font-size:24px;font-weight:600;letter-spacing:-.01em;text-align:center;line-height:1.2;word-break:break-word}
+  .ens{font-family:var(--mono);font-size:12.5px;color:var(--accent);text-align:center;margin-top:5px}
+  .ens:empty{display:none}
+  .status{display:flex;justify-content:center;align-items:center;gap:6px;font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:8px}
+  .status .dot{width:7px;height:7px;border-radius:99px;background:var(--faint)}
+  .status.on{color:var(--online)}.status.on .dot{background:var(--online)}
+  .status:empty{display:none}
+  .bio{color:var(--text2);text-align:center;margin:14px 0 0;font-size:15px}
+  .bio:empty{display:none}
+  .links{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin:16px 0 0}
+  .links:empty{display:none}
+  .links a{font-family:var(--mono);font-size:12px;color:var(--text2);background:var(--subtle);border:1px solid var(--border);
+           padding:6px 11px;border-radius:6px}
+  .links a:hover{border-color:var(--accent);color:#fff}
+  .addr{margin:20px 0 0;background:#0e0e13;border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px;display:flex;align-items:center;gap:8px}
+  .lbl button{margin-left:auto;background:none;border:1px solid var(--border);color:var(--faint);border-radius:6px;
+              font:11px var(--mono);padding:2px 8px;cursor:pointer;letter-spacing:0;text-transform:none}
+  .lbl button:hover{color:var(--text);border-color:#3a3a48}
+  .mono{font-family:var(--mono);font-size:12px;color:var(--text);word-break:break-all;line-height:1.5}
+  .btn{display:block;width:100%;border:0;border-radius:11px;padding:14px;margin-top:18px;background:var(--accent);color:#fff;
+       font:600 16px var(--ui);cursor:pointer}
+  .btn:hover{background:#9179ff}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .hint{color:var(--faint);font-size:12.5px;text-align:center;margin:12px 0 0;line-height:1.5}
+  .hint b{color:var(--text2);font-weight:500}
+  .err{background:rgba(229,96,77,.12);border:1px solid rgba(229,96,77,.4);color:#ffb4a8;border-radius:9px;
+       padding:10px 12px;font-size:13px;margin-top:14px}
+  .foot{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:22px;text-align:center}
+  .foot a{color:var(--faint);border-bottom:1px solid var(--border)}
+  [hidden]{display:none !important}
+  .skel{color:transparent!important;background:var(--subtle);border-radius:6px;animation:sk 1.2s ease-in-out infinite}
+  @keyframes sk{50%{opacity:.45}}
+</style></head>
+<body>
+  <div class="top">
+    <a href="/" style="display:flex;align-items:center;gap:9px"><span class="d"></span><span class="b">beagle</span></a>
+    <span class="sp"></span>
+    <div class="lang"><button id="langEn" class="on">EN</button><button id="langZh">中文</button></div>
+  </div>
+
+  <div class="card" id="card">
+    <img id="face" class="face blank" alt="" />
+    <div id="name" class="name skel">loading</div>
+    <div id="ens" class="ens"></div>
+    <div id="status" class="status"></div>
+    <p id="bio" class="bio"></p>
+    <div id="links" class="links"></div>
+
+    <div id="addrBox" class="addr" hidden>
+      <div class="lbl"><span id="addrLbl">Beagle address</span><button id="copy" type="button">copy</button></div>
+      <div id="addr" class="mono"></div>
+    </div>
+
+    <div id="err" class="err" hidden></div>
+
+    <button id="add" class="btn" disabled>Add me as a friend</button>
+    <p id="hint" class="hint"></p>
+  </div>
+
+  <p class="foot"><a href="/">app.beagle.chat</a> · <a href="/privacy.html">privacy</a></p>
+
+<script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
+<script src="/profile/profile.js?v=cd3a41e7c7"></script>
+</body></html>

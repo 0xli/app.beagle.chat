@@ -5323,10 +5323,12 @@ ${peer.address}`
       optional: "optional",
       introPh: "Building decentralised things in San Francisco",
       face: "A FACE",
+      faceReq: "required",
       shuffle: "shuffle",
       upload: "upload",
+      needFace: "Pick a face \u2014 in a list of names, it is what tells you apart at a glance.",
       cont: "Continue",
-      skip: "Skip \u2014 use a random name",
+      skip: "Skip \u2014 use a random name and face",
       h2: "Now add one person.",
       b2: "Beagle stays quiet until you do. Send them your link, or let them scan it \u2014 it reaches them wherever they run Beagle.",
       yourLink: "YOUR LINK",
@@ -5338,6 +5340,9 @@ ${peer.address}`
       alreadyHere: "Or say hello to someone already here:",
       add: "add",
       requested: "requested",
+      invitedBy: "You were invited by:",
+      onOpen: "on open",
+      willAdd: "The friend request goes out the moment you open Beagle \u2014 nothing else to do.",
       open: "Open Beagle",
       later: "I'll add someone later",
       privacy: "Privacy",
@@ -5372,10 +5377,12 @@ ${peer.address}`
       optional: "\u9009\u586B",
       introPh: "\u5728\u65E7\u91D1\u5C71\u505A\u53BB\u4E2D\u5FC3\u5316\u7684\u4E1C\u897F",
       face: "\u5934\u50CF",
+      faceReq: "\u5FC5\u586B",
       shuffle: "\u6362\u4E00\u6279",
       upload: "\u4E0A\u4F20",
+      needFace: "\u9009\u4E00\u4E2A\u5934\u50CF \u2014\u2014 \u5728\u4E00\u5217\u540D\u5B57\u91CC\uFF0C\u522B\u4EBA\u4E00\u773C\u5C31\u662F\u9760\u5B83\u8BA4\u51FA\u4F60\u7684\u3002",
       cont: "\u7EE7\u7EED",
-      skip: "\u8DF3\u8FC7\uFF0C\u968F\u673A\u53D6\u4E2A\u540D\u5B57",
+      skip: "\u8DF3\u8FC7\uFF0C\u968F\u673A\u53D6\u4E2A\u540D\u5B57\u548C\u5934\u50CF",
       h2: "\u73B0\u5728\u52A0\u4E00\u4E2A\u4EBA\u3002",
       b2: "\u5728\u6B64\u4E4B\u524D Beagle \u4F1A\u4E00\u76F4\u5B89\u9759\u3002\u628A\u94FE\u63A5\u53D1\u7ED9\u5BF9\u65B9\uFF0C\u6216\u8005\u8BA9\u5BF9\u65B9\u626B\u7801 \u2014\u2014 \u4ED6\u5728\u54EA\u53F0\u8BBE\u5907\u4E0A\u7528 Beagle \u90FD\u6536\u5F97\u5230\u3002",
       yourLink: "\u4F60\u7684\u94FE\u63A5",
@@ -5387,6 +5394,9 @@ ${peer.address}`
       alreadyHere: "\u6216\u8005\uFF0C\u5148\u8DDF\u5DF2\u7ECF\u5728\u8FD9\u91CC\u7684\u4EBA\u6253\u4E2A\u62DB\u547C\uFF1A",
       add: "\u6DFB\u52A0",
       requested: "\u5DF2\u53D1\u9001",
+      invitedBy: "\u9080\u8BF7\u4F60\u7684\u4EBA\uFF1A",
+      onOpen: "\u6253\u5F00\u5373\u53D1",
+      willAdd: "\u6253\u5F00 Beagle \u7684\u90A3\u4E00\u523B\u5C31\u4F1A\u53D1\u51FA\u597D\u53CB\u8BF7\u6C42 \u2014\u2014 \u4E0D\u7528\u518D\u505A\u522B\u7684\u3002",
       open: "\u6253\u5F00 Beagle",
       later: "\u4EE5\u540E\u518D\u52A0\u8054\u7CFB\u4EBA",
       privacy: "\u9690\u79C1\u8BF4\u660E",
@@ -5423,6 +5433,27 @@ ${peer.address}`
       address: "DMtGmaH17YMWACJk8ByX9B8WSMX5WvWdLF7v2YmRErAC2Z5xz1X8"
     }
   ];
+  var DK_REF_KEY = "beagle-web:ref";
+  function dkReadRef() {
+    try {
+      const r = JSON.parse(localStorage.getItem(DK_REF_KEY) || "null");
+      if (!r || !r.userid || !r.address)
+        return null;
+      if (r.ts && Date.now() - r.ts > 12 * 3600 * 1e3) {
+        localStorage.removeItem(DK_REF_KEY);
+        return null;
+      }
+      return r;
+    } catch (e) {
+      return null;
+    }
+  }
+  function dkClearRef() {
+    try {
+      localStorage.removeItem(DK_REF_KEY);
+    } catch (e) {
+    }
+  }
   function ObLabel({ children, note }) {
     return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, letterSpacing: ".12em", color: OB.muted } }, children), note && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: note.req ? OB.accent : OB.faint2 } }, note.text));
   }
@@ -5456,7 +5487,7 @@ ${peer.address}`
     ))) : null);
   }
   function DkWelcome2({ lang, onLang, me, onSave, onAdd, onClose, onCreateIdentity }) {
-    var _a;
+    var _a, _b;
     const W = OB_T[lang === "zh" ? "zh" : "en"];
     const [step, setStep] = React.useState(1);
     const [name, setName] = React.useState(me.name || "");
@@ -5474,6 +5505,8 @@ ${peer.address}`
     const mintRef = React.useRef(null);
     const [copied, setCopied] = React.useState(false);
     const [sent, setSent] = React.useState({});
+    const [warnFace, setWarnFace] = React.useState(false);
+    const [ref] = React.useState(() => dkReadRef());
     const nameRef = React.useRef(null);
     const fileRef = React.useRef(null);
     const hasKey = !!me.hasIdentity && !!me.carrier;
@@ -5538,6 +5571,16 @@ ${peer.address}`
         nameRef.current.focus();
     }, [step]);
     const link = hasKey ? `${location.origin}${location.pathname}#/chat?address=${me.carrier}` : "";
+    const contacts = ref ? [{
+      key: ref.userid,
+      ref: true,
+      userid: ref.userid,
+      address: ref.address,
+      name: ref.name || (ref.ens ? ref.ens.replace(/\.beagles\.eth$/i, "") : `${ref.userid.slice(0, 8)}\u2026${ref.userid.slice(-4)}`),
+      sub: ref.ens || ref.userid,
+      punkId: (_b = ref.punkId) != null ? _b : null,
+      avatarUrl: ref.avatarUrl || null
+    }] : DK_FIRST_CONTACTS.map((c) => ({ key: c.ens, ref: false, userid: c.userid, address: c.address, name: c.name, sub: c.ens }));
     const commit = (extra) => onSave({ name: name.trim(), description: intro.trim(), punkId: punk, avatarDataUrl: upload, listed, ...extra });
     const advance = async (nm) => {
       const final = (nm || name).trim();
@@ -5549,6 +5592,15 @@ ${peer.address}`
       }
       if (nm)
         setName(nm);
+      let face = punk;
+      if (face == null && !upload) {
+        if (!nm) {
+          setWarnFace(true);
+          return;
+        }
+        face = tiles.length ? tiles[Math.floor(Math.random() * tiles.length)].id : Math.floor(Math.random() * 1e4);
+        setPunk(face);
+      }
       if (!hasKey) {
         setPendingSubmit(true);
         try {
@@ -5559,11 +5611,17 @@ ${peer.address}`
         }
         setPendingSubmit(false);
       }
-      await onSave({ name: final, description: intro.trim(), punkId: punk, avatarDataUrl: upload, listed });
+      await onSave({ name: final, description: intro.trim(), punkId: face, avatarDataUrl: upload, listed });
       setStep(2);
     };
     const finish = () => {
-      commit({ onboarded: true });
+      if (ref && ref.address && !sent[ref.userid]) {
+        setSent((s) => Object.assign({}, s, { [ref.userid]: true }));
+        if (onAdd)
+          onAdd(ref.address);
+      }
+      commit(Object.assign({ onboarded: true }, ref ? { referredBy: ref.userid } : {}));
+      dkClearRef();
       onClose();
     };
     const copyLink = () => {
@@ -5608,6 +5666,7 @@ ${peer.address}`
           }
           setUpload(d);
           setPunk(null);
+          setWarnFace(false);
         } catch (err) {
         }
       };
@@ -5671,7 +5730,7 @@ ${peer.address}`
             advance();
         }
       }
-    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.optional } }, W.face), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, flexWrap: "wrap" } }, tiles.map((p) => /* @__PURE__ */ React.createElement(
+    )), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(ObLabel, { note: { text: W.faceReq, req: true } }, W.face), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, flexWrap: "wrap" } }, tiles.map((p) => /* @__PURE__ */ React.createElement(
       "button",
       {
         key: p.id,
@@ -5682,6 +5741,7 @@ ${peer.address}`
         onClick: () => {
           setPunk(p.id);
           setUpload(null);
+          setWarnFace(false);
         },
         style: { width: 40, height: 40 }
       },
@@ -5706,19 +5766,19 @@ ${peer.address}`
         style: { width: 40, height: 40, display: "inline-flex", alignItems: "center", justifyContent: "center" }
       },
       /* @__PURE__ */ React.createElement(Icon, { name: "image", size: 16, stroke: 1.8 })
-    ), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUpload, style: { display: "none" } })))) : /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 24 } }, /* @__PURE__ */ React.createElement("h1", { className: "ob-h1", style: h }, W.h2), /* @__PURE__ */ React.createElement("p", { style: body }, W.b2), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 18, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement(ObQr, { value: link }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement(ObLabel, null, W.yourLink), /* @__PURE__ */ React.createElement("div", { className: "ob-in", style: { padding: "11px 13px", fontFamily: OB.mono, fontSize: 13, color: OB.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, link), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, marginTop: 9 } }, /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: copyLink }, copied ? W.copied : W.copyLink), /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: share }, W.share)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.worksOn), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 7, flexWrap: "wrap" } }, OB_PLATFORMS.concat([W.tab]).map((p) => /* @__PURE__ */ React.createElement("span", { key: p, style: { fontFamily: OB.mono, fontSize: 12, color: "#a8a5b6", background: OB.subtle, border: `1px solid ${OB.border}`, padding: "6px 11px", borderRadius: 6 } }, p)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.alreadyHere), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, DK_FIRST_CONTACTS.map((c) => /* @__PURE__ */ React.createElement("div", { key: c.ens, style: { display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 9, border: `1px solid ${OB.border}`, background: OB.field } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: c.userid, size: 30, radius: 8, fallbackSeed: c.userid }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: OB.text } }, c.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 10.5, color: OB.faint } }, c.ens)), sent[c.ens] ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.online } }, W.requested) : /* @__PURE__ */ React.createElement(
+    ), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUpload, style: { display: "none" } })), warnFace && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, fontSize: 13, color: OB.accent } }, W.needFace))) : /* @__PURE__ */ React.createElement("div", { className: "ob-body", style: { display: "flex", flexDirection: "column", gap: 24 } }, /* @__PURE__ */ React.createElement("h1", { className: "ob-h1", style: h }, W.h2), /* @__PURE__ */ React.createElement("p", { style: body }, W.b2), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 18, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement(ObQr, { value: link }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement(ObLabel, null, W.yourLink), /* @__PURE__ */ React.createElement("div", { className: "ob-in", style: { padding: "11px 13px", fontFamily: OB.mono, fontSize: 13, color: OB.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, link), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 9, marginTop: 9 } }, /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: copyLink }, copied ? W.copied : W.copyLink), /* @__PURE__ */ React.createElement("button", { className: "ob-sec", style: { flex: 1, padding: "11px 14px", fontSize: 13 }, onClick: share }, W.share)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, W.worksOn), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 7, flexWrap: "wrap" } }, OB_PLATFORMS.concat([W.tab]).map((p) => /* @__PURE__ */ React.createElement("span", { key: p, style: { fontFamily: OB.mono, fontSize: 12, color: "#a8a5b6", background: OB.subtle, border: `1px solid ${OB.border}`, padding: "6px 11px", borderRadius: 6 } }, p)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${OB.hair}`, paddingTop: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: OB.muted, marginBottom: 10 } }, ref ? W.invitedBy : W.alreadyHere), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, contacts.map((c) => /* @__PURE__ */ React.createElement("div", { key: c.key, style: { display: "flex", alignItems: "center", gap: 11, padding: "9px 11px", borderRadius: 9, border: `1px solid ${OB.border}`, background: OB.field } }, c.ref ? /* @__PURE__ */ React.createElement(ObFace, { url: c.avatarUrl, punk: c.punkId, seed: c.userid, size: 30, radius: 8 }) : /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: c.userid, size: 30, radius: 8, fallbackSeed: c.userid }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: OB.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: OB.mono, fontSize: 10.5, color: OB.faint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.sub)), c.ref ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.online, whiteSpace: "nowrap" } }, W.onOpen) : sent[c.key] ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: OB.mono, fontSize: 11, color: OB.online } }, W.requested) : /* @__PURE__ */ React.createElement(
       "button",
       {
         className: "ob-sec",
         style: { padding: "6px 12px", fontSize: 12 },
         onClick: () => {
-          setSent((s) => Object.assign({}, s, { [c.ens]: true }));
+          setSent((s) => Object.assign({}, s, { [c.key]: true }));
           if (onAdd)
             onAdd(c.address);
         }
       },
       W.add
-    )))))), /* @__PURE__ */ React.createElement("div", { className: "ob-foot", style: { display: "flex", alignItems: "center", gap: 18, flexShrink: 0 } }, step === 2 && /* @__PURE__ */ React.createElement("label", { style: {
+    )))), ref && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12.5, color: OB.faint, marginTop: 10, lineHeight: 1.5 } }, W.willAdd))), /* @__PURE__ */ React.createElement("div", { className: "ob-foot", style: { display: "flex", alignItems: "center", gap: 18, flexShrink: 0 } }, step === 2 && /* @__PURE__ */ React.createElement("label", { style: {
       display: "flex",
       alignItems: "flex-start",
       gap: 10,
@@ -5743,7 +5803,7 @@ ${peer.address}`
       },
       pendingSubmit && /* @__PURE__ */ React.createElement("span", { className: "ob-busydot" }),
       pendingSubmit ? W.keyBusy : step === 1 ? W.cont : W.open
-    ), step === 1 && pendingSubmit ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: OB.faint } }, W.helpBusy) : /* @__PURE__ */ React.createElement(
+    ), step === 1 && pendingSubmit ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: OB.faint } }, W.helpBusy) : step === 2 && ref ? null : /* @__PURE__ */ React.createElement(
       "button",
       {
         className: "ob-mut",
