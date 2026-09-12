@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12T16:31:50.476Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12T19:01:29.629Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -17954,6 +17954,90 @@ ${ts}`);
     };
   }
 
+  // src/notify.js
+  init_buffer_global();
+  init_process_global();
+  var DISMISS_KEY = "beagle-web:notify-dismissed";
+  function createNotifier({ nameOf } = {}) {
+    const supported = typeof Notification !== "undefined" && "permission" in Notification;
+    const shown = /* @__PURE__ */ new Map();
+    const permission = () => supported ? Notification.permission : "unsupported";
+    const dismissed = () => {
+      try {
+        return localStorage.getItem(DISMISS_KEY) === "1";
+      } catch {
+        return false;
+      }
+    };
+    const shouldOffer = () => supported && Notification.permission === "default" && !dismissed();
+    async function request() {
+      if (!supported)
+        return "unsupported";
+      try {
+        return await Notification.requestPermission();
+      } catch {
+        return Notification.permission;
+      }
+    }
+    function dismiss() {
+      try {
+        localStorage.setItem(DISMISS_KEY, "1");
+      } catch {
+      }
+    }
+    const looking = () => document.visibilityState === "visible" && document.hasFocus();
+    async function show(msg) {
+      if (!supported || Notification.permission !== "granted")
+        return;
+      const who = await nameOf?.(msg.peer) || `${String(msg.peer).slice(0, 8)}\u2026`;
+      const body2 = msg.file ? `\u{1F4CE} ${msg.file.name || "file"}` : String(msg.text || "").slice(0, 160);
+      const opts = { body: body2, tag: `beagle:${msg.peer}`, renotify: true, data: { peer: msg.peer }, silent: false };
+      try {
+        const reg = await navigator.serviceWorker?.getRegistration?.();
+        if (reg?.showNotification) {
+          await reg.showNotification(who, opts);
+          return;
+        }
+      } catch {
+      }
+      try {
+        shown.get(msg.peer)?.close();
+        const n = new Notification(who, opts);
+        n.onclick = () => {
+          try {
+            window.focus();
+          } catch {
+          }
+          n.close();
+        };
+        shown.set(msg.peer, n);
+      } catch {
+      }
+    }
+    function onEvent(e) {
+      if (e?.type !== "message" || e.msg?.dir !== "in")
+        return;
+      if (looking())
+        return;
+      void show(e.msg);
+    }
+    try {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState !== "visible")
+          return;
+        for (const n of shown.values()) {
+          try {
+            n.close();
+          } catch {
+          }
+        }
+        shown.clear();
+      });
+    } catch {
+    }
+    return { supported, permission, shouldOffer, request, dismiss, onEvent };
+  }
+
   // src/backend-c.js
   init_buffer_global();
   init_process_global();
@@ -19218,13 +19302,28 @@ ${ts}`);
       }
     };
   }
-  function createReadOnlyRouter({ getIdentity, profile, storageOk, askOwner, forwardAdd }) {
+  var LOCAL_ONLY = /* @__PURE__ */ new Set([
+    "/api/call-signal",
+    "/api/call-poll",
+    "/api/call-ice-servers",
+    "/api/webrtc-file-save",
+    "/api/identity-import",
+    "/api/create-identity"
+  ]);
+  var READ_ONLY_REFUSAL = "Calls run in the tab that holds the connection \u2014 switch to it, or take over here.";
+  var NO_ANSWER = "Beagle's other tab did not answer. Reload that tab, or close it and use this one.";
+  function createReadOnlyRouter({ getIdentity, profile, storageOk, askOwner, forwardAdd, forward }) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
       const url = new URL(path, location.origin);
       const p = url.pathname;
       if (UNSUPPORTED.has(p))
         return json({ ok: false, unsupported: true, error: "not available in the browser client" });
+      if (LOCAL_ONLY.has(p)) {
+        if (p === "/api/call-poll")
+          return json({ signals: [], cursor: 0 });
+        return json({ ok: false, readOnly: true, error: READ_ONLY_REFUSAL }, 409);
+      }
       const punkOne = /^\/api\/punk\/(\d{1,5})$/.exec(p);
       if (method === "GET" && punkOne) {
         try {
@@ -19247,7 +19346,7 @@ ${ts}`);
           me.ephemeral = !!identity?.ephemeral || storageOk?.() === false;
           me.readOnly = true;
           const peers2 = fromOwner?.peers ?? [];
-          return p === "/api/state" ? json({ me, friends: peers2, pending: [], readOnly: true, locked: true }) : json({ me, peers: peers2, requests: fromOwner?.requests ?? [], exits: [], activeExit: null, readOnly: true, locked: true });
+          return p === "/api/state" ? json({ me, friends: peers2, pending: fromOwner?.requests ?? [], readOnly: true }) : json({ me, peers: peers2, requests: fromOwner?.requests ?? [], exits: [], activeExit: null, readOnly: true });
         }
         case "GET /api/friends-list": {
           const fromOwner = await askOwner?.("desktop");
@@ -19283,23 +19382,18 @@ ${ts}`);
           if (!address)
             return json({ ok: false, error: "no address" }, 400);
           const r = await forwardAdd?.(address, String(body2.hello || ""));
-          if (!r) {
-            return json({
-              ok: false,
-              readOnly: true,
-              error: "Beagle's other tab did not answer. Reload that tab, or close it and use this one."
-            }, 409);
-          }
+          if (!r)
+            return json({ ok: false, readOnly: true, error: NO_ANSWER }, 409);
           return r.ok ? json({ ok: true, viaOwner: true }) : json({ ok: false, readOnly: true, error: r.error || "could not send" }, 409);
         }
-        default:
+        default: {
+          const r = await forward?.(path, init);
+          if (r)
+            return json(r.body, r.status);
           if (method === "GET")
             return json({ ok: true, readOnly: true, items: [], list: [] });
-          return json({
-            ok: false,
-            readOnly: true,
-            error: "Beagle is running in another tab \u2014 this one can read, but not send."
-          }, 409);
+          return json({ ok: false, readOnly: true, error: NO_ANSWER }, 409);
+        }
       }
     };
   }
@@ -19665,6 +19759,17 @@ ${ts}`);
         this.persistence = r;
       }).catch(() => {
       });
+      this.notifier = createNotifier({
+        nameOf: async (userid) => {
+          try {
+            const r = await this.backend?.call({ op: "friends-list" });
+            const f = (r?.data?.friends || []).find((x) => x.userid === userid);
+            return f?.alias || f?.name || "";
+          } catch {
+            return "";
+          }
+        }
+      });
       this.lock = createTabLock({
         onAcquired: () => {
           if (!this.readOnly)
@@ -19751,6 +19856,7 @@ ${ts}`);
         onEvent: (e) => {
           this.events.push(e);
           this.onEvent?.(e);
+          this.notifier?.onEvent(e);
         }
       }).then((backend2) => {
         this.backend = backend2;
@@ -19827,6 +19933,7 @@ ${ts}`);
     async takeover() {
       this.lockState = await this.lock.takeover();
       if (this.lockState.held) {
+        this.readOnly = false;
         this.routers.early = null;
         this.bringUp?.();
       }
@@ -19848,7 +19955,8 @@ ${ts}`);
         profile: this.profile,
         storageOk: () => this.storageOk !== false && !isStorageWedged(),
         askOwner: (what) => this.askOwner(what),
-        forwardAdd: (address, hello) => this.forwardAdd(address, hello)
+        forwardAdd: (address, hello) => this.forwardAdd(address, hello),
+        forward: (path, init) => this.forwardApi(path, init)
       });
       this.lock.waitForLock?.();
     },
@@ -19884,6 +19992,23 @@ ${ts}`);
      *  a second tab is no different. Resolves null when no tab answers. */
     forwardAdd(address, hello) {
       return this.askChannel({ type: "add-friend", address, hello }, "add-friend-result", ACTION_FORWARD_MS);
+    },
+    /** Replay any /api request in the tab that holds the peer.
+     *
+     *  The body crosses as it is — a string, or the File/Blob/ArrayBuffer a
+     *  file send carries (all structured-cloneable) — and the owner runs it
+     *  through its own patched fetch, so it takes exactly the path a click in
+     *  that tab would. Resolves { status, body } or null when nobody answers. */
+    forwardApi(path, init) {
+      const body2 = init?.body;
+      const cloneable = body2 == null || typeof body2 === "string" || body2 instanceof Blob || body2 instanceof ArrayBuffer || ArrayBuffer.isView(body2);
+      return this.askChannel({
+        type: "api-request",
+        path: String(path),
+        method: (init?.method || "GET").toUpperCase(),
+        contentType: init?.headers?.["content-type"] || init?.headers?.["Content-Type"] || (typeof body2 === "string" ? "application/json" : void 0),
+        body: cloneable ? body2 : String(body2)
+      }, "api-result", ACTION_FORWARD_MS);
     },
     /** One message on the action channel, one answer (or null on timeout). */
     askChannel(msg, resultType, timeoutMs) {
@@ -19935,6 +20060,25 @@ ${ts}`);
             flashTab();
           }
           bc.postMessage({ type: "open-chat-result", id: d.id, ok: !!address });
+          return;
+        }
+        if (d?.type === "api-request" && d.id) {
+          const run = () => fetch(d.path, {
+            method: d.method || "GET",
+            headers: d.contentType ? { "content-type": d.contentType } : void 0,
+            body: d.method === "GET" || d.method === "HEAD" ? void 0 : d.body
+          }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => ({ ok: x.ok })) }));
+          try {
+            let r = await run();
+            const deadline = Date.now() + ACTION_BOOT_WAIT_MS;
+            while ((r.body?.booting || r.body?.starting) && Date.now() < deadline) {
+              await new Promise((f) => setTimeout(f, 1e3));
+              r = await run();
+            }
+            bc.postMessage({ type: "api-result", id: d.id, status: r.status, body: r.body });
+          } catch (err) {
+            bc.postMessage({ type: "api-result", id: d.id, status: 500, body: { ok: false, error: String(err?.message || err) } });
+          }
           return;
         }
         if (d?.type !== "add-friend" || !d.id)

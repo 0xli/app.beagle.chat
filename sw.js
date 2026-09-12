@@ -60,6 +60,25 @@
     });
     return Promise.race([read, deadline(DB_TIMEOUT_MS)]);
   }
+  self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    event.waitUntil((async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const mine = all.filter((c) => new URL(c.url).origin === self.location.origin);
+      const target = mine.find((c) => c.focused) || mine[0];
+      if (target) {
+        try {
+          await target.focus();
+        } catch {
+        }
+        return;
+      }
+      try {
+        await self.clients.openWindow("/");
+      } catch {
+      }
+    })());
+  });
   self.addEventListener("install", () => self.skipWaiting());
   self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
   self.addEventListener("fetch", (event) => {

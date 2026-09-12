@@ -5827,7 +5827,7 @@ ${peer.address}`
     en: {
       title: "Beagle is already open in another tab.",
       body: "One identity can only run in one place at a time \u2014 two would fight over the same connection. The other tab is already connected, so going back to it is usually what you want.",
-      bar: "Read-only \u2014 Beagle is running in another tab. You can read here; sending happens there.",
+      bar: "Beagle is running in another tab. Chats and sends work here too \u2014 they go out through that tab. Calls need that tab.",
       go: "Go to that tab",
       going: "asking\u2026",
       // Honest about the limit: no API lets one tab put another in front. We can
@@ -5841,7 +5841,7 @@ ${peer.address}`
     zh: {
       title: "Beagle \u5DF2\u7ECF\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u6253\u5F00\u4E86\u3002",
       body: "\u540C\u4E00\u4E2A\u8EAB\u4EFD\u4E00\u6B21\u53EA\u80FD\u5728\u4E00\u4E2A\u5730\u65B9\u8FD0\u884C\uFF0C\u4E24\u4E2A\u4F1A\u62A2\u540C\u4E00\u6761\u8FDE\u63A5\u3002\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u5DF2\u7ECF\u8FDE\u4E0A\u4E86\uFF0C\u56DE\u5230\u90A3\u8FB9\u901A\u5E38\u624D\u662F\u4F60\u60F3\u8981\u7684\u3002",
-      bar: "\u53EA\u8BFB \u2014\u2014 Beagle \u6B63\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u8FD0\u884C\u3002\u8FD9\u91CC\u53EF\u4EE5\u770B\uFF0C\u53D1\u9001\u5728\u90A3\u8FB9\u3002",
+      bar: "Beagle \u6B63\u5728\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u91CC\u8FD0\u884C\u3002\u8FD9\u91CC\u4E5F\u80FD\u770B\u80FD\u53D1 \u2014\u2014 \u6D88\u606F\u7ECF\u7531\u90A3\u4E2A\u6807\u7B7E\u9875\u53D1\u51FA\u3002\u901A\u8BDD\u8981\u53BB\u90A3\u8FB9\u3002",
       go: "\u53BB\u90A3\u4E2A\u6807\u7B7E\u9875",
       going: "\u6B63\u5728\u547C\u53EB\u2026",
       asked: "\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u7684\u6807\u9898\u6B63\u5728\u95EA \u{1F44B} Beagle is here\uFF0C\u5728\u6807\u7B7E\u680F\u91CC\u627E\u4E00\u4E0B\uFF0C\u6216\u8005\u5728\u8FD9\u91CC\u63A5\u7BA1\u3002",
@@ -5851,6 +5851,73 @@ ${peer.address}`
       failed: "\u53E6\u4E00\u4E2A\u6807\u7B7E\u9875\u6CA1\u6709\u4EA4\u51FA\u63A7\u5236\u6743\u3002\u8BF7\u5148\u5173\u6389\u5B83\u518D\u8BD5\u3002"
     }
   };
+  var OB_NOTIFY_T = {
+    en: {
+      text: "Get a desktop notification when a friend writes while this tab is in the background?",
+      yes: "Turn on",
+      no: "Not now"
+    },
+    zh: {
+      text: "\u597D\u53CB\u53D1\u6D88\u606F\u65F6\uFF0C\u5982\u679C\u8FD9\u4E2A\u6807\u7B7E\u9875\u5728\u540E\u53F0\uFF0C\u8981\u4E0D\u8981\u5F39\u684C\u9762\u901A\u77E5\uFF1F",
+      yes: "\u6253\u5F00",
+      no: "\u5148\u4E0D\u7528"
+    }
+  };
+  function DkNotifyOffer({ lang, onEnable, onDismiss }) {
+    const W = OB_NOTIFY_T[lang === "zh" ? "zh" : "en"];
+    React.useEffect(() => {
+      obInstallCss();
+    }, []);
+    return /* @__PURE__ */ React.createElement("div", { style: {
+      position: "fixed",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 79,
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      flexWrap: "wrap",
+      padding: "8px 14px",
+      background: "#1a1f2e",
+      borderTop: "1px solid #2c3550",
+      fontFamily: OB.ui,
+      fontSize: 12.5,
+      color: "#d9dce8"
+    } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 200 } }, W.text), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: onDismiss,
+        style: {
+          padding: "5px 12px",
+          borderRadius: 7,
+          border: "1px solid #3a4470",
+          background: "transparent",
+          color: "#c8cde6",
+          fontFamily: OB.ui,
+          fontSize: 12,
+          cursor: "pointer"
+        }
+      },
+      W.no
+    ), /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: onEnable,
+        style: {
+          padding: "5px 12px",
+          borderRadius: 7,
+          border: "none",
+          background: OB.accent,
+          color: "#fff",
+          fontFamily: OB.ui,
+          fontSize: 12,
+          cursor: "pointer"
+        }
+      },
+      W.yes
+    ));
+  }
   function DkLockedOut2({ lang, onTakeover, onLocate, compact }) {
     const W = OB_LOCK_T[lang === "zh" ? "zh" : "en"];
     const [busy, setBusy] = React.useState(false);
@@ -6106,4 +6173,59 @@ ${peer.address}`
   // src/ui/entry.jsx
   setUiHost(host);
   mount(document.getElementById("root"));
+  var TWEAKS_KEY = "decentlan.tweaks";
+  var hostLang = () => {
+    try {
+      return JSON.parse(localStorage.getItem(TWEAKS_KEY) || "{}").lang || "en";
+    } catch {
+      return "en";
+    }
+  };
+  function HostBars() {
+    const app = window.BeagleWeb;
+    const [readOnly, setReadOnly] = React.useState(!!(app == null ? void 0 : app.readOnly));
+    const [offer, setOffer] = React.useState(false);
+    React.useEffect(() => {
+      const tick = () => {
+        setReadOnly(!!(app == null ? void 0 : app.readOnly));
+        const n = app == null ? void 0 : app.notifier;
+        setOffer(!!(n && n.shouldOffer() && !app.readOnly && app.backend && !document.querySelector(".ob-root")));
+      };
+      tick();
+      const t = setInterval(tick, 1e3);
+      return () => clearInterval(t);
+    }, []);
+    if (readOnly) {
+      return /* @__PURE__ */ React.createElement(
+        DkLockedOut2,
+        {
+          compact: true,
+          lang: hostLang(),
+          onTakeover: () => app.takeover(),
+          onLocate: () => app.locate()
+        }
+      );
+    }
+    if (offer) {
+      return /* @__PURE__ */ React.createElement(
+        DkNotifyOffer,
+        {
+          lang: hostLang(),
+          onEnable: async () => {
+            await app.notifier.request();
+            setOffer(false);
+          },
+          onDismiss: () => {
+            app.notifier.dismiss();
+            setOffer(false);
+          }
+        }
+      );
+    }
+    return null;
+  }
+  var bars = document.createElement("div");
+  bars.id = "host-bars";
+  document.body.appendChild(bars);
+  ReactDOM.createRoot(bars).render(/* @__PURE__ */ React.createElement(HostBars, null));
 })();
