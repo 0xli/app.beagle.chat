@@ -68,6 +68,16 @@
        font:600 16px var(--ui);cursor:pointer}
   .btn:hover{background:#9179ff}
   .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.second{background:var(--subtle);color:var(--text2);border:1px solid var(--border);font-weight:500;font-size:14.5px;padding:12px}
+  .btn.second:hover{background:var(--hair);color:var(--text)}
+  .app{margin-top:20px;padding:14px 14px 4px;border:1px solid var(--bfield);border-radius:12px;background:linear-gradient(180deg,rgba(124,92,255,.10),rgba(124,92,255,.03))}
+  .app-t{font-weight:600;font-size:15px}
+  .app-b{color:var(--text2);font-size:13.5px;margin:6px 0 0;line-height:1.5}
+  .app-b:empty{display:none}
+  a.store{display:flex;align-items:center;justify-content:center;gap:9px;text-decoration:none;margin-top:12px;background:#fff;color:#111;font-weight:600}
+  a.store:hover{background:#ededf5}
+  .store-i{display:inline-flex;width:20px;height:20px}
+  .store-i svg{width:20px;height:20px}
   .hint{color:var(--faint);font-size:12.5px;text-align:center;margin:12px 0 0;line-height:1.5}
   .hint b{color:var(--text2);font-weight:500}
   .err{background:rgba(229,96,77,.12);border:1px solid rgba(229,96,77,.4);color:#ffb4a8;border-radius:9px;
@@ -100,6 +110,16 @@
 
     <div id="err" class="err" hidden></div>
 
+    <!-- A phone: the app is the better client (calls, notifications, runs in
+         the background). Shown by profile.js when the visitor is on iOS or
+         Android; the browser path stays one tap away. -->
+    <div id="appBox" class="app" hidden>
+      <div id="appTitle" class="app-t"></div>
+      <p id="appBody" class="app-b"></p>
+      <a id="store" class="btn store" rel="noopener"><span class="store-i" id="storeIcon"></span><span id="storeText"></span></a>
+      <p id="appThen" class="app-b"></p>
+    </div>
+
     <button id="add" class="btn" disabled>Add me as a friend</button>
     <p id="hint" class="hint"></p>
   </div>
@@ -107,5 +127,5 @@
   <p class="foot"><a href="/">app.beagle.chat</a> · <a href="/privacy.html">privacy</a></p>
 
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="/profile/profile.js?v=9dc6d6504b"></script>
+<script src="/profile/profile.js?v=8207bbbe7c"></script>
 </body></html>

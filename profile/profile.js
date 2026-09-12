@@ -96,6 +96,23 @@
   var IDENTITY_MIRROR = "beagle-web:kv:identity";
   var ACTION_CHANNEL = "beagle-web-actions";
   var $ = (id) => document.getElementById(id);
+  var STORE = {
+    ios: "https://apps.apple.com/us/app/beagle-chat/id1597429120",
+    android: "https://play.google.com/store/apps/details?id=chat.beagle"
+  };
+  var APPLE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.6-3.8zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.9-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>';
+  var PLAY_SVG = '<svg viewBox="0 0 24 24"><path fill="#00d7fe" d="M3.6 2.5 13 12l-9.4 9.5c-.4-.2-.6-.6-.6-1.1v-17c0-.5.2-.9.6-.9z"/><path fill="#00f076" d="M16.6 8.4 13 12 3.6 2.5c.3-.2.8-.2 1.2 0l11.8 5.9z"/><path fill="#ff3a44" d="M16.6 15.6 4.8 21.5c-.4.2-.9.2-1.2 0L13 12l3.6 3.6z"/><path fill="#ffd500" d="M20.6 10.7c.8.4.8 1.5 0 1.9l-4 2.3L13 12l3.6-3.6 4 2.3z"/></svg>';
+  function phonePlatform() {
+    try {
+      const ua = navigator.userAgent || "";
+      if (/iPhone|iPad|iPod/i.test(ua) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+        return "ios";
+      if (/Android/i.test(ua))
+        return "android";
+    } catch {
+    }
+    return null;
+  }
   var B58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
   var T = {
     en: {
@@ -114,6 +131,12 @@
       notFoundHint: "A profile link looks like app.beagle.chat/<address> or app.beagle.chat/<name>.beagles.eth.",
       unknownName: (n) => `${n} is not registered on beagles.eth.`,
       open: "Open Beagle",
+      appTitle: "On a phone, use the Beagle app",
+      appBody: "Calls, notifications, and messages while you are doing something else \u2014 a browser tab cannot do all of that.",
+      storeIos: "Get it on the App Store",
+      storeAndroid: "Get it on Google Play",
+      appThen: "Then open the app, tap Add, and paste the address above.",
+      addBrowser: "Add me in the browser instead",
       handed: "Opened in your Beagle tab \u2014 switch to that tab and tap Add.",
       openHere: "Open here instead"
     },
@@ -133,6 +156,12 @@
       notFoundHint: "\u4E2A\u4EBA\u9875\u94FE\u63A5\u957F\u8FD9\u6837\uFF1Aapp.beagle.chat/<\u5730\u5740> \u6216 app.beagle.chat/<\u540D\u5B57>.beagles.eth\u3002",
       unknownName: (n) => `${n} \u6CA1\u6709\u5728 beagles.eth \u6CE8\u518C\u3002`,
       open: "\u6253\u5F00 Beagle",
+      appTitle: "\u624B\u673A\u4E0A\uFF0C\u8BF7\u7528 Beagle app",
+      appBody: "\u901A\u8BDD\u3001\u901A\u77E5\u3001\u540E\u53F0\u6536\u6D88\u606F \u2014\u2014 \u6D4F\u89C8\u5668\u6807\u7B7E\u9875\u505A\u4E0D\u5230\u8FD9\u4E9B\u3002",
+      storeIos: "App Store \u4E0B\u8F7D",
+      storeAndroid: "Google Play \u4E0B\u8F7D",
+      appThen: "\u88C5\u597D\u540E\u6253\u5F00 app\uFF0C\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u4E0A\u9762\u7684\u5730\u5740\u3002",
+      addBrowser: "\u8FD8\u662F\u5728\u6D4F\u89C8\u5668\u91CC\u52A0\u6211",
       handed: "\u5DF2\u5728\u4F60\u6253\u5F00\u7684 Beagle \u6807\u7B7E\u9875\u91CC\u6253\u5F00 \u2014\u2014 \u5207\u6362\u8FC7\u53BB\uFF0C\u70B9\u300C\u6DFB\u52A0\u300D\u3002",
       openHere: "\u5728\u8FD9\u91CC\u6253\u5F00"
     }
@@ -357,6 +386,26 @@
     add.disabled = !p.address;
     $("hint").textContent = p.address ? hasIdentityHere() ? t.hintHave : `${t.hintNew} ${t.hintApp}` : t.noAddr;
     add.onclick = () => addMe(p);
+    const phone = phonePlatform();
+    const box = $("appBox");
+    if (phone && p.address) {
+      box.hidden = false;
+      $("appTitle").textContent = t.appTitle;
+      $("appBody").textContent = t.appBody;
+      $("store").href = STORE[phone];
+      $("storeIcon").innerHTML = phone === "ios" ? APPLE_SVG : PLAY_SVG;
+      $("storeText").textContent = phone === "ios" ? t.storeIos : t.storeAndroid;
+      $("appThen").textContent = t.appThen;
+      if (!hasIdentityHere()) {
+        add.textContent = t.addBrowser;
+        add.classList.add("second");
+        $("hint").textContent = t.hintNew;
+      } else {
+        add.parentNode.insertBefore(box, $("hint").nextSibling);
+      }
+    } else {
+      box.hidden = true;
+    }
   }
   function hasIdentityHere() {
     try {
