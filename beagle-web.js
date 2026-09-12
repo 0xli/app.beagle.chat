@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12T19:18:11.473Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12T22:14:51.711Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -208,6 +208,119 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     }
   });
 
+  // src/shims/worker-timers.js
+  function schedule(op, fn, delay, args) {
+    if (typeof fn !== "function")
+      return new Timer(0);
+    const id = nextId++;
+    const entry = { fn, args, interval: op === "interval", nativeHandle: null };
+    pending.set(id, entry);
+    if (worker) {
+      worker.postMessage({ op, id, ms: ms(delay) });
+    } else {
+      entry.nativeHandle = op === "interval" ? native.setInterval(() => fn(...args), ms(delay)) : native.setTimeout(() => {
+        pending.delete(id);
+        fn(...args);
+      }, ms(delay));
+    }
+    return new Timer(id);
+  }
+  function cancel(handle) {
+    const id = handle instanceof Timer ? handle.id : Number(handle);
+    const entry = pending.get(id);
+    if (!entry)
+      return;
+    pending.delete(id);
+    if (worker)
+      worker.postMessage({ op: "clear", id });
+    else if (entry.nativeHandle != null) {
+      native.clearTimeout(entry.nativeHandle);
+      native.clearInterval(entry.nativeHandle);
+    }
+  }
+  function setTimeout(fn, delay, ...args) {
+    return schedule("timeout", fn, delay, args);
+  }
+  function setInterval(fn, delay, ...args) {
+    return schedule("interval", fn, delay, args);
+  }
+  function clearTimeout(handle) {
+    cancel(handle);
+  }
+  function clearInterval(handle) {
+    cancel(handle);
+  }
+  var native, WORKER_SRC, worker, nextId, pending, Timer, ms, workerTimers;
+  var init_worker_timers = __esm({
+    "src/shims/worker-timers.js"() {
+      native = {
+        setTimeout: globalThis.setTimeout.bind(globalThis),
+        clearTimeout: globalThis.clearTimeout.bind(globalThis),
+        setInterval: globalThis.setInterval.bind(globalThis),
+        clearInterval: globalThis.clearInterval.bind(globalThis)
+      };
+      WORKER_SRC = `
+const t = new Map();
+onmessage = (e) => {
+  const m = e.data;
+  if (m.op === "timeout") t.set(m.id, setTimeout(() => { t.delete(m.id); postMessage(m.id); }, m.ms));
+  else if (m.op === "interval") t.set(m.id, setInterval(() => postMessage(m.id), m.ms));
+  else if (m.op === "clear") { const h = t.get(m.id); if (h !== undefined) { clearTimeout(h); clearInterval(h); t.delete(m.id); } }
+};`;
+      worker = null;
+      try {
+        if (typeof Worker !== "undefined" && typeof Blob !== "undefined" && typeof URL?.createObjectURL === "function") {
+          worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" })));
+          worker.onerror = () => {
+            worker = null;
+          };
+        }
+      } catch {
+        worker = null;
+      }
+      nextId = 1;
+      pending = /* @__PURE__ */ new Map();
+      if (worker) {
+        worker.onmessage = (e) => {
+          const p = pending.get(e.data);
+          if (!p)
+            return;
+          if (!p.interval)
+            pending.delete(e.data);
+          try {
+            p.fn(...p.args);
+          } catch (err) {
+            native.setTimeout(() => {
+              throw err;
+            }, 0);
+          }
+        };
+      }
+      Timer = class {
+        constructor(id) {
+          this.id = id;
+        }
+        unref() {
+          return this;
+        }
+        ref() {
+          return this;
+        }
+        hasRef() {
+          return true;
+        }
+        refresh() {
+          return this;
+        }
+        [Symbol.toPrimitive]() {
+          return this.id;
+        }
+      };
+      ms = (delay) => Math.max(0, Number(delay) || 0);
+      workerTimers = () => !!worker;
+    }
+  });
+
   // node_modules/@noble/hashes/_u64.js
   function setU64FromNum(view, byteOffset, n, isLE) {
     const h = fromNumH(n);
@@ -220,6 +333,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@noble/hashes/_u64.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       fromNumH = (n) => n / 2 ** 32 | 0;
       fromNumL = (n) => n >>> 0;
     }
@@ -298,6 +412,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@noble/hashes/utils.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       atitle = (title) => title ? `"${title}" ` : "";
       aobject = (value, label) => {
         if (value === null || typeof value !== "object" || Array.isArray(value))
@@ -323,6 +438,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@noble/hashes/_md.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_u64();
       init_utils();
       HashMD = class {
@@ -439,6 +555,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@noble/hashes/sha2.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_md();
       init_utils();
       SHA256_K = /* @__PURE__ */ Uint32Array.from([
@@ -636,6 +753,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "src/shims/node-crypto.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_tweetnacl = __toESM(require_nacl_fast());
       init_sha2();
       Sha512 = class {
@@ -687,6 +805,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/tweetnacl/nacl-fast.js"(exports, module) {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       (function(nacl15) {
         "use strict";
         var gf = function(init) {
@@ -3044,6 +3163,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/utils/base58.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
       BASE = BigInt(58);
       indexes = new Map([...ALPHABET].map((char, index) => [char, BigInt(index)]));
@@ -3117,6 +3237,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/address.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_base58();
       CARRIER_PUBLIC_KEY_SIZE = 32;
       CARRIER_NOSPAM_SIZE = 4;
@@ -3131,6 +3252,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
       "use strict";
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       Object.defineProperty(exports, "__esModule", { value: true });
       var _0 = new Uint8Array(16);
       var _9 = new Uint8Array(32);
@@ -4708,6 +4830,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/crypto/sign.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_curve25519_js = __toESM(require_lib());
       import_tweetnacl2 = __toESM(require_nacl_fast());
     }
@@ -4748,6 +4871,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/utils/bytes.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_crypto();
     }
   });
@@ -4758,6 +4882,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "src/shims/node-events.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       EventEmitter = class {
         constructor() {
           __privateAdd(this, _l, /* @__PURE__ */ new Map());
@@ -4872,6 +4997,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "src/shims/node-stub.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       vfs = globalThis.__beagleVfs ?? (globalThis.__beagleVfs = /* @__PURE__ */ new Map());
       enoent = (p) => Object.assign(new Error(`ENOENT: no such file '${p}'`), { code: "ENOENT" });
       key = (p) => String(p);
@@ -5085,6 +5211,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/bootstrap.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_base58();
       init_bytes();
       import_tweetnacl4 = __toESM(require_nacl_fast(), 1);
@@ -5311,6 +5438,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/inline-file.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       MAX_META_LEN = 4096;
     }
   });
@@ -5321,6 +5449,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/flatbuffers/mjs/constants.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       SIZEOF_SHORT = 2;
       SIZEOF_INT = 4;
       FILE_IDENTIFIER_LENGTH = 4;
@@ -5334,6 +5463,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/flatbuffers/mjs/utils.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       int32 = new Int32Array(2);
       float32 = new Float32Array(int32.buffer);
       float64 = new Float64Array(int32.buffer);
@@ -5347,6 +5477,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/flatbuffers/mjs/encoding.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       (function(Encoding2) {
         Encoding2[Encoding2["UTF8_BYTES"] = 1] = "UTF8_BYTES";
         Encoding2[Encoding2["UTF16_STRING"] = 2] = "UTF16_STRING";
@@ -5360,6 +5491,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/flatbuffers/mjs/byte-buffer.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_constants();
       init_encoding();
       init_utils2();
@@ -5614,6 +5746,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/flatbuffers/mjs/builder.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_byte_buffer();
       init_constants();
       Builder = class _Builder {
@@ -6120,6 +6253,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/flatbuffers/mjs/flatbuffers.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_constants();
       init_utils2();
       init_builder();
@@ -6380,6 +6514,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/packet.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_flatbuffers();
       PACKET_TYPE_USERINFO = 3;
       PACKET_TYPE_FRIEND_REQUEST = 6;
@@ -6588,6 +6723,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/tox-onion.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_tweetnacl5 = __toESM(require_nacl_fast(), 1);
       init_bytes();
       NET_PACKET_ONION_ANNOUNCE_REQUEST = 131;
@@ -6668,6 +6804,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/tox-dht-crypto.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_tweetnacl6 = __toESM(require_nacl_fast(), 1);
       init_bytes();
       NET_PACKET_CRYPTO = 32;
@@ -6752,6 +6889,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/dht-rpc.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_tweetnacl7 = __toESM(require_nacl_fast(), 1);
       init_bytes();
       NET_PACKET_PING_REQUEST = 0;
@@ -6908,6 +7046,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/reed-solomon.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       EXP = new Uint8Array(512);
       LOG = new Uint8Array(256);
       (function initTables() {
@@ -7000,6 +7139,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/filetransfer.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_bytes();
       init_node_crypto();
       init_node_stub();
@@ -7577,10 +7717,10 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
       persistPartial_fn = function(st, force = false) {
         if (!st.partPath)
           return;
-        const pending = st.contiguous - st.persisted;
-        if (pending <= 0)
+        const pending2 = st.contiguous - st.persisted;
+        if (pending2 <= 0)
           return;
-        if (!force && pending < PERSIST_INTERVAL_BYTES)
+        if (!force && pending2 < PERSIST_INTERVAL_BYTES)
           return;
         try {
           appendFileSync(st.partPath, st.buf.subarray(st.persisted, st.contiguous));
@@ -8073,6 +8213,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/dnft1.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_filetransfer();
       DNFT1_MAGIC = Uint8Array.from([30, 68, 78, 70, 84, 49]);
       DNFT1_HEADER_LENGTH = 11;
@@ -8157,6 +8298,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/crypto/shared-key.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_tweetnacl8 = __toESM(require_nacl_fast(), 1);
       init_bytes();
       cache = /* @__PURE__ */ new Map();
@@ -8437,6 +8579,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/net-crypto.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_tweetnacl9 = __toESM(require_nacl_fast(), 1);
       init_node_crypto();
       init_bytes();
@@ -8558,6 +8701,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/express.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_flatbuffers();
       import_tweetnacl10 = __toESM(require_nacl_fast());
       init_base58();
@@ -8834,6 +8978,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "src/shims/node-net.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       DEFAULT_BRIDGE = "/relay-ws";
       bridgeCursor = 0;
       bridgeTickets = /* @__PURE__ */ new Map();
@@ -9040,6 +9185,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/tcp-relay.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       import_tweetnacl11 = __toESM(require_nacl_fast());
       init_node_net();
       init_node_events();
@@ -9526,6 +9672,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/tcp-relay-pool.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_events();
       init_base58();
       init_tcp_relay();
@@ -9899,6 +10046,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/runtime/errors.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       LegacyProtocolNotImplementedError = class extends Error {
         constructor(area) {
           super(`${area} is not implemented: legacy Carrier/toxcore wire compatibility is still unresolved`);
@@ -9914,6 +10062,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/compat/dht.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_errors();
       LegacyDhtClient = class {
         async lookup(pubkey) {
@@ -9965,6 +10114,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/crypto/keypair.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_stub();
       init_node_stub();
       import_tweetnacl12 = __toESM(require_nacl_fast(), 1);
@@ -9981,6 +10131,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "src/shims/node-dgram.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       FakeSocket = class {
         constructor() {
           __privateAdd(this, _l2, /* @__PURE__ */ new Map());
@@ -10080,6 +10231,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/transport/udp.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_dgram();
       init_node_events();
       STUN_MAGIC_COOKIE_BYTES = Uint8Array.of(33, 18, 164, 66);
@@ -10399,6 +10551,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/stun.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_crypto();
       init_bytes();
       STUN_MAGIC_COOKIE = 554869826;
@@ -10453,6 +10606,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/turn.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_stun();
       REQUEST_TIMEOUT_MS = 3e3;
       REQUEST_RETRIES = 3;
@@ -10735,12 +10889,12 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
           clearTimeout(__privateGet(this, _refreshTimer));
         if (__privateGet(this, _closed))
           return;
-        const ms = Math.max(15e3, lifetime * 1e3 / 2);
+        const ms2 = Math.max(15e3, lifetime * 1e3 / 2);
         __privateSet(this, _refreshTimer, setTimeout(() => {
           this.refresh().catch((err) => {
             console.error("[turn] refresh failed:", err.message);
           });
-        }, ms));
+        }, ms2));
       };
     }
   });
@@ -10771,6 +10925,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/turn-creds.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_crypto();
       import_tweetnacl13 = __toESM(require_nacl_fast(), 1);
       init_base58();
@@ -10840,6 +10995,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/ice-servers.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_base58();
       init_turn_creds();
     }
@@ -10898,6 +11054,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/transport/dgram-lifecycle.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_dgram();
     }
   });
@@ -11082,9 +11239,9 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
   function relayPortScore(port) {
     return isLikelyStableRelayPort(port) ? 3 : 0;
   }
-  function sleep(ms) {
+  function sleep(ms2) {
     return new Promise((resolve2) => {
-      setTimeout(resolve2, Math.max(0, ms));
+      setTimeout(resolve2, Math.max(0, ms2));
     });
   }
   function randomBigUint64() {
@@ -11295,6 +11452,7 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
     "node_modules/@decentnetwork/peer/dist/peer.js"() {
       init_buffer_global();
       init_process_global();
+      init_worker_timers();
       init_node_events();
       init_node_stub();
       init_node_stub();
@@ -13914,8 +14072,8 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
             return false;
           const start = session.sendBufferStartNum;
           if (start !== void 0) {
-            const pending = endPacketNumber - start >>> 0;
-            if (pending === 0 || pending > 2147483648)
+            const pending2 = endPacketNumber - start >>> 0;
+            if (pending2 === 0 || pending2 > 2147483648)
               return true;
           } else if (!session.sendArray || session.sendArray.size === 0) {
             return true;
@@ -17097,10 +17255,12 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.7","builtAt":"2026-09-12
   // src/web-entry.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
 
   // src/identity.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
   var import_tweetnacl3 = __toESM(require_nacl_fast(), 1);
   init_address();
   init_sign();
@@ -17153,10 +17313,12 @@ ${ts}`);
   // src/store.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
 
   // src/store-ls.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
   var PREFIX = "beagle-web:";
   var BACKEND_KEY = `${PREFIX}backend`;
   var KV = `${PREFIX}kv:`;
@@ -17526,9 +17688,9 @@ ${ts}`);
     }
     console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
   }
-  var withTimeout = (promise, ms) => Promise.race([
+  var withTimeout = (promise, ms2) => Promise.race([
     promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`storage did not settle in ${ms}ms`)), ms))
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`storage did not settle in ${ms2}ms`)), ms2))
   ]);
   async function withStore(idbOp, lsOp, memOp) {
     if (backend === "mem")
@@ -17779,6 +17941,7 @@ ${ts}`);
   // src/tab-lock.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
   var LOCK = "beagle-peer";
   var CHANNEL = "beagle-web";
   var HANDOVER_TIMEOUT_MS = 3e3;
@@ -17972,6 +18135,7 @@ ${ts}`);
   // src/notify.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
   var DISMISS_KEY = "beagle-web:notify-dismissed";
   function createNotifier({ nameOf } = {}) {
     const supported = typeof Notification !== "undefined" && "permission" in Notification;
@@ -18053,9 +18217,13 @@ ${ts}`);
     return { supported, permission, shouldOffer, request, dismiss, onEvent };
   }
 
+  // src/web-entry.js
+  init_worker_timers();
+
   // src/backend-c.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
   init_peer();
   init_address();
   init_sign();
@@ -18064,6 +18232,7 @@ ${ts}`);
   // src/express-client.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
   init_express();
   function normalizeExpressNodes(entries) {
     return (entries || []).map((e) => ({
@@ -18129,9 +18298,9 @@ ${ts}`);
     const self2 = { ...describeIdentity(keyPair), ephemeral: !!ephemeral };
     const profile = sharedProfile || await kvGetSafe(PROFILE_KEY, null) || { name: "", description: "" };
     let autoAccept = await kvGetSafe(AUTOACCEPT_KEY, false) ?? false;
-    let pending = await kvGetSafe(PENDING_KEY, null) || [];
+    let pending2 = await kvGetSafe(PENDING_KEY, null) || [];
     const aliases = await kvGetSafe(ALIAS_KEY, null) || {};
-    const savePending = () => kvPut2(PENDING_KEY, pending);
+    const savePending = () => kvPut2(PENDING_KEY, pending2);
     const saveAliases = () => kvPut2(ALIAS_KEY, aliases);
     async function recordMessage(peer2, dir, text, via, file, status) {
       const msg = { peer: peer2, dir, text, via, ts: Date.now(), read: dir === "out" };
@@ -18194,8 +18363,8 @@ ${ts}`);
           onEvent?.({ type: "friend-added", userid });
           return;
         }
-        if (!pending.some((p) => p.userid === userid)) {
-          pending.push({
+        if (!pending2.some((p) => p.userid === userid)) {
+          pending2.push({
             userid,
             name: req.name || "",
             descr: req.description || "",
@@ -18510,13 +18679,13 @@ ${ts}`);
     const friendView = (f, stats) => {
       const uid = f.userid || f.pubkey;
       const s = stats?.get(uid);
-      const pending2 = f.status === "requested" && !f.acceptedAt || outgoing.has(uid) && !confirmed.has(uid);
+      const pending3 = f.status === "requested" && !f.acceptedAt || outgoing.has(uid) && !confirmed.has(uid);
       return {
         userid: uid,
         address: f.address,
         name: aliases[uid] || f.name || "",
         alias: aliases[uid] || "",
-        status: pending2 ? "requested" : isOnline(uid) ? "online" : "offline",
+        status: pending3 ? "requested" : isOnline(uid) ? "online" : "offline",
         // Advertised client metadata (userinfo extension). The UI uses this to
         // decide whether a peer can take a WebRTC DataChannel file — a phone
         // cannot, and treats the offer as an incoming CALL.
@@ -18648,12 +18817,12 @@ ${ts}`);
           return ok({ userid, via: "onion", queued: true });
         }
         case "friends-pending":
-          return ok({ pending });
+          return ok({ pending: pending2 });
         case "friends-accept": {
-          const idx = pending.findIndex((p) => p.userid === req.userid);
+          const idx = pending2.findIndex((p) => p.userid === req.userid);
           if (idx < 0)
             return fail("no such pending request");
-          const [entry] = pending.splice(idx, 1);
+          const [entry] = pending2.splice(idx, 1);
           try {
             await peer.acceptFriendRequest(req.userid, {
               name: entry.name,
@@ -18663,7 +18832,7 @@ ${ts}`);
               nospam: entry.nospam
             });
           } catch (err) {
-            pending.splice(idx, 0, entry);
+            pending2.splice(idx, 0, entry);
             return fail(String(err?.message || err));
           }
           void savePending();
@@ -18671,7 +18840,7 @@ ${ts}`);
           return ok({ userid: req.userid });
         }
         case "friends-reject": {
-          pending = pending.filter((p) => p.userid !== req.userid);
+          pending2 = pending2.filter((p) => p.userid !== req.userid);
           try {
             peer.rejectFriendRequest(req.userid);
           } catch {
@@ -18876,10 +19045,12 @@ ${ts}`);
   // src/api-router.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
 
   // src/punks.js
   init_buffer_global();
   init_process_global();
+  init_worker_timers();
   var ZERO = "0".repeat(32);
   var CONFIG_URL2 = "https://beagle.chat/assets/bgservers.json";
   var API_TIMEOUT_MS = 4e3;
@@ -19786,6 +19957,7 @@ ${ts}`);
           }
         }
       });
+      this.workerTimers = workerTimers();
       this.lock = createTabLock({
         onAcquired: () => {
           if (!this.readOnly)
