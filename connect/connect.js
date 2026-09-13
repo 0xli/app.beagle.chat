@@ -4779,6 +4779,14 @@ ${nonce2}`);
     }
   })();
   var lsUsable = available();
+  var WEBKIT = (() => {
+    try {
+      const ua = String(globalThis.navigator?.userAgent || "");
+      return /AppleWebKit/.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/.test(ua);
+    } catch {
+      return false;
+    }
+  })();
   var backend = (() => {
     if (forced === "mem")
       return "mem";
@@ -4789,8 +4797,11 @@ ${nonce2}`);
         unlatch();
       return "idb";
     }
-    if (lsUsable && latched())
-      return "ls";
+    if (lsUsable && latched()) {
+      if (WEBKIT)
+        return "ls";
+      unlatch();
+    }
     return "idb";
   })();
   function isStorageWedged() {
@@ -4806,7 +4817,8 @@ ${nonce2}`);
       return;
     backend = lsUsable ? "ls" : "mem";
     if (backend === "ls") {
-      latch();
+      if (WEBKIT)
+        latch();
       if (err?.stage !== "open") {
         migration = withTimeout(migrate(err), MIGRATE_TIMEOUT_MS).catch(() => {
         });
@@ -4865,10 +4877,33 @@ ${nonce2}`);
     }
     console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
   }
-  var withTimeout = (promise, ms) => Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`storage did not settle in ${ms}ms`)), ms))
-  ]);
+  var LATE_SLACK_MS = 3e3;
+  function deadline(ms, onExpire) {
+    let timer, armedAt, rearmed = false;
+    const arm = () => {
+      armedAt = Date.now();
+      timer = setTimeout(() => {
+        if (!rearmed && Date.now() - armedAt > ms + LATE_SLACK_MS) {
+          rearmed = true;
+          arm();
+          return;
+        }
+        onExpire();
+      }, ms);
+    };
+    arm();
+    return { cancel: () => clearTimeout(timer) };
+  }
+  var withTimeout = (promise, ms) => new Promise((resolve, reject) => {
+    const d = deadline(ms, () => reject(new Error(`storage did not settle in ${ms}ms`)));
+    promise.then((v) => {
+      d.cancel();
+      resolve(v);
+    }, (e) => {
+      d.cancel();
+      reject(e);
+    });
+  });
   async function withStore(idbOp, lsOp, memOp) {
     if (backend === "mem")
       return memOp();
@@ -4877,6 +4912,14 @@ ${nonce2}`);
     try {
       return await idbOp();
     } catch (err) {
+      if (!WEBKIT && err?.stage !== "open") {
+        try {
+          return await idbOp();
+        } catch (again) {
+          console.warn("beagle-web: IndexedDB operation failed twice; staying on it", again?.message || again);
+          return memOp();
+        }
+      }
       degrade(err);
       if (backend === "ls")
         return runLs(lsOp, memOp);
@@ -4897,13 +4940,13 @@ ${nonce2}`);
       const settle = (fn2, v) => {
         if (!done) {
           done = true;
-          clearTimeout(timer);
+          timer.cancel();
           fn2(v);
         }
       };
-      const timer = setTimeout(
-        () => settle(reject, new Error(`IndexedDB ${mode} on '${store}' did not settle in ${timeoutMs}ms`)),
-        timeoutMs
+      const timer = deadline(
+        timeoutMs,
+        () => settle(reject, new Error(`IndexedDB ${mode} on '${store}' did not settle in ${timeoutMs}ms`))
       );
       let t, req;
       try {
@@ -4920,8 +4963,8 @@ ${nonce2}`);
   }
   var idb = async (store, mode, fn, timeoutMs) => {
     const budget = timeoutMs ?? TX_TIMEOUT_MS;
-    const deadline = Date.now() + budget;
-    const left = () => Math.max(50, deadline - Date.now());
+    const deadline2 = Date.now() + budget;
+    const left = () => Math.max(50, deadline2 - Date.now());
     let db;
     try {
       db = await withTimeout(openDB(), Math.min(left(), OPEN_TIMEOUT_MS));
@@ -4950,7 +4993,10 @@ ${nonce2}`);
         return v;
       },
       () => kvGet(key),
-      () => memKv.get(key)
+      // The memory floor for a MIRRORED key is the mirror: a boot read of the
+      // identity that failed twice must not turn a returning user into a
+      // stranger with a fresh key.
+      () => lsUsable && MIRRORED.has(key) ? kvGet(key) ?? memKv.get(key) : memKv.get(key)
     );
   }
   async function kvGetSafe(key, fallback = null, onFail) {

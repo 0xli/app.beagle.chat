@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+// http:// is a different origin from https:// — different storage, so no
+// identity and no friends there — and not a secure context, so the browser
+// withholds WebCrypto and the page cannot even mint a key. Seen 2026-09-13:
+// a person typed http://app.beagle.chat and found an empty Profile. Only
+// localhost and LAN addresses may run over http (dev, and the daemon's own UI).
+if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/.test(location.hostname)) {
+  location.replace("https://" + location.host + location.pathname + location.search + location.hash);
+}
+</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Beagle Chat</title>
@@ -136,7 +146,7 @@
 <!-- The UI: @decentnetwork/beagle-ui plus this platform's host (src/ui/). -->
 <!-- backend C: identity, storage, tab lock, /api interception. Must precede app.js. -->
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="beagle-web.js?v=655b4bb5f7"></script>
+<script src="beagle-web.js?v=8bde06e9b3"></script>
 <script src="app.js?v=bb768fe5fc"></script>
 </body>
 </html>

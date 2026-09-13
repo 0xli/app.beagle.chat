@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.8","builtAt":"2026-09-13T06:17:34.833Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.8","builtAt":"2026-09-13T23:06:23.093Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -14065,7 +14065,7 @@ onmessage = (e) => {
         const watched = __privateGet(this, _friendSessions).get(pubkey);
         if (!watched)
           return false;
-        const deadline = Date.now() + timeoutMs;
+        const deadline2 = Date.now() + timeoutMs;
         for (; ; ) {
           const session = __privateGet(this, _friendSessions).get(pubkey);
           if (session !== watched || !session.established)
@@ -14078,7 +14078,7 @@ onmessage = (e) => {
           } else if (!session.sendArray || session.sendArray.size === 0) {
             return true;
           }
-          if (Date.now() >= deadline)
+          if (Date.now() >= deadline2)
             return false;
           await sleep(250);
         }
@@ -14854,7 +14854,7 @@ onmessage = (e) => {
             }
             const relayOnly = !session.remote || session.remote.host.startsWith("tcp:");
             const pathless = relayOnly && !session.hasTcpRoute;
-            const deadline = proven && !pathless ? PROVEN_SESSION_HARD_TIMEOUT_MS : FRIEND_TIMEOUT_MS;
+            const deadline2 = proven && !pathless ? PROVEN_SESSION_HARD_TIMEOUT_MS : FRIEND_TIMEOUT_MS;
             if (rekeyStuck) {
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `session re-key desync for ${friendId} (no good decrypt in ${silentFor}ms; undecryptable packets still arriving) \u2014 tearing down to re-handshake`);
               __privateGet(this, _friendSessions).delete(friendId);
@@ -14869,9 +14869,9 @@ onmessage = (e) => {
               } catch {
               }
               continue;
-            } else if (proven && !pathless && silentFor > FRIEND_TIMEOUT_MS && silentFor <= deadline) {
+            } else if (proven && !pathless && silentFor > FRIEND_TIMEOUT_MS && silentFor <= deadline2) {
               __privateMethod(this, _debugVerboseLog, debugVerboseLog_fn).call(this, `session blackout-grace ${friendId} (silent ${silentFor}ms, proven \u2014 keeping keys, not re-handshaking)`);
-            } else if (silentFor > deadline) {
+            } else if (silentFor > deadline2) {
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `session timeout for ${friendId} (no ping in ${silentFor}ms, proven=${proven}; lastPingRecv=${session.lastPingRecvMs ?? "never"}) \u2014 tearing down to re-handshake`);
               __privateGet(this, _friendSessions).delete(friendId);
               __privateMethod(this, _setFriendOffline, setFriendOffline_fn).call(this, friendId);
@@ -17600,6 +17600,14 @@ ${ts}`);
     }
   })();
   var lsUsable = available();
+  var WEBKIT = (() => {
+    try {
+      const ua = String(globalThis.navigator?.userAgent || "");
+      return /AppleWebKit/.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/.test(ua);
+    } catch {
+      return false;
+    }
+  })();
   var backend = (() => {
     if (forced === "mem")
       return "mem";
@@ -17610,8 +17618,11 @@ ${ts}`);
         unlatch();
       return "idb";
     }
-    if (lsUsable && latched())
-      return "ls";
+    if (lsUsable && latched()) {
+      if (WEBKIT)
+        return "ls";
+      unlatch();
+    }
     return "idb";
   })();
   function storageMode() {
@@ -17629,7 +17640,8 @@ ${ts}`);
       return;
     backend = lsUsable ? "ls" : "mem";
     if (backend === "ls") {
-      latch();
+      if (WEBKIT)
+        latch();
       if (err?.stage !== "open") {
         migration = withTimeout(migrate(err), MIGRATE_TIMEOUT_MS).catch(() => {
         });
@@ -17688,10 +17700,33 @@ ${ts}`);
     }
     console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
   }
-  var withTimeout = (promise, ms2) => Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`storage did not settle in ${ms2}ms`)), ms2))
-  ]);
+  var LATE_SLACK_MS = 3e3;
+  function deadline(ms2, onExpire) {
+    let timer, armedAt, rearmed = false;
+    const arm = () => {
+      armedAt = Date.now();
+      timer = setTimeout(() => {
+        if (!rearmed && Date.now() - armedAt > ms2 + LATE_SLACK_MS) {
+          rearmed = true;
+          arm();
+          return;
+        }
+        onExpire();
+      }, ms2);
+    };
+    arm();
+    return { cancel: () => clearTimeout(timer) };
+  }
+  var withTimeout = (promise, ms2) => new Promise((resolve2, reject) => {
+    const d = deadline(ms2, () => reject(new Error(`storage did not settle in ${ms2}ms`)));
+    promise.then((v) => {
+      d.cancel();
+      resolve2(v);
+    }, (e) => {
+      d.cancel();
+      reject(e);
+    });
+  });
   async function withStore(idbOp, lsOp, memOp) {
     if (backend === "mem")
       return memOp();
@@ -17700,6 +17735,14 @@ ${ts}`);
     try {
       return await idbOp();
     } catch (err) {
+      if (!WEBKIT && err?.stage !== "open") {
+        try {
+          return await idbOp();
+        } catch (again) {
+          console.warn("beagle-web: IndexedDB operation failed twice; staying on it", again?.message || again);
+          return memOp();
+        }
+      }
       degrade(err);
       if (backend === "ls")
         return runLs(lsOp, memOp);
@@ -17720,13 +17763,13 @@ ${ts}`);
       const settle = (fn2, v) => {
         if (!done) {
           done = true;
-          clearTimeout(timer);
+          timer.cancel();
           fn2(v);
         }
       };
-      const timer = setTimeout(
-        () => settle(reject, new Error(`IndexedDB ${mode} on '${store}' did not settle in ${timeoutMs}ms`)),
-        timeoutMs
+      const timer = deadline(
+        timeoutMs,
+        () => settle(reject, new Error(`IndexedDB ${mode} on '${store}' did not settle in ${timeoutMs}ms`))
       );
       let t, req;
       try {
@@ -17743,8 +17786,8 @@ ${ts}`);
   }
   var idb = async (store, mode, fn, timeoutMs) => {
     const budget = timeoutMs ?? TX_TIMEOUT_MS;
-    const deadline = Date.now() + budget;
-    const left = () => Math.max(50, deadline - Date.now());
+    const deadline2 = Date.now() + budget;
+    const left = () => Math.max(50, deadline2 - Date.now());
     let db;
     try {
       db = await withTimeout(openDB(), Math.min(left(), OPEN_TIMEOUT_MS));
@@ -17773,7 +17816,10 @@ ${ts}`);
         return v;
       },
       () => kvGet(key2),
-      () => memKv.get(key2)
+      // The memory floor for a MIRRORED key is the mirror: a boot read of the
+      // identity that failed twice must not turn a returning user into a
+      // stranger with a fresh key.
+      () => lsUsable && MIRRORED.has(key2) ? kvGet(key2) ?? memKv.get(key2) : memKv.get(key2)
     );
   }
   async function kvGetSafe(key2, fallback = null, onFail) {
@@ -18041,6 +18087,8 @@ ${ts}`);
       onLost?.(reason);
     }
     async function acquire({ steal = false } = {}) {
+      if (held)
+        return { held: true, via: "queued" };
       return new Promise((resolve2) => {
         const opts = steal ? { steal: true } : { ifAvailable: true };
         navigator.locks.request(LOCK, opts, (lock) => hold(lock, resolve2)).catch((err) => {
@@ -18068,6 +18116,10 @@ ${ts}`);
       });
       bc.postMessage({ type: "request-release" });
       const clean2 = await releasedCleanly;
+      for (let i = 0; i < 40 && !held; i++)
+        await new Promise((r) => setTimeout(r, 25));
+      if (held)
+        return { held: true, via: clean2 ? "handover" : "queued" };
       const result = await acquire({ steal: !clean2 });
       return { ...result, via: clean2 ? "handover" : "steal" };
     }
@@ -19505,6 +19557,10 @@ ${ts}`);
       const p = url.pathname;
       if (UNSUPPORTED.has(p))
         return json({ ok: false, unsupported: true, error: "not available in the browser client" });
+      const hdr = init?.headers || {};
+      const forwarded = hdr["x-beagle-forwarded"] || hdr["X-Beagle-Forwarded"] || typeof hdr.get === "function" && hdr.get("x-beagle-forwarded");
+      if (forwarded && method !== "GET")
+        return json({ ok: false, readOnly: true, error: NO_ANSWER }, 409);
       if (LOCAL_ONLY.has(p)) {
         if (p === "/api/call-poll")
           return json({ signals: [], cursor: 0 });
@@ -19968,6 +20024,11 @@ ${ts}`);
           this.bringUp?.();
         },
         onLost: (r) => {
+          try {
+            this.actions?.close();
+          } catch {
+          }
+          this.actions = null;
           this.routers = { early: null, full: null };
           this.lockState = { held: false, reason: r || "taken by another tab" };
           this.onLockLost?.(r);
@@ -20124,6 +20185,8 @@ ${ts}`);
      *  service — re-acquiring the lock without installing the routers would
      *  leave the tab just as dead as before. */
     async takeover() {
+      if (this.lock?.held && !this.readOnly)
+        return this.lockState;
       this.lockState = await this.lock.takeover();
       if (this.lockState.held) {
         this.readOnly = false;
@@ -20230,6 +20293,8 @@ ${ts}`);
       this.actions = bc;
       bc.onmessage = async (ev) => {
         const d = ev.data;
+        if (this.readOnly || !this.lockState?.held)
+          return;
         if (d?.type === "state-request" && d.id) {
           let data = null;
           try {
@@ -20258,13 +20323,13 @@ ${ts}`);
         if (d?.type === "api-request" && d.id) {
           const run = () => fetch(d.path, {
             method: d.method || "GET",
-            headers: d.contentType ? { "content-type": d.contentType } : void 0,
+            headers: { "x-beagle-forwarded": "1", ...d.contentType ? { "content-type": d.contentType } : {} },
             body: d.method === "GET" || d.method === "HEAD" ? void 0 : d.body
           }).then(async (x) => ({ status: x.status, body: await x.json().catch(() => ({ ok: x.ok })) }));
           try {
             let r = await run();
-            const deadline = Date.now() + ACTION_BOOT_WAIT_MS;
-            while ((r.body?.booting || r.body?.starting) && Date.now() < deadline) {
+            const deadline2 = Date.now() + ACTION_BOOT_WAIT_MS;
+            while ((r.body?.booting || r.body?.starting) && Date.now() < deadline2) {
               await new Promise((f) => setTimeout(f, 1e3));
               r = await run();
             }
@@ -20279,13 +20344,13 @@ ${ts}`);
         const done = (ok, error) => bc.postMessage({ type: "add-friend-result", id: d.id, ok, error });
         const send = () => fetch("/api/add", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: { "content-type": "application/json", "x-beagle-forwarded": "1" },
           body: JSON.stringify({ address: String(d.address || ""), hello: String(d.hello || "") })
         }).then((x) => x.json());
         try {
           let r = await send();
-          const deadline = Date.now() + ACTION_BOOT_WAIT_MS;
-          while (r?.booting && Date.now() < deadline) {
+          const deadline2 = Date.now() + ACTION_BOOT_WAIT_MS;
+          while (r?.booting && Date.now() < deadline2) {
             await new Promise((f) => setTimeout(f, 1e3));
             r = await send();
           }
