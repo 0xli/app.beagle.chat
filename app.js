@@ -519,6 +519,9 @@
       minWidth: 0
     } }, dkContactPreview(peer.lastMsg) || peer.lastMsg))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)" } }, peer.lastTime), peer.unread ? /* @__PURE__ */ React.createElement(Unread, { n: peer.unread }) : peer.pending ? /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 11, stroke: 2.2, color: "var(--warn, #d29922)", title: "friend request pending" }) : /* @__PURE__ */ React.createElement(StatusDot, { online: peer.online })));
   }
+  function dkActivityTs(p) {
+    return Math.max(p.lastTs || 0, p.acceptedAt || 0, p.requestedAt || 0);
+  }
   function PeerSidebar({ T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed }) {
     const [q, setQ] = React.useState("");
     const [addr, setAddr] = React.useState("");
@@ -556,7 +559,7 @@
       const s = (p.alias || "") + " " + p.userId + " " + p.ip;
       return s.toLowerCase().includes(q.toLowerCase());
     }).slice().sort((a, b) => {
-      const ta = a.lastTs || 0, tb = b.lastTs || 0;
+      const ta = dkActivityTs(a), tb = dkActivityTs(b);
       if (ta !== tb)
         return tb - ta;
       return String(a.alias || a.userId || "").localeCompare(String(b.alias || b.userId || ""));
@@ -2715,6 +2718,35 @@ ${peer.address}`
     )));
     return /* @__PURE__ */ React.createElement(Card, { label: zh ? "\u663E\u793A" : "Display" }, /* @__PURE__ */ React.createElement("div", { style: { ...row, borderBottom: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement("span", { style: name }, zh ? "\u8BED\u8A00" : "Language"), seg("lang", t.lang, (v) => setTweak("lang", v), [["en", "EN"], ["zh", "\u4E2D\u6587"]])), /* @__PURE__ */ React.createElement("div", { style: row }, /* @__PURE__ */ React.createElement("span", { style: name }, zh ? "\u4E3B\u9898" : "Theme"), seg("theme", t.theme, (v) => setTweak("theme", v), [["dark", zh ? "\u6DF1\u8272" : "Dark"], ["light", zh ? "\u6D45\u8272" : "Light"]])));
   }
+  function DkAlertSettings({ t, setTweak }) {
+    const zh = t.lang === "zh";
+    const toggle = (key, label, sub, last) => /* @__PURE__ */ React.createElement("label", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 13,
+      padding: "13px 16px",
+      cursor: "pointer",
+      borderBottom: last ? "none" : "1px solid var(--line)"
+    } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: t[key] !== false,
+        onChange: (e) => setTweak(key, e.target.checked),
+        style: { width: 16, height: 16, accentColor: "var(--accent)" }
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--text)" } }, label), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--dim)", marginTop: 2 } }, sub)));
+    return /* @__PURE__ */ React.createElement(Card, { label: zh ? "\u63D0\u9192" : "Alerts" }, toggle(
+      "alertSound",
+      zh ? "\u65B0\u6D88\u606F\u63D0\u793A\u97F3" : "Sound for new messages",
+      zh ? "\u6536\u5230\u65B0\u6D88\u606F\u6216\u597D\u53CB\u8BF7\u6C42\u65F6\u64AD\u653E\u77ED\u4FC3\u63D0\u793A\u97F3\u3002\u6B63\u5728\u770B\u7684\u5F53\u524D\u4F1A\u8BDD\u4E0D\u4F1A\u54CD\u3002" : "A short chime when a message or friend request arrives. Silent for the conversation you are reading."
+    ), toggle(
+      "alertFlash",
+      zh ? "\u6807\u7B7E\u9875\u95EA\u70C1" : "Flash the tab",
+      zh ? "\u7A97\u53E3\u4E0D\u5728\u524D\u53F0\u65F6\uFF0C\u6807\u7B7E\u6807\u9898\u548C\u56FE\u6807\u95EA\u70C1\u63D0\u793A\uFF0C\u56DE\u5230\u7A97\u53E3\u5373\u505C\u6B62\u3002" : "While this window is in the background, the tab title and icon blink until you come back.",
+      true
+    ));
+  }
   function ProfileTab({ T, me, onEdit, t, setTweak }) {
     var _a;
     const [qr, setQr] = React.useState(null);
@@ -2736,7 +2768,7 @@ ${peer.address}`
         },
         style: { width: 16, height: 16, accentColor: "var(--accent)" }
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--text)" } }, T && T.autoAcceptLabel || "Auto-accept friend requests"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--dim)", marginTop: 2 } }, T && T.autoAcceptSub || "Off: requests wait in the sidebar for your approval.")))), hostHasKeyBackup && /* @__PURE__ */ React.createElement(DkKeyBackup, { t: t || {} }), t && setTweak && /* @__PURE__ */ React.createElement(DkDisplaySettings, { t, setTweak }), /* @__PURE__ */ React.createElement(Card, { label: T.network }, /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.virtualIp, value: me.ip, copy: true }), /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.wireLabel, value: `${me.wire} \xB7 lossless`, mono: false }), /* @__PURE__ */ React.createElement(DkVersionRow, { T, me }), /* @__PURE__ */ React.createElement(DkUpdateCheck, { T })), /* @__PURE__ */ React.createElement(Card, { label: T.dangerZone }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 13, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: "color-mix(in oklab, var(--danger), transparent 86%)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--danger)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "trash", size: 17, stroke: 2 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--danger)" } }, T.deleteNode), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)", marginTop: 1 } }, T.deleteSub)), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", size: "sm" }, T.delete)))), qr && /* @__PURE__ */ React.createElement(DkQrModal, { T, value: qr.value, label: qr.label, onClose: () => setQr(null) }), editing && /* @__PURE__ */ React.createElement(DkEditModal, { T, me, onClose: () => setEditing(false), onSave: (name, description) => {
+    ), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--text)" } }, T && T.autoAcceptLabel || "Auto-accept friend requests"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--dim)", marginTop: 2 } }, T && T.autoAcceptSub || "Off: requests wait in the sidebar for your approval.")))), hostHasKeyBackup && /* @__PURE__ */ React.createElement(DkKeyBackup, { t: t || {} }), t && setTweak && /* @__PURE__ */ React.createElement(DkAlertSettings, { t, setTweak }), t && setTweak && /* @__PURE__ */ React.createElement(DkDisplaySettings, { t, setTweak }), /* @__PURE__ */ React.createElement(Card, { label: T.network }, /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.virtualIp, value: me.ip, copy: true }), /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.wireLabel, value: `${me.wire} \xB7 lossless`, mono: false }), /* @__PURE__ */ React.createElement(DkVersionRow, { T, me }), /* @__PURE__ */ React.createElement(DkUpdateCheck, { T })), /* @__PURE__ */ React.createElement(Card, { label: T.dangerZone }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 13, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: "color-mix(in oklab, var(--danger), transparent 86%)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--danger)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "trash", size: 17, stroke: 2 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--danger)" } }, T.deleteNode), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)", marginTop: 1 } }, T.deleteSub)), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", size: "sm" }, T.delete)))), qr && /* @__PURE__ */ React.createElement(DkQrModal, { T, value: qr.value, label: qr.label, onClose: () => setQr(null) }), editing && /* @__PURE__ */ React.createElement(DkEditModal, { T, me, onClose: () => setEditing(false), onSave: (name, description) => {
       if (onEdit)
         onEdit(name, description);
       setEditing(false);
@@ -4285,6 +4317,181 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1040, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement(MyNode, { T, me, activeExit, peers, reqCount }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.peerRouting, count: peers.length }), /* @__PURE__ */ React.createElement(PeerTable, { T, peers, onOpenChat })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.exitNodes, trailing: /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { icon: "plus", size: "sm" }, T.addExit)) }), activeExit && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, background: "color-mix(in oklab, var(--warn), transparent 90%)", border: "1px solid color-mix(in oklab, var(--warn), transparent 70%)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 17, color: "var(--warn)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, T.egressVia), /* @__PURE__ */ React.createElement(Mono, { size: 13, copy: activeExit }, activeExit), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "unlink", size: "sm", onClick: () => onSetExit(null) }, T.stopRouting)), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, exits.map((r) => /* @__PURE__ */ React.createElement(ExitCard, { key: r.region, T, region: r, activeExit, onSetExit }))))));
   }
   Object.assign(window, { NetworkTab });
+  var dkAudioCtx = null;
+  function dkAudio() {
+    if (dkAudioCtx && dkAudioCtx.state !== "closed")
+      return dkAudioCtx;
+    try {
+      dkAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      dkAudioCtx = null;
+    }
+    return dkAudioCtx;
+  }
+  function dkUnlockAudioOnGesture() {
+    const unlock = () => {
+      const c = dkAudio();
+      if (c && c.state === "suspended")
+        c.resume().catch(() => {
+        });
+    };
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }
+  function dkChime(kind) {
+    const c = dkAudio();
+    if (!c)
+      return;
+    if (c.state === "suspended")
+      c.resume().catch(() => {
+      });
+    const notes = kind === "request" ? [[660, 0], [880, 0.14]] : [[880, 0], [1175, 0.11]];
+    const t0 = c.currentTime;
+    for (const [freq, at] of notes) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      o.connect(g);
+      g.connect(c.destination);
+      const t = t0 + at;
+      g.gain.setValueAtTime(1e-4, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(1e-4, t + 0.17);
+      o.start(t);
+      o.stop(t + 0.2);
+    }
+  }
+  var dkFlash = { timer: null, title: "", link: null, href: null, badged: null, on: false, n: 0, label: "" };
+  function dkBadgedIcon(href) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          if (!img.naturalWidth)
+            return rej(new Error("icon has no intrinsic size"));
+          const s = 64, cv = document.createElement("canvas");
+          cv.width = s;
+          cv.height = s;
+          const cx = cv.getContext("2d");
+          cx.drawImage(img, 0, 0, s, s);
+          cx.beginPath();
+          cx.arc(s - 14, 14, 12, 0, Math.PI * 2);
+          cx.fillStyle = "#e5484d";
+          cx.fill();
+          cx.lineWidth = 3;
+          cx.strokeStyle = "#fff";
+          cx.stroke();
+          res(cv.toDataURL("image/png"));
+        } catch (e) {
+          rej(e);
+        }
+      };
+      img.onerror = () => rej(new Error("icon failed to load"));
+      img.src = href;
+    });
+  }
+  function dkFlashTick() {
+    dkFlash.on = !dkFlash.on;
+    document.title = `(${dkFlash.n}) ${dkFlash.on ? dkFlash.label : dkFlash.title}`;
+  }
+  function dkFlashStart(label, count) {
+    dkFlash.n += count || 1;
+    dkFlash.label = label;
+    if (dkFlash.timer)
+      return;
+    dkFlash.title = document.title;
+    dkFlash.link = document.querySelector('link[rel~="icon"]');
+    dkFlash.href = dkFlash.link ? dkFlash.link.href : null;
+    dkFlash.badged = null;
+    dkFlash.on = false;
+    if (dkFlash.href) {
+      dkBadgedIcon(dkFlash.href).then((b) => {
+        dkFlash.badged = b;
+        if (dkFlash.timer && dkFlash.link)
+          dkFlash.link.href = b;
+      }).catch(() => {
+      });
+    }
+    dkFlashTick();
+    dkFlash.timer = setInterval(dkFlashTick, 1e3);
+  }
+  function dkFlashStop() {
+    if (!dkFlash.timer)
+      return;
+    clearInterval(dkFlash.timer);
+    dkFlash.timer = null;
+    dkFlash.n = 0;
+    document.title = dkFlash.title;
+    if (dkFlash.link && dkFlash.href)
+      dkFlash.link.href = dkFlash.href;
+  }
+  function dkLooking() {
+    return document.visibilityState === "visible" && document.hasFocus();
+  }
+  function useIncomingAlerts({ T, peers, requests, loaded, activeId, sound = true, flash = true }) {
+    const prev = React.useRef(null);
+    React.useEffect(() => dkUnlockAudioOnGesture(), []);
+    React.useEffect(() => {
+      if (!flash)
+        dkFlashStop();
+    }, [flash]);
+    React.useEffect(() => {
+      const seen = () => {
+        if (dkLooking())
+          dkFlashStop();
+      };
+      window.addEventListener("focus", seen);
+      window.addEventListener("pointerdown", seen, { passive: true });
+      document.addEventListener("visibilitychange", seen);
+      return () => {
+        window.removeEventListener("focus", seen);
+        window.removeEventListener("pointerdown", seen);
+        document.removeEventListener("visibilitychange", seen);
+        dkFlashStop();
+      };
+    }, []);
+    React.useEffect(() => {
+      if (!loaded)
+        return;
+      const byId = /* @__PURE__ */ new Map();
+      for (const p of peers || []) {
+        const dir = p.lastDir || (String(p.lastMsg || "").startsWith("you: ") ? "out" : "in");
+        byId.set(p.id, { ts: p.lastTs || 0, dir });
+      }
+      const reqIds = new Set((requests || []).map((r) => r.id));
+      const was = prev.current;
+      prev.current = { byId, reqIds };
+      if (!was)
+        return;
+      let msgs = 0, elsewhere = 0, reqs = 0;
+      for (const [id, cur] of byId) {
+        if (cur.dir !== "in" || !cur.ts)
+          continue;
+        const old = was.byId.get(id);
+        if (old ? cur.ts <= old.ts : Date.now() - cur.ts > 3e4)
+          continue;
+        msgs += 1;
+        if (id !== activeId)
+          elsewhere += 1;
+      }
+      for (const id of reqIds)
+        if (!was.reqIds.has(id))
+          reqs += 1;
+      if (!msgs && !reqs)
+        return;
+      const looking = dkLooking();
+      if (sound && !(looking && !reqs && !elsewhere))
+        dkChime(reqs && !msgs ? "request" : "message");
+      if (flash && !looking) {
+        const label = msgs ? T && T.alertMsg || "New message" : T && T.alertReq || "New friend request";
+        dkFlashStart(label, msgs + reqs);
+      }
+    }, [peers, requests, loaded, activeId, T, sound, flash]);
+  }
   var TWEAKS_STORAGE_KEY = "decentlan.tweaks";
   function useTweaks(defaults) {
     const [values, setValues] = React.useState(() => {
@@ -4342,7 +4549,9 @@ ${peer.address}`
       "accent": "#7B6CF6",
       "density": "compact",
       "lang": "en",
-      "startTab": "chat"
+      "startTab": "chat",
+      "alertSound": true,
+      "alertFlash": true
     }
   );
   function dkDetectLang() {
@@ -4411,6 +4620,8 @@ ${peer.address}`
       network: "Network",
       apps: "Apps",
       profile: "Profile",
+      alertMsg: "New message",
+      alertReq: "New friend request",
       recommended: "Discover",
       registered: "Names",
       here: "Here",
@@ -4591,6 +4802,8 @@ ${peer.address}`
       network: "\u7F51\u7EDC",
       apps: "\u5E94\u7528",
       profile: "\u6211\u7684",
+      alertMsg: "\u65B0\u6D88\u606F",
+      alertReq: "\u65B0\u7684\u597D\u53CB\u8BF7\u6C42",
       recommended: "\u63A8\u8350",
       registered: "\u540D\u5F55",
       here: "\u5728\u573A",
@@ -4983,6 +5196,15 @@ ${peer.address}`
     const T = STR[t.lang] || STR.en;
     const vars = dkTheme(t.theme, t.accent);
     const rowPad = t.density === "comfortable" ? "11px 12px" : "7px 10px";
+    useIncomingAlerts({
+      T,
+      peers,
+      requests,
+      loaded: data.loaded,
+      activeId,
+      sound: t.alertSound !== false,
+      flash: t.alertFlash !== false
+    });
     const callCtl = useCallController(me.userId, (peerId, video, direction) => {
       const text = `WebRTC ${video ? "video" : "audio"} call: ${direction}`;
       dkApi.logLocal(peerId, direction === "outgoing" ? "out" : "in", text).then(() => {
@@ -5124,10 +5346,16 @@ ${peer.address}`
       { id: "recommended", icon: "sparkles", label: T.recommended },
       { id: "registered", icon: "at", label: T.registered },
       { id: "network", icon: "network", label: T.network },
-      { id: "apps", icon: "grid", label: T.apps },
-      { id: "profile", icon: "userRound", label: T.profile }
+      { id: "apps", icon: "grid", label: T.apps }
     ];
-    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", nav.find((n) => n.id === tab).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: {
+      padding: 4,
+      borderRadius: 12,
+      cursor: "pointer",
+      display: "flex",
+      border: "1px solid " + (tab === "profile" ? "var(--line)" : "transparent"),
+      background: tab === "profile" ? "var(--panel-2)" : "transparent"
+    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
       DkLockedOut,
       {
         compact: true,
