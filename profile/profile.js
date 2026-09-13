@@ -100,6 +100,36 @@
     ios: "https://apps.apple.com/us/app/beagle-chat/id1597429120",
     android: "https://play.google.com/store/apps/details?id=chat.beagle"
   };
+  var ANDROID_PACKAGE = "chat.beagle";
+  var OPEN_APP_WAIT_MS = 1600;
+  var appScheme = (p) => `beagle://add?address=${encodeURIComponent(p.address)}${p.name ? `&name=${encodeURIComponent(p.name)}` : ""}${p.ens ? `&ens=${encodeURIComponent(p.ens)}` : ""}`;
+  var playWithReferrer = (p) => `${STORE.android}&referrer=${encodeURIComponent(`address=${p.address}`)}`;
+  var androidIntent = (p) => `intent://add?address=${encodeURIComponent(p.address)}#Intent;scheme=beagle;package=${ANDROID_PACKAGE};S.browser_fallback_url=${encodeURIComponent(playWithReferrer(p))};end`;
+  function openAppOrStore(phone, p) {
+    let gone = false;
+    const off = () => {
+      gone = gone || document.visibilityState === "hidden";
+    };
+    document.addEventListener("visibilitychange", off);
+    window.addEventListener("pagehide", () => {
+      gone = true;
+    });
+    const store = phone === "android" ? playWithReferrer(p) : STORE[phone];
+    setTimeout(() => {
+      document.removeEventListener("visibilitychange", off);
+      if (!gone && document.visibilityState === "visible")
+        location.href = store;
+    }, OPEN_APP_WAIT_MS);
+    location.href = phone === "android" && /Chrome/i.test(navigator.userAgent) ? androidIntent(p) : appScheme(p);
+  }
+  function setSmartBannerArgument() {
+    try {
+      const m = document.querySelector('meta[name="apple-itunes-app"]');
+      if (m && !/app-argument/.test(m.content))
+        m.content = `${m.content}, app-argument=${location.href}`;
+    } catch {
+    }
+  }
   var APPLE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.6-3.8zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.9-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>';
   var PLAY_SVG = '<svg viewBox="0 0 24 24"><path fill="#00d7fe" d="M3.6 2.5 13 12l-9.4 9.5c-.4-.2-.6-.6-.6-1.1v-17c0-.5.2-.9.6-.9z"/><path fill="#00f076" d="M16.6 8.4 13 12 3.6 2.5c.3-.2.8-.2 1.2 0l11.8 5.9z"/><path fill="#ff3a44" d="M16.6 15.6 4.8 21.5c-.4.2-.9.2-1.2 0L13 12l3.6 3.6z"/><path fill="#ffd500" d="M20.6 10.7c.8.4.8 1.5 0 1.9l-4 2.3L13 12l3.6-3.6 4 2.3z"/></svg>';
   function phonePlatform() {
@@ -132,8 +162,8 @@
       unknownName: (n) => `${n} is not registered on beagles.eth.`,
       open: "Open Beagle",
       addApp: "Add me in the Beagle app",
-      appHint: "One tap copies my address and opens the app page. In Beagle, tap Add and paste.",
-      copiedApp: "Address copied. In Beagle, tap Add and paste.",
+      appHint: "Opens Beagle if you have it, or the store if not. My address is copied either way: in Beagle, tap Add and paste.",
+      copiedApp: "Address copied. Opening Beagle \u2014 or the store if it is not installed. Then tap Add and paste.",
       addBrowser: "Continue in the browser instead",
       handed: "Opened in your Beagle tab \u2014 switch to that tab and tap Add.",
       openHere: "Open here instead"
@@ -155,8 +185,8 @@
       unknownName: (n) => `${n} \u6CA1\u6709\u5728 beagles.eth \u6CE8\u518C\u3002`,
       open: "\u6253\u5F00 Beagle",
       addApp: "\u5728 Beagle app \u91CC\u52A0\u6211",
-      appHint: "\u70B9\u4E00\u4E0B\uFF1A\u590D\u5236\u6211\u7684\u5730\u5740\u5E76\u6253\u5F00 app \u9875\u9762\u3002\u5728 Beagle \u91CC\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u5373\u53EF\u3002",
-      copiedApp: "\u5730\u5740\u5DF2\u590D\u5236\u3002\u5728 Beagle \u91CC\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u5373\u53EF\u3002",
+      appHint: "\u88C5\u4E86 Beagle \u5C31\u76F4\u63A5\u6253\u5F00\uFF0C\u6CA1\u88C5\u5C31\u53BB\u5546\u5E97\u3002\u5730\u5740\u5DF2\u590D\u5236\uFF1A\u5728 Beagle \u91CC\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u5373\u53EF\u3002",
+      copiedApp: "\u5730\u5740\u5DF2\u590D\u5236\u3002\u6B63\u5728\u6253\u5F00 Beagle \u2014\u2014 \u6CA1\u88C5\u7684\u8BDD\u4F1A\u53BB\u5546\u5E97\u3002\u7136\u540E\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u3002",
       addBrowser: "\u8FD8\u662F\u5728\u6D4F\u89C8\u5668\u91CC\u7EE7\u7EED",
       handed: "\u5DF2\u5728\u4F60\u6253\u5F00\u7684 Beagle \u6807\u7B7E\u9875\u91CC\u6253\u5F00 \u2014\u2014 \u5207\u6362\u8FC7\u53BB\uFF0C\u70B9\u300C\u6DFB\u52A0\u300D\u3002",
       openHere: "\u5728\u8FD9\u91CC\u6253\u5F00"
@@ -391,13 +421,16 @@
       $("storeIcon").innerHTML = phone === "ios" ? APPLE_SVG : PLAY_SVG;
       $("storeText").textContent = t.addApp;
       $("appHint").textContent = t.appHint;
-      store.onclick = () => {
+      setSmartBannerArgument();
+      store.onclick = (e) => {
+        e.preventDefault();
         try {
           navigator.clipboard.writeText(p.address);
         } catch {
         }
         $("appHint").textContent = t.copiedApp;
         $("appHint").classList.add("ok");
+        openAppOrStore(phone, p);
       };
       add.textContent = t.addBrowser;
       add.classList.add("second");

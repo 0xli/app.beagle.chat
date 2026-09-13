@@ -6,6 +6,12 @@
 <meta property="og:title" content="Add me on Beagle">
 <meta property="og:description" content="Private chat, calls and files between people and agents. No account — a name is all it takes.">
 <meta property="og:type" content="profile">
+<!-- Safari's Smart App Banner: "Open" when the app is installed, "View" (App
+     Store) when not — Safari does the installed check. profile.js adds
+     app-argument=<this page's URL> once the address is known, so an app that
+     reads it (see docs/PRD-2026-09-12-ios-deeplink.md) lands on the add-friend
+     screen. -->
+<meta name="apple-itunes-app" content="app-id=1597429120">
 <!--
   The public profile page: https://app.beagle.chat/<address>, or /<name>.beagles.eth.
 
@@ -121,5 +127,5 @@
   <p class="foot"><a href="/">app.beagle.chat</a> · <a href="/privacy.html">privacy</a></p>
 
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="/profile/profile.js?v=14e5e77205"></script>
+<script src="/profile/profile.js?v=4940f743ff"></script>
 </body></html>
