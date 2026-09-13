@@ -131,12 +131,10 @@
       notFoundHint: "A profile link looks like app.beagle.chat/<address> or app.beagle.chat/<name>.beagles.eth.",
       unknownName: (n) => `${n} is not registered on beagles.eth.`,
       open: "Open Beagle",
-      appTitle: "On a phone, use the Beagle app",
-      appBody: "Calls, notifications, and messages while you are doing something else \u2014 a browser tab cannot do all of that.",
-      storeIos: "Get it on the App Store",
-      storeAndroid: "Get it on Google Play",
-      appThen: "Then open the app, tap Add, and paste the address above.",
-      addBrowser: "Add me in the browser instead",
+      addApp: "Add me in the Beagle app",
+      appHint: "One tap copies my address and opens the app page. In Beagle, tap Add and paste.",
+      copiedApp: "Address copied. In Beagle, tap Add and paste.",
+      addBrowser: "Continue in the browser instead",
       handed: "Opened in your Beagle tab \u2014 switch to that tab and tap Add.",
       openHere: "Open here instead"
     },
@@ -156,12 +154,10 @@
       notFoundHint: "\u4E2A\u4EBA\u9875\u94FE\u63A5\u957F\u8FD9\u6837\uFF1Aapp.beagle.chat/<\u5730\u5740> \u6216 app.beagle.chat/<\u540D\u5B57>.beagles.eth\u3002",
       unknownName: (n) => `${n} \u6CA1\u6709\u5728 beagles.eth \u6CE8\u518C\u3002`,
       open: "\u6253\u5F00 Beagle",
-      appTitle: "\u624B\u673A\u4E0A\uFF0C\u8BF7\u7528 Beagle app",
-      appBody: "\u901A\u8BDD\u3001\u901A\u77E5\u3001\u540E\u53F0\u6536\u6D88\u606F \u2014\u2014 \u6D4F\u89C8\u5668\u6807\u7B7E\u9875\u505A\u4E0D\u5230\u8FD9\u4E9B\u3002",
-      storeIos: "App Store \u4E0B\u8F7D",
-      storeAndroid: "Google Play \u4E0B\u8F7D",
-      appThen: "\u88C5\u597D\u540E\u6253\u5F00 app\uFF0C\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u4E0A\u9762\u7684\u5730\u5740\u3002",
-      addBrowser: "\u8FD8\u662F\u5728\u6D4F\u89C8\u5668\u91CC\u52A0\u6211",
+      addApp: "\u5728 Beagle app \u91CC\u52A0\u6211",
+      appHint: "\u70B9\u4E00\u4E0B\uFF1A\u590D\u5236\u6211\u7684\u5730\u5740\u5E76\u6253\u5F00 app \u9875\u9762\u3002\u5728 Beagle \u91CC\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u5373\u53EF\u3002",
+      copiedApp: "\u5730\u5740\u5DF2\u590D\u5236\u3002\u5728 Beagle \u91CC\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u5373\u53EF\u3002",
+      addBrowser: "\u8FD8\u662F\u5728\u6D4F\u89C8\u5668\u91CC\u7EE7\u7EED",
       handed: "\u5DF2\u5728\u4F60\u6253\u5F00\u7684 Beagle \u6807\u7B7E\u9875\u91CC\u6253\u5F00 \u2014\u2014 \u5207\u6362\u8FC7\u53BB\uFF0C\u70B9\u300C\u6DFB\u52A0\u300D\u3002",
       openHere: "\u5728\u8FD9\u91CC\u6253\u5F00"
     }
@@ -390,19 +386,22 @@
     const box = $("appBox");
     if (phone && p.address) {
       box.hidden = false;
-      $("appTitle").textContent = t.appTitle;
-      $("appBody").textContent = t.appBody;
-      $("store").href = STORE[phone];
+      const store = $("store");
+      store.href = STORE[phone];
       $("storeIcon").innerHTML = phone === "ios" ? APPLE_SVG : PLAY_SVG;
-      $("storeText").textContent = phone === "ios" ? t.storeIos : t.storeAndroid;
-      $("appThen").textContent = t.appThen;
-      if (!hasIdentityHere()) {
-        add.textContent = t.addBrowser;
-        add.classList.add("second");
-        $("hint").textContent = t.hintNew;
-      } else {
-        add.parentNode.insertBefore(box, $("hint").nextSibling);
-      }
+      $("storeText").textContent = t.addApp;
+      $("appHint").textContent = t.appHint;
+      store.onclick = () => {
+        try {
+          navigator.clipboard.writeText(p.address);
+        } catch {
+        }
+        $("appHint").textContent = t.copiedApp;
+        $("appHint").classList.add("ok");
+      };
+      add.textContent = t.addBrowser;
+      add.classList.add("second");
+      $("hint").textContent = "";
     } else {
       box.hidden = true;
     }
