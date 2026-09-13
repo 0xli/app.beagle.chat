@@ -102,10 +102,10 @@
   };
   var ANDROID_PACKAGE = "chat.beagle";
   var OPEN_APP_WAIT_MS = 1600;
-  var appScheme = (p) => `beagle://add?address=${encodeURIComponent(p.address)}${p.name ? `&name=${encodeURIComponent(p.name)}` : ""}${p.ens ? `&ens=${encodeURIComponent(p.ens)}` : ""}`;
+  var appScheme = (p, scheme = "beagle") => `${scheme}://add?address=${encodeURIComponent(p.address)}${p.name ? `&name=${encodeURIComponent(p.name)}` : ""}${p.ens ? `&ens=${encodeURIComponent(p.ens)}` : ""}`;
   var playWithReferrer = (p) => `${STORE.android}&referrer=${encodeURIComponent(`address=${p.address}`)}`;
   var androidIntent = (p) => `intent://add?address=${encodeURIComponent(p.address)}#Intent;scheme=beagle;package=${ANDROID_PACKAGE};S.browser_fallback_url=${encodeURIComponent(playWithReferrer(p))};end`;
-  function openAppOrStore(phone, p) {
+  function openAppOrStore(phone, p, onNothingTookIt) {
     let gone = false;
     const off = () => {
       gone = gone || document.visibilityState === "hidden";
@@ -114,13 +114,16 @@
     window.addEventListener("pagehide", () => {
       gone = true;
     });
-    const store = phone === "android" ? playWithReferrer(p) : STORE[phone];
     setTimeout(() => {
       document.removeEventListener("visibilitychange", off);
-      if (!gone && document.visibilityState === "visible")
-        location.href = store;
+      if (gone || document.visibilityState !== "visible")
+        return;
+      if (phone === "android")
+        location.href = playWithReferrer(p);
+      else
+        onNothingTookIt?.();
     }, OPEN_APP_WAIT_MS);
-    location.href = phone === "android" && /Chrome/i.test(navigator.userAgent) ? androidIntent(p) : appScheme(p);
+    location.href = phone === "android" ? /Chrome/i.test(navigator.userAgent) ? androidIntent(p) : appScheme(p) : appScheme(p, "beaglechat");
   }
   function setSmartBannerArgument() {
     try {
@@ -165,6 +168,8 @@
       appHint: "Opens Beagle if you have it, or the store if not. My address is copied either way: in Beagle, tap Add and paste.",
       copiedApp: "Address copied. Opening Beagle \u2014 or the store if it is not installed. Then tap Add and paste.",
       addBrowser: "Continue in the browser instead",
+      notOpened: "Beagle did not open. If it is installed, tap Open in the banner at the top of this page. If not, get it below \u2014 the address is already copied.",
+      getIos: "Get Beagle on the App Store",
       handed: "Opened in your Beagle tab \u2014 switch to that tab and tap Add.",
       openHere: "Open here instead"
     },
@@ -188,6 +193,8 @@
       appHint: "\u88C5\u4E86 Beagle \u5C31\u76F4\u63A5\u6253\u5F00\uFF0C\u6CA1\u88C5\u5C31\u53BB\u5546\u5E97\u3002\u5730\u5740\u5DF2\u590D\u5236\uFF1A\u5728 Beagle \u91CC\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u5373\u53EF\u3002",
       copiedApp: "\u5730\u5740\u5DF2\u590D\u5236\u3002\u6B63\u5728\u6253\u5F00 Beagle \u2014\u2014 \u6CA1\u88C5\u7684\u8BDD\u4F1A\u53BB\u5546\u5E97\u3002\u7136\u540E\u70B9\u300C\u6DFB\u52A0\u300D\uFF0C\u7C98\u8D34\u3002",
       addBrowser: "\u8FD8\u662F\u5728\u6D4F\u89C8\u5668\u91CC\u7EE7\u7EED",
+      notOpened: "Beagle \u6CA1\u6709\u6253\u5F00\u3002\u88C5\u4E86\u7684\u8BDD\uFF0C\u70B9\u9875\u9762\u9876\u90E8\u6A2A\u5E45\u91CC\u7684\u300C\u6253\u5F00\u300D\uFF1B\u6CA1\u88C5\u5C31\u70B9\u4E0B\u9762\u4E0B\u8F7D \u2014\u2014 \u5730\u5740\u5DF2\u7ECF\u590D\u5236\u597D\u4E86\u3002",
+      getIos: "\u53BB App Store \u4E0B\u8F7D Beagle",
       handed: "\u5DF2\u5728\u4F60\u6253\u5F00\u7684 Beagle \u6807\u7B7E\u9875\u91CC\u6253\u5F00 \u2014\u2014 \u5207\u6362\u8FC7\u53BB\uFF0C\u70B9\u300C\u6DFB\u52A0\u300D\u3002",
       openHere: "\u5728\u8FD9\u91CC\u6253\u5F00"
     }
@@ -430,7 +437,12 @@
         }
         $("appHint").textContent = t.copiedApp;
         $("appHint").classList.add("ok");
-        openAppOrStore(phone, p);
+        openAppOrStore(phone, p, () => {
+          $("appHint").textContent = t.notOpened;
+          $("appHint").classList.remove("ok");
+          $("storeText").textContent = t.getIos;
+          store.onclick = null;
+        });
       };
       add.textContent = t.addBrowser;
       add.classList.add("second");
