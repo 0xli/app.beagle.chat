@@ -133,6 +133,12 @@
     } catch {
     }
   }
+  var ICON = {
+    x: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.2 8.3L23.2 22h-6.6l-5.2-6.8L5.5 22H2.3l7.7-8.8L1.9 2h6.8l4.7 6.2L18.9 2zm-1.2 18h1.8L7.4 3.9H5.5L17.7 20z"/></svg>',
+    github: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.7 5.5.7 11.8c0 5 3.2 9.2 7.7 10.7.6.1.8-.2.8-.5v-2c-3.1.7-3.8-1.3-3.8-1.3-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.2 1.7 1.2 1 1.7 2.7 1.2 3.3.9.1-.7.4-1.2.7-1.5-2.5-.3-5.1-1.3-5.1-5.6 0-1.2.4-2.2 1.2-3-.1-.3-.5-1.5.1-3 0 0 1-.3 3.1 1.2a10.8 10.8 0 0 1 5.7 0c2.1-1.5 3.1-1.2 3.1-1.2.6 1.5.2 2.7.1 3 .8.8 1.2 1.8 1.2 3 0 4.3-2.6 5.3-5.1 5.6.4.4.8 1.1.8 2.1v3.1c0 .3.2.6.8.5 4.5-1.5 7.7-5.7 7.7-10.7C23.3 5.5 18.3.5 12 .5z"/></svg>',
+    linkedin: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.4 2H3.6C2.7 2 2 2.7 2 3.6v16.8c0 .9.7 1.6 1.6 1.6h16.8c.9 0 1.6-.7 1.6-1.6V3.6c0-.9-.7-1.6-1.6-1.6zM8 19H5V9.5h3V19zM6.5 8.2a1.7 1.7 0 1 1 0-3.5 1.7 1.7 0 0 1 0 3.5zM19 19h-3v-4.6c0-1.1 0-2.5-1.5-2.5s-1.8 1.2-1.8 2.4V19h-3V9.5h2.9v1.3c.4-.8 1.4-1.5 2.8-1.5 3 0 3.6 2 3.6 4.6V19z"/></svg>',
+    web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19M12 2.5c2.8 3 2.8 16 0 19M12 2.5c-2.8 3-2.8 16 0 19"/></svg>'
+  };
   var APPLE_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.6-3.8zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.9-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>';
   var PLAY_SVG = '<svg viewBox="0 0 24 24"><path fill="#00d7fe" d="M3.6 2.5 13 12l-9.4 9.5c-.4-.2-.6-.6-.6-1.1v-17c0-.5.2-.9.6-.9z"/><path fill="#00f076" d="M16.6 8.4 13 12 3.6 2.5c.3-.2.8-.2 1.2 0l11.8 5.9z"/><path fill="#ff3a44" d="M16.6 15.6 4.8 21.5c-.4.2-.9.2-1.2 0L13 12l3.6 3.6z"/><path fill="#ffd500" d="M20.6 10.7c.8.4.8 1.5 0 1.9l-4 2.3L13 12l3.6-3.6 4 2.3z"/></svg>';
   function phonePlatform() {
@@ -373,28 +379,29 @@
     const links = $("links");
     links.innerHTML = "";
     const social = [
-      ["twitter", (h) => `https://x.com/${h}`, "@"],
-      ["github", (h) => `https://github.com/${h}`, "github/"],
-      ["linkedin", (h) => `https://www.linkedin.com/in/${h}`, "in/"]
+      ["twitter", (h) => `https://x.com/${h}`, "@", "x"],
+      ["github", (h) => `https://github.com/${h}`, "", "github"],
+      ["linkedin", (h) => `https://www.linkedin.com/in/${h}`, "", "linkedin"]
     ];
-    for (const [k, url, pre] of social) {
+    const chip = (href, icon, label, title) => {
+      const a = document.createElement("a");
+      a.href = href;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.title = title;
+      a.innerHTML = `<span class="ico">${ICON[icon]}</span>`;
+      a.appendChild(document.createTextNode(label));
+      return a;
+    };
+    for (const [k, url, pre, icon] of social) {
       const h = String(p.socials?.[k] || "").replace(/^@/, "").replace(/^https?:\/\/[^/]+\//, "").replace(/\/+$/, "");
       if (!h)
         continue;
-      const a = document.createElement("a");
-      a.href = url(h);
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.textContent = pre + h;
-      links.appendChild(a);
+      links.appendChild(chip(url(h), icon, pre + h, { x: "X / Twitter", github: "GitHub", linkedin: "LinkedIn" }[icon]));
     }
     if (p.url) {
       const a = document.createElement("a");
-      a.href = p.url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.textContent = p.url.replace(/^https?:\/\//, "").replace(/\/+$/, "");
-      links.appendChild(a);
+      links.appendChild(chip(p.url, "web", p.url.replace(/^https?:\/\//, "").replace(/\/+$/, ""), p.url));
     }
     $("addrLbl").textContent = t.addr;
     $("copy").textContent = t.copy;
