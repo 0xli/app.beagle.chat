@@ -294,6 +294,16 @@
     }
     return null;
   }
+  function setPageIcon(src) {
+    try {
+      for (const id of ["icon", "touchIcon"]) {
+        const l = $(id);
+        if (l && src)
+          l.href = src;
+      }
+    } catch {
+    }
+  }
   function identicon(seed, size) {
     let h = 2166136261;
     for (const ch of String(seed)) {
@@ -364,10 +374,13 @@
           face.classList.add("blank");
         }
       };
+      face.onload = () => setPageIcon(face.src);
       face.src = urls[0];
     } else {
       face.onerror = null;
+      face.onload = null;
       face.src = identicon(p.userid, 96);
+      setPageIcon(face.src);
     }
     $("name").classList.remove("skel");
     $("name").textContent = shownName;

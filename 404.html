@@ -22,6 +22,10 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
      reads it (see docs/PRD-2026-09-12-ios-deeplink.md) lands on the add-friend
      screen. -->
 <meta name="apple-itunes-app" content="app-id=1597429120">
+<!-- The tab icon: the site's mark until the person's face is known, then the
+     face (profile.js swaps it), so a card is recognisable in the tab strip. -->
+<link id="icon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%237c5cff'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6.5 16.5 5-4.5-5-4.5'/%3E%3Cpath d='M12.5 17h5'/%3E%3C/g%3E%3C/svg%3E">
+<link id="touchIcon" rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%237c5cff'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6.5 16.5 5-4.5-5-4.5'/%3E%3Cpath d='M12.5 17h5'/%3E%3C/g%3E%3C/svg%3E">
 <!--
   The public profile page: https://app.beagle.chat/<address>, or /<name>.beagles.eth.
 
@@ -139,5 +143,5 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
   <p class="foot"><a href="/">app.beagle.chat</a> · <a href="/privacy.html">privacy</a></p>
 
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="/profile/profile.js?v=f5da779b60"></script>
+<script src="/profile/profile.js?v=8381205a93"></script>
 </body></html>
