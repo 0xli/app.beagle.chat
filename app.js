@@ -378,11 +378,13 @@
       const t = setInterval(refresh, 2500);
       return () => clearInterval(t);
     }, [refresh]);
+    const inFlight = React.useRef(/* @__PURE__ */ new Set());
     const loadThread = React.useCallback(async (peerId) => {
-      if (!peerId)
+      if (!peerId || inFlight.current.has(peerId))
         return;
+      inFlight.current.add(peerId);
       try {
-        const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId));
+        const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId) + "&limit=200");
         const arr = d.chats && d.chats[peerId] || [];
         await prefetchThreadFiles(arr);
         const msgs = arr.map((m) => ({
@@ -415,6 +417,8 @@
         const withDay = msgs.length ? [{ day: dkDayLabel(arr[0].ts) }].concat(msgs) : [];
         setThreads((t) => Object.assign({}, t, { [peerId]: withDay }));
       } catch (e) {
+      } finally {
+        inFlight.current.delete(peerId);
       }
     }, []);
     return Object.assign({}, snap, { threads, refresh, loadThread });
@@ -2437,7 +2441,7 @@ ${peer.address}`
     const register = () => {
       const l = label.trim();
       if (l)
-        post("/api/ens-register", { name: l, displayName: me.name });
+        post("/api/ens-register", { name: l, displayName: me.name, description: me.description || "" });
     };
     const bind = (chain, address) => post("/api/ens-bind-wallet", { chain, address });
     const bindEth = async () => {
@@ -4749,7 +4753,7 @@ ${peer.address}`
       updRestart: "Restart",
       updBusy: "Updating\u2026 (about a minute)",
       updDone: "Updated \u2014 restart to apply.",
-      updRestarting: "Restarting\u2026 this page reloads when it\u2019s back. (If beagle was started by hand in a terminal, run it again.)",
+      updRestarting: "Restarting\u2026 this page reloads when it\u2019s back. (If it has not come back after a minute, run beagle again.)",
       updNpx: "Running via npx \u2014 restarting picks up the latest version automatically.",
       updDev: "Running from a source checkout \u2014 update with:",
       updPeerDaemon: "The peer version belongs to the running agentnet daemon, not to this app. Update it with:",
@@ -4931,7 +4935,7 @@ ${peer.address}`
       updRestart: "\u91CD\u542F",
       updBusy: "\u66F4\u65B0\u4E2D\u2026(\u7EA6\u4E00\u5206\u949F)",
       updDone: "\u66F4\u65B0\u5B8C\u6210\u2014\u2014\u91CD\u542F\u540E\u751F\u6548\u3002",
-      updRestarting: "\u6B63\u5728\u91CD\u542F\u2026\u5B8C\u6210\u540E\u672C\u9875\u4F1A\u81EA\u52A8\u5237\u65B0\u3002(\u5982\u679C beagle \u662F\u5728\u7EC8\u7AEF\u91CC\u624B\u52A8\u542F\u52A8\u7684,\u8BF7\u91CD\u65B0\u8FD0\u884C\u4E00\u6B21\u3002)",
+      updRestarting: "\u6B63\u5728\u91CD\u542F\u2026\u5B8C\u6210\u540E\u672C\u9875\u4F1A\u81EA\u52A8\u5237\u65B0\u3002(\u5982\u679C\u4E00\u5206\u949F\u540E\u8FD8\u6CA1\u56DE\u6765,\u8BF7\u91CD\u65B0\u8FD0\u884C\u4E00\u6B21 beagle\u3002)",
       updNpx: "\u4F60\u662F\u7528 npx \u8FD0\u884C\u7684\u2014\u2014\u91CD\u542F\u5373\u81EA\u52A8\u83B7\u53D6\u6700\u65B0\u7248\u3002",
       updDev: "\u5F53\u524D\u4ECE\u6E90\u7801\u76EE\u5F55\u8FD0\u884C,\u8BF7\u624B\u52A8\u66F4\u65B0:",
       updPeerDaemon: "peer \u7684\u7248\u672C\u5C5E\u4E8E\u6B63\u5728\u8FD0\u884C\u7684 agentnet daemon,\u4E0D\u5C5E\u4E8E\u672C\u5E94\u7528\u3002\u8BF7\u7528\u8FD9\u6761\u547D\u4EE4\u66F4\u65B0:",
