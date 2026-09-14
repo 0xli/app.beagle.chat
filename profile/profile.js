@@ -388,7 +388,8 @@
     const st = $("status");
     st.className = "status" + (p.online ? " on" : "");
     st.innerHTML = p.online ? `<span class="dot"></span>${t.online}` : p.source === "bridge" || p.ens ? `<span class="dot"></span>${t.seen}` : "";
-    $("bio").textContent = p.description || "";
+    const bioText = p.description || "";
+    $("bio").textContent = /^\s*\S.*'s Beagle Chat Profile\s*$/i.test(bioText) ? "" : bioText;
     const links = $("links");
     links.innerHTML = "";
     const social = [
