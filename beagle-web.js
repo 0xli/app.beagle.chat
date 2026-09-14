@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.11","builtAt":"2026-09-14T02:43:51.456Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.11","builtAt":"2026-09-14T08:15:23.286Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -18748,7 +18748,13 @@ ${ts}`);
         // beagles.eth name — which until now meant an identicon and nothing else.
         punkId: f.punkId ?? null,
         unread: s?.unread ?? 0,
-        lastMessage: s?.lastMessage ?? null
+        lastMessage: s?.lastMessage ?? null,
+        // The sidebar (beagle-ui 0.2.9+) ranks a friend by the newest of last
+        // message, acceptedAt and requestedAt, so someone just added or
+        // accepted lands on top like a fresh message would. Without these two
+        // a new friend sat at the bottom, under everyone with any history.
+        acceptedAt: f.acceptedAt ?? null,
+        requestedAt: f.requestedAt ?? outgoing.get(uid)?.requestedAt ?? null
       };
     };
     const friendList = async () => {
@@ -19434,7 +19440,11 @@ ${ts}`);
       // reacts to send/receive: unread badge, last-message preview, timestamp.
       unread: f.unread ?? 0,
       lastMsg: lm ? (lm.dir === "out" ? "you: " : "") + (lm.text ?? "") : "",
+      lastDir: lm?.dir ?? null,
       lastTime: shortClock(lm?.ts),
+      // For the sidebar's ranking and the new-friend-on-top rule; ms epochs.
+      acceptedAt: f.acceptedAt ?? null,
+      requestedAt: f.requestedAt ?? null,
       // The raw stamp too: lastTime is formatted for display and cannot be
       // ordered, which is why the sidebar never reordered on new activity.
       lastTs: lm?.ts ?? 0
