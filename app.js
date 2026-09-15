@@ -537,6 +537,10 @@
         setFromDeepLink(true);
       }
     }, [prefillAddr]);
+    const dismissDeepLink = () => {
+      setFromDeepLink(false);
+      onPrefillConsumed && onPrefillConsumed();
+    };
     const submitAddr = () => {
       const v = addr.trim();
       if (!v || addState && addState.kind === "sending")
@@ -549,9 +553,11 @@
           onPrefillConsumed && onPrefillConsumed();
           setAddState({ kind: "ok", msg: T.addSent });
         } else {
+          dismissDeepLink();
           setAddState({ kind: "err", msg: r && r.error ? `${T.addFailed}: ${r.error}` : T.addFailed });
         }
       }).catch((e) => {
+        dismissDeepLink();
         setAddState({ kind: "err", msg: `${T.addFailed}: ${e && e.message || e}` });
       }).finally(() => {
         setTimeout(() => setAddState((s) => s && s.kind !== "sending" ? null : s), 6e3);
@@ -577,8 +583,11 @@
       background: "color-mix(in oklab, var(--accent), transparent 88%)",
       border: "1px solid var(--accent)",
       borderRadius: 8,
-      padding: "7px 10px"
-    } }, T.deepLinkConfirm || "\u901A\u8FC7\u94FE\u63A5\u6DFB\u52A0\u8FD9\u4F4D\u597D\u53CB? \u70B9\u300C\u6DFB\u52A0\u300D\u53D1\u9001\u597D\u53CB\u8BF7\u6C42 / Add this contact from the link? Tap Add to send a friend request."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 7 } }, /* @__PURE__ */ React.createElement(
+      padding: "7px 10px",
+      display: "flex",
+      alignItems: "flex-start",
+      gap: 8
+    } }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, T.deepLinkConfirm || "\u901A\u8FC7\u94FE\u63A5\u6DFB\u52A0\u8FD9\u4F4D\u597D\u53CB? \u70B9\u300C\u6DFB\u52A0\u300D\u53D1\u9001\u597D\u53CB\u8BF7\u6C42 / Add this contact from the link? Tap Add to send a friend request."), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "x", title: T.cancel || "Dismiss", onClick: dismissDeepLink, style: { flexShrink: 0 } })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 7 } }, /* @__PURE__ */ React.createElement(
       "input",
       {
         value: addr,
@@ -5165,10 +5174,16 @@ ${peer.address}`
       window.addEventListener("hashchange", onHash);
       return () => window.removeEventListener("hashchange", onHash);
     }, []);
+    const jumpedFor = React.useRef("");
     React.useEffect(() => {
-      if (!pendingAddr)
+      if (!pendingAddr) {
+        jumpedFor.current = "";
         return;
-      setTab("chat");
+      }
+      if (jumpedFor.current !== pendingAddr) {
+        jumpedFor.current = pendingAddr;
+        setTab("chat");
+      }
       if (!peers || !peers.length)
         return;
       const hit = peers.find((p) => p.address && p.address === pendingAddr);
