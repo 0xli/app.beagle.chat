@@ -108,6 +108,7 @@
     unlink: '<path d="M9 15 5.5 18.5a3.5 3.5 0 0 1-5-5L4 10"/><path d="m15 9 3.5-3.5a3.5 3.5 0 0 1 5 5L20 14"/><path d="M8 8 4 4M16 16l4 4M3 11h2M11 3v2"/>',
     zap: '<path d="M13 2 4 13h7l-1 9 9-11h-7l1-9Z"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+    bellOff: '<path d="M8.7 3.4A6 6 0 0 1 18 8.5c0 3 .5 5 1.1 6.3M6.1 6.1A6 6 0 0 0 6 8.5c0 6.5-2.5 8-2.5 8H16"/><path d="M13.7 20.5a2 2 0 0 1-3.4 0"/><path d="m3 3 18 18"/>',
     plug: '<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8Z"/><path d="M12 16v6"/>'
   });
   var H = {};
@@ -491,7 +492,7 @@
       paddingLeft: 8
     } }, r.descr), failed[r.id] && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11, color: "var(--danger)" } }, failed[r.id]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => act(r, "accept"), style: { flex: 1 } }, T.accept), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "x", size: "sm", onClick: () => act(r, "reject"), style: { flex: 1 } }, T.reject))))));
   }
-  function PeerRow({ peer, T, active, onClick }) {
+  function PeerRow({ peer, T, active, onClick, muted }) {
     const name = peer.alias || peer.userId;
     return /* @__PURE__ */ React.createElement("button", { onClick, style: {
       display: "flex",
@@ -513,7 +514,7 @@
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis"
-    } }, peer.alias || shortKey(peer.userId, 8, 5)), peer.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 13, color: "var(--faint)", stroke: 2 }), peer.wire === "64" && /* @__PURE__ */ React.createElement(Tag, { tone: "off", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "w64")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, peer.ip), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)", fontSize: 11 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", { style: {
+    } }, peer.alias || shortKey(peer.userId, 8, 5)), peer.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 13, color: "var(--faint)", stroke: 2 }), muted && /* @__PURE__ */ React.createElement(Icon, { name: "bellOff", size: 12, color: "var(--faint)", stroke: 2, title: T && T.mutedTag || "sound muted" }), peer.wire === "64" && /* @__PURE__ */ React.createElement(Tag, { tone: "off", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "w64")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, peer.ip), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)", fontSize: 11 } }, "\xB7"), /* @__PURE__ */ React.createElement("span", { style: {
       fontSize: 11,
       color: "var(--dim)",
       whiteSpace: "nowrap",
@@ -526,7 +527,7 @@
   function dkActivityTs(p) {
     return Math.max(p.lastTs || 0, p.acceptedAt || 0, p.requestedAt || 0);
   }
-  function PeerSidebar({ T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed }) {
+  function PeerSidebar({ T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted }) {
     const [q, setQ] = React.useState("");
     const [addr, setAddr] = React.useState("");
     const [addState, setAddState] = React.useState(null);
@@ -608,7 +609,7 @@
       fontSize: 11.5,
       lineHeight: 1.35,
       color: addState.kind === "err" ? "var(--bad, #e5484d)" : addState.kind === "ok" ? "var(--good, #46a758)" : "var(--faint)"
-    } }, addState.msg), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: "search", size: 15, color: "var(--faint)", stroke: 2, style: { position: "absolute", left: 9 } }), /* @__PURE__ */ React.createElement("input", { value: q, onChange: (e) => setQ(e.target.value), placeholder: T.search, style: { ...inputStyle, paddingLeft: 30 } }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", padding: "10px 8px 16px" } }, /* @__PURE__ */ React.createElement(RequestsBlock, { T, requests, onAct }), /* @__PURE__ */ React.createElement(Section, { label: T.peers, count: `${online}/${peers.length}`, style: { margin: "6px 4px 8px" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, filtered.map((p) => /* @__PURE__ */ React.createElement(PeerRow, { key: p.id, peer: p, T, active: p.id === activeId, onClick: () => onSelect(p.id) })), !filtered.length && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, textAlign: "center", fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "no matches"))));
+    } }, addState.msg), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: "search", size: 15, color: "var(--faint)", stroke: 2, style: { position: "absolute", left: 9 } }), /* @__PURE__ */ React.createElement("input", { value: q, onChange: (e) => setQ(e.target.value), placeholder: T.search, style: { ...inputStyle, paddingLeft: 30 } }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", padding: "10px 8px 16px" } }, /* @__PURE__ */ React.createElement(RequestsBlock, { T, requests, onAct }), /* @__PURE__ */ React.createElement(Section, { label: T.peers, count: `${online}/${peers.length}`, style: { margin: "6px 4px 8px" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, filtered.map((p) => /* @__PURE__ */ React.createElement(PeerRow, { key: p.id, peer: p, T, active: p.id === activeId, onClick: () => onSelect(p.id), muted: !!muted && muted.includes(p.id) })), !filtered.length && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, textAlign: "center", fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "no matches"))));
   }
   var inputStyle = {
     flex: 1,
@@ -1593,7 +1594,7 @@
       ) : mine && m.status === "sent" && m.confirmed === false ? /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, stroke: 2.2, color: "var(--faint)", title: T.sentUnconfirmed || "sent \u2014 not confirmed by the peer" }) : mine && m.status && /* @__PURE__ */ React.createElement(Icon, { name: "checkCheck", size: 12, stroke: 2.2, color: m.status === "read" ? "var(--accent)" : "var(--faint)" })))
     );
   }
-  function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread }) {
+  function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, muted, onToggleMute }) {
     const scrollRef = React.useRef(null);
     const isGroup = React.useMemo(() => dkThreadIsGroup(threadProp), [threadProp]);
     const followScrollRef = React.useRef(true);
@@ -1877,7 +1878,14 @@
 ${peer.address}`
         },
         shortKey(peer.address, 8, 6)
-      )))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), onCall && /* @__PURE__ */ React.createElement(Btn, { icon: "phone", title: T && T.audioCall || "Audio call", onClick: () => onCall(peer.userId, false) }), onCall && /* @__PURE__ */ React.createElement(Btn, { icon: "video", title: T && T.videoCall || "Video call", onClick: () => onCall(peer.userId, true) }), onSendRtcFile && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      )))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), onToggleMute && /* @__PURE__ */ React.createElement(
+        Btn,
+        {
+          icon: muted ? "bellOff" : "bell",
+          title: muted ? T && T.unmuteSound || "Turn sound back on for this chat" : T && T.muteSound || "Mute sound for this chat",
+          onClick: () => onToggleMute(peer.id)
+        }
+      ), onCall && /* @__PURE__ */ React.createElement(Btn, { icon: "phone", title: T && T.audioCall || "Audio call", onClick: () => onCall(peer.userId, false) }), onCall && /* @__PURE__ */ React.createElement(Btn, { icon: "video", title: T && T.videoCall || "Video call", onClick: () => onCall(peer.userId, true) }), onSendRtcFile && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
         "input",
         {
           ref: rtcFileRef,
@@ -2069,9 +2077,9 @@ ${peer.address}`
   function ChatEmpty({ T }) {
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "var(--faint)", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "message", size: 40, stroke: 1.4, color: "var(--line)" }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13 } }, T.pickPeer));
   }
-  function ChatTab({ T, lang, peers, requests, activeId, thread, onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, prefillAddr, onPrefillConsumed }) {
+  function ChatTab({ T, lang, peers, requests, activeId, thread, onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, prefillAddr, onPrefillConsumed, muted, onToggleMute }) {
     const peer = peers.find((p) => p.id === activeId);
-    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
+    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, muted: !!muted && muted.includes(peer.id), onToggleMute }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
   }
   Object.assign(window, { ChatTab });
   function CopyBtn({ value, copiedText = "Copied", copyFailedText = "Copy failed", copyTitle = "Copy" }) {
@@ -4445,8 +4453,10 @@ ${peer.address}`
   function dkLooking() {
     return document.visibilityState === "visible" && document.hasFocus();
   }
-  function useIncomingAlerts({ T, peers, requests, loaded, activeId, sound = true, flash = true }) {
+  function useIncomingAlerts({ T, peers, requests, loaded, activeId, sound = true, flash = true, muted }) {
     const prev = React.useRef(null);
+    const mutedRef = React.useRef(/* @__PURE__ */ new Set());
+    mutedRef.current = new Set(muted || []);
     React.useEffect(() => dkUnlockAudioOnGesture(), []);
     React.useEffect(() => {
       if (!flash)
@@ -4480,7 +4490,7 @@ ${peer.address}`
       prev.current = { byId, reqIds };
       if (!was)
         return;
-      let msgs = 0, elsewhere = 0, reqs = 0;
+      let msgs = 0, elsewhere = 0, reqs = 0, loud = 0, loudElsewhere = 0;
       for (const [id, cur] of byId) {
         if (cur.dir !== "in" || !cur.ts)
           continue;
@@ -4490,6 +4500,11 @@ ${peer.address}`
         msgs += 1;
         if (id !== activeId)
           elsewhere += 1;
+        if (!mutedRef.current.has(id)) {
+          loud += 1;
+          if (id !== activeId)
+            loudElsewhere += 1;
+        }
       }
       for (const id of reqIds)
         if (!was.reqIds.has(id))
@@ -4497,8 +4512,8 @@ ${peer.address}`
       if (!msgs && !reqs)
         return;
       const looking = dkLooking();
-      if (sound && !(looking && !reqs && !elsewhere))
-        dkChime(reqs && !msgs ? "request" : "message");
+      if (sound && (reqs || loud) && !(looking && !reqs && !loudElsewhere))
+        dkChime(reqs && !loud ? "request" : "message");
       if (flash && !looking) {
         const label = msgs ? T && T.alertMsg || "New message" : T && T.alertReq || "New friend request";
         dkFlashStart(label, msgs + reqs);
@@ -4635,6 +4650,9 @@ ${peer.address}`
       profile: "Profile",
       alertMsg: "New message",
       alertReq: "New friend request",
+      muteSound: "Mute sound for this chat",
+      unmuteSound: "Turn sound back on for this chat",
+      mutedTag: "sound muted",
       recommended: "Discover",
       registered: "Names",
       here: "Here",
@@ -4817,6 +4835,9 @@ ${peer.address}`
       profile: "\u6211\u7684",
       alertMsg: "\u65B0\u6D88\u606F",
       alertReq: "\u65B0\u7684\u597D\u53CB\u8BF7\u6C42",
+      muteSound: "\u5173\u95ED\u6B64\u4F1A\u8BDD\u7684\u63D0\u793A\u97F3",
+      unmuteSound: "\u6062\u590D\u6B64\u4F1A\u8BDD\u7684\u63D0\u793A\u97F3",
+      mutedTag: "\u5DF2\u9759\u97F3",
       recommended: "\u63A8\u8350",
       registered: "\u540D\u5F55",
       here: "\u5728\u573A",
@@ -5215,6 +5236,8 @@ ${peer.address}`
     const T = STR[t.lang] || STR.en;
     const vars = dkTheme(t.theme, t.accent);
     const rowPad = t.density === "comfortable" ? "11px 12px" : "7px 10px";
+    const mutedIds = Array.isArray(t.alertMuted) ? t.alertMuted : [];
+    const onToggleMute = (id) => setTweak("alertMuted", mutedIds.includes(id) ? mutedIds.filter((x) => x !== id) : mutedIds.concat(id));
     useIncomingAlerts({
       T,
       peers,
@@ -5222,7 +5245,8 @@ ${peer.address}`
       loaded: data.loaded,
       activeId,
       sound: t.alertSound !== false,
-      flash: t.alertFlash !== false
+      flash: t.alertFlash !== false,
+      muted: mutedIds
     });
     const callCtl = useCallController(me.userId, (peerId, video, direction) => {
       const text = `WebRTC ${video ? "video" : "audio"} call: ${direction}`;
@@ -5374,7 +5398,7 @@ ${peer.address}`
       display: "flex",
       border: "1px solid " + (tab === "profile" ? "var(--line)" : "transparent"),
       background: tab === "profile" ? "var(--panel-2)" : "transparent"
-    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr("") }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), /* @__PURE__ */ React.createElement("div", { style: { height: 46, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: 12, padding: "0 16px" } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr(""), muted: mutedIds, onToggleMute }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak })), data.locked && /* @__PURE__ */ React.createElement(
       DkLockedOut,
       {
         compact: true,
