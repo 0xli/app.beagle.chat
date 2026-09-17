@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.13","builtAt":"2026-09-17T09:06:15.596Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.14","builtAt":"2026-09-17T09:24:40.287Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -5359,13 +5359,13 @@ onmessage = (e) => {
         for (let i = 0; i < count; i++) {
           const family = data[offset];
           offset += 1;
-          let host2;
+          let host;
           let transport;
           if (family === 2 || family === 130) {
             if (offset + 4 + 2 + PUBLIC_KEY_SIZE > data.length) {
               return nodes;
             }
-            host2 = [...data.slice(offset, offset + 4)].join(".");
+            host = [...data.slice(offset, offset + 4)].join(".");
             offset += 4;
             transport = family === 2 ? "udp4" : "tcp4";
           } else if (family === 10 || family === 138) {
@@ -5376,7 +5376,7 @@ onmessage = (e) => {
             for (let part = 0; part < 8; part++) {
               parts.push((data[offset + part * 2] << 8 | data[offset + part * 2 + 1]).toString(16));
             }
-            host2 = parts.join(":");
+            host = parts.join(":");
             offset += 16;
             transport = family === 10 ? "udp6" : "tcp6";
           } else {
@@ -5386,7 +5386,7 @@ onmessage = (e) => {
           offset += 2;
           const publicKey = data.slice(offset, offset + PUBLIC_KEY_SIZE);
           offset += PUBLIC_KEY_SIZE;
-          nodes.push({ host: host2, port, publicKey, transport });
+          nodes.push({ host, port, publicKey, transport });
         }
         return nodes;
       };
@@ -6697,12 +6697,12 @@ onmessage = (e) => {
       throw new Error(`${name} must be ${len} bytes`);
     }
   }
-  function packIpPort(host2, port) {
+  function packIpPort(host, port) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error("invalid port");
     }
     const out = new Uint8Array(PACKED_IP_PORT_SIZE);
-    const ipv4 = host2.split(".");
+    const ipv4 = host.split(".");
     if (ipv4.length !== 4) {
       throw new Error("only IPv4 onion path packing is currently supported");
     }
@@ -6867,8 +6867,8 @@ onmessage = (e) => {
       return new Uint8Array(0);
     return plain.slice(1, plain.length - 8);
   }
-  function packUdpNodeV4(host2, port, pk) {
-    const parts = host2.split(".").map((p) => Number.parseInt(p, 10));
+  function packUdpNodeV4(host, port, pk) {
+    const parts = host.split(".").map((p) => Number.parseInt(p, 10));
     if (parts.length !== 4 || parts.some((n) => !(n >= 0 && n <= 255)))
       return void 0;
     if (pk.length !== 32 || !(port > 0 && port <= 65535))
@@ -8950,10 +8950,10 @@ onmessage = (e) => {
     }
     return out.length ? out : [DEFAULT_BRIDGE];
   }
-  function bridgeUrl(host2, port, attempt = 0) {
+  function bridgeUrl(host, port, attempt = 0) {
     const bridges = configuredBridges();
     const base = bridges[(bridgeCursor + attempt) % bridges.length];
-    return `${base}?host=${encodeURIComponent(host2)}&port=${encodeURIComponent(port)}`;
+    return `${base}?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
   }
   function rotateBridge() {
     const n = configuredBridges().length;
@@ -9007,7 +9007,7 @@ onmessage = (e) => {
         }
       };
       WsSocket = class {
-        constructor({ host: host2, port }) {
+        constructor({ host, port }) {
           /** Open against bridge #attempt; failover happens in onclose. */
           __privateAdd(this, _open);
           __privateAdd(this, _emit);
@@ -9019,7 +9019,7 @@ onmessage = (e) => {
           __privateAdd(this, _target, null);
           this.writableLength = 0;
           this.destroyed = false;
-          __privateSet(this, _target, { host: host2, port });
+          __privateSet(this, _target, { host, port });
           __privateMethod(this, _open, open_fn).call(this, 0);
         }
         on(event, fn) {
@@ -9069,9 +9069,9 @@ onmessage = (e) => {
       _target = new WeakMap();
       _open = new WeakSet();
       open_fn = function(attempt) {
-        const { host: host2, port } = __privateGet(this, _target);
+        const { host, port } = __privateGet(this, _target);
         __privateSet(this, _attempt, attempt);
-        __privateSet(this, _ws, new WebSocket(bridgeUrl(host2, port, attempt)));
+        __privateSet(this, _ws, new WebSocket(bridgeUrl(host, port, attempt)));
         __privateGet(this, _ws).binaryType = "arraybuffer";
         wsStat("opened");
         __privateGet(this, _ws).onopen = () => {
@@ -10316,18 +10316,18 @@ onmessage = (e) => {
           }
           return void 0;
         }
-        async send(data, host2, port) {
+        async send(data, host, port) {
           const socket = __privateGet(this, _socket2);
           if (!socket || !__privateGet(this, _bound)) {
             throw new Error("UDP transport is not started");
           }
-          const route = __privateGet(this, _turnRoutes).get(`${host2}:${port}`);
+          const route = __privateGet(this, _turnRoutes).get(`${host}:${port}`);
           if (route) {
             route.send(data);
             return;
           }
           await new Promise((resolve2, reject) => {
-            socket.send(data, port, host2, (error) => {
+            socket.send(data, port, host, (error) => {
               if (error) {
                 reject(error);
                 return;
@@ -10339,18 +10339,18 @@ onmessage = (e) => {
         /** Direct socket send, bypassing TURN routes. ICE/TURN use this so
          *  their own control packets (SEND-INDICATION, binding checks) don't
          *  recurse back through the route table. */
-        async sendDirect(data, host2, port) {
+        async sendDirect(data, host, port) {
           const socket = __privateGet(this, _socket2);
           if (!socket || !__privateGet(this, _bound)) {
             throw new Error("UDP transport is not started");
           }
           await new Promise((resolve2, reject) => {
-            socket.send(data, port, host2, (error) => error ? reject(error) : resolve2());
+            socket.send(data, port, host, (error) => error ? reject(error) : resolve2());
           });
         }
         /** Synchronous fire-and-forget direct send (for hot TURN data path). */
-        sendDirectSync(data, host2, port) {
-          __privateGet(this, _socket2)?.send(data, port, host2);
+        sendDirectSync(data, host, port) {
+          __privateGet(this, _socket2)?.send(data, port, host);
         }
         addStunInterceptor(fn) {
           __privateGet(this, _stunInterceptors).push(fn);
@@ -10358,11 +10358,11 @@ onmessage = (e) => {
         removeStunInterceptor(fn) {
           __privateSet(this, _stunInterceptors, __privateGet(this, _stunInterceptors).filter((f) => f !== fn));
         }
-        registerTurnRoute(host2, port, route) {
-          __privateGet(this, _turnRoutes).set(`${host2}:${port}`, route);
+        registerTurnRoute(host, port, route) {
+          __privateGet(this, _turnRoutes).set(`${host}:${port}`, route);
         }
-        unregisterTurnRoute(host2, port) {
-          __privateGet(this, _turnRoutes).delete(`${host2}:${port}`);
+        unregisterTurnRoute(host, port) {
+          __privateGet(this, _turnRoutes).delete(`${host}:${port}`);
         }
       };
       _socket2 = new WeakMap();
@@ -11171,13 +11171,13 @@ onmessage = (e) => {
     while (offset + 1 <= data.length) {
       const family = data[offset];
       offset += 1;
-      let host2 = "";
+      let host = "";
       let isTcp = false;
       if (family === 2 || family === 130) {
         if (offset + 4 + 2 + 32 > data.length) {
           break;
         }
-        host2 = [...data.slice(offset, offset + 4)].join(".");
+        host = [...data.slice(offset, offset + 4)].join(".");
         offset += 4;
         isTcp = family === 130;
       } else if (family === 10 || family === 138) {
@@ -11188,7 +11188,7 @@ onmessage = (e) => {
         for (let i = 0; i < 8; i++) {
           parts.push((data[offset + i * 2] << 8 | data[offset + i * 2 + 1]).toString(16));
         }
-        host2 = parts.join(":");
+        host = parts.join(":");
         offset += 16;
         isTcp = family === 138;
       } else {
@@ -11198,7 +11198,7 @@ onmessage = (e) => {
       offset += 2;
       const pk = carrierIdFromPublicKey(data.slice(offset, offset + 32));
       offset += 32;
-      nodes.push({ host: host2, port, pk, isTcp });
+      nodes.push({ host, port, pk, isTcp });
     }
     return nodes;
   }
@@ -11252,8 +11252,8 @@ onmessage = (e) => {
     }
     return v;
   }
-  function ipv4ToInt(host2) {
-    const parts = host2.split(".");
+  function ipv4ToInt(host) {
+    const parts = host.split(".");
     if (parts.length !== 4)
       return void 0;
     const oct = parts.map((p) => Number.parseInt(p, 10));
@@ -11302,14 +11302,14 @@ onmessage = (e) => {
     }
     return out;
   }
-  function isInIpv4Subnet(host2, subnet) {
-    const ip = ipv4ToInt(host2);
+  function isInIpv4Subnet(host, subnet) {
+    const ip = ipv4ToInt(host);
     if (ip === void 0)
       return false;
     return (ip & subnet.maskBits) >>> 0 === subnet.networkBits;
   }
-  function isCgnatAddress(host2) {
-    const o = host2.split(".");
+  function isCgnatAddress(host) {
+    const o = host.split(".");
     if (o.length !== 4)
       return false;
     const a = Number(o[0]);
@@ -11335,12 +11335,12 @@ onmessage = (e) => {
         stdio: ["ignore", "pipe", "ignore"]
       });
       for (const match of output.matchAll(/IPv4[^:\r\n]*:\s*(\d+\.\d+\.\d+\.\d+)/gi)) {
-        const host2 = match[1];
-        if (!isPrivateAddress(host2) || isCgnatAddress(host2) || host2.startsWith("127.") || host2.startsWith("169.254."))
+        const host = match[1];
+        if (!isPrivateAddress(host) || isCgnatAddress(host) || host.startsWith("127.") || host.startsWith("169.254."))
           continue;
-        if (localSubnets.some((s) => isInIpv4Subnet(host2, s)))
+        if (localSubnets.some((s) => isInIpv4Subnet(host, s)))
           continue;
-        found.add(host2);
+        found.add(host);
       }
     } catch {
     }
@@ -11380,21 +11380,21 @@ onmessage = (e) => {
     } catch {
     }
     const wslHostAddrs = getWslWindowsHostAddresses(subnets);
-    for (const host2 of wslHostAddrs)
-      allOwn.add(host2);
+    for (const host of wslHostAddrs)
+      allOwn.add(host);
     addrs.unshift(...wslHostAddrs);
     _lanAddrsCache = addrs;
     _lanSubnetsCache = subnets;
     _allOwnAddrsCache = allOwn;
     _ownVirtualAddrsCache = ownVirtual;
   }
-  function isOwnAddress(host2) {
+  function isOwnAddress(host) {
     refreshLanIfaceCache();
-    return _allOwnAddrsCache.has(host2);
+    return _allOwnAddrsCache.has(host);
   }
-  function isOwnVirtualAddress(host2) {
+  function isOwnVirtualAddress(host) {
     refreshLanIfaceCache();
-    return _ownVirtualAddrsCache.has(host2);
+    return _ownVirtualAddrsCache.has(host);
   }
   function getPhysicalLanAddresses() {
     refreshLanIfaceCache();
@@ -11404,13 +11404,13 @@ onmessage = (e) => {
     refreshLanIfaceCache();
     return _lanSubnetsCache;
   }
-  function isPrivateAddress(host2) {
-    if (!host2)
+  function isPrivateAddress(host) {
+    if (!host)
       return false;
-    if (host2 === "localhost")
+    if (host === "localhost")
       return true;
-    if (host2.includes(":")) {
-      const lower = host2.toLowerCase();
+    if (host.includes(":")) {
+      const lower = host.toLowerCase();
       if (lower === "::1")
         return true;
       if (lower.startsWith("fe80:"))
@@ -11419,7 +11419,7 @@ onmessage = (e) => {
         return true;
       return false;
     }
-    const parts = host2.split(".");
+    const parts = host.split(".");
     if (parts.length !== 4)
       return false;
     const oct = parts.map((p) => Number.parseInt(p, 10));
@@ -11492,10 +11492,10 @@ onmessage = (e) => {
         }
         return raw.split(",").map((entry) => entry.trim()).filter(Boolean).map((entry) => {
           const idx = entry.lastIndexOf(":");
-          const host2 = idx === -1 ? entry : entry.slice(0, idx);
+          const host = idx === -1 ? entry : entry.slice(0, idx);
           const port = idx === -1 ? 3478 : Number.parseInt(entry.slice(idx + 1), 10);
           return {
-            host: host2,
+            host,
             port: Number.isFinite(port) && port > 0 ? port : 3478,
             username: "allcom",
             password: "allcompass"
@@ -15655,18 +15655,18 @@ onmessage = (e) => {
         }
       };
       _cacheFriendRemote = new WeakSet();
-      cacheFriendRemote_fn = function(friendId, host2, port, realPublicKey, dhtPublicKey) {
+      cacheFriendRemote_fn = function(friendId, host, port, realPublicKey, dhtPublicKey) {
         const friend = __privateGet(this, _friends).get(friendId);
         if (!friend) {
           return;
         }
-        if (__privateMethod(this, _isUnroutableSelfSource, isUnroutableSelfSource_fn).call(this, host2, port, false)) {
+        if (__privateMethod(this, _isUnroutableSelfSource, isUnroutableSelfSource_fn).call(this, host, port, false)) {
           return;
         }
-        if (friend.remoteHost !== host2 || friend.remotePort !== port) {
+        if (friend.remoteHost !== host || friend.remotePort !== port) {
           __privateGet(this, _friends).set(friendId, {
             ...friend,
-            remoteHost: host2,
+            remoteHost: host,
             remotePort: port
           });
         }
@@ -15678,8 +15678,8 @@ onmessage = (e) => {
           };
           __privateGet(this, _friendSessions).set(friendId, session);
         }
-        __privateMethod(this, _adoptRemote, adoptRemote_fn).call(this, session, host2, port);
-        __privateMethod(this, _rememberEndpointCandidate, rememberEndpointCandidate_fn).call(this, session, host2, port);
+        __privateMethod(this, _adoptRemote, adoptRemote_fn).call(this, session, host, port);
+        __privateMethod(this, _rememberEndpointCandidate, rememberEndpointCandidate_fn).call(this, session, host, port);
         if (realPublicKey && !session.friendRealPublicKey) {
           session.friendRealPublicKey = realPublicKey;
         }
@@ -15689,10 +15689,10 @@ onmessage = (e) => {
         }
       };
       _isUnroutableSelfSource = new WeakSet();
-      isUnroutableSelfSource_fn = function(host2, port, observed) {
-        if (isOwnVirtualAddress(host2))
+      isUnroutableSelfSource_fn = function(host, port, observed) {
+        if (isOwnVirtualAddress(host))
           return true;
-        if (!isOwnAddress(host2))
+        if (!isOwnAddress(host))
           return false;
         const ourPort = __privateGet(this, _udp)?.localPort();
         if (ourPort !== void 0 && port === ourPort)
@@ -15700,32 +15700,32 @@ onmessage = (e) => {
         return !observed;
       };
       _adoptRemote = new WeakSet();
-      adoptRemote_fn = function(session, host2, port, observed = false) {
-        if (__privateMethod(this, _isUnroutableSelfSource, isUnroutableSelfSource_fn).call(this, host2, port, observed)) {
+      adoptRemote_fn = function(session, host, port, observed = false) {
+        if (__privateMethod(this, _isUnroutableSelfSource, isUnroutableSelfSource_fn).call(this, host, port, observed)) {
           return;
         }
-        if (!observed && isPrivateAddress(host2) && !isCgnatAddress(host2) && !getPhysicalLanSubnets().some((sub) => isInIpv4Subnet(host2, sub))) {
-          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `ignoring advertised private endpoint ${host2}:${port} \u2014 not on any of our LANs`);
+        if (!observed && isPrivateAddress(host) && !isCgnatAddress(host) && !getPhysicalLanSubnets().some((sub) => isInIpv4Subnet(host, sub))) {
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `ignoring advertised private endpoint ${host}:${port} \u2014 not on any of our LANs`);
           return;
         }
-        if (session.lanRemoteHost && session.remote?.host === session.lanRemoteHost && host2 !== session.lanRemoteHost && // Same-host exception: a peer on THIS machine (iOS Simulator) moves
+        if (session.lanRemoteHost && session.remote?.host === session.lanRemoteHost && host !== session.lanRemoteHost && // Same-host exception: a peer on THIS machine (iOS Simulator) moves
         // with us when our DHCP address changes — the old LAN lock target is
         // dead and the peer now answers from our own current address (or
         // loopback). Refusing that move pins the session to the dead IP
         // forever. isOwnAddress is cached; no syscall on the hot path.
-        !(host2 === "127.0.0.1" || isOwnAddress(host2))) {
+        !(host === "127.0.0.1" || isOwnAddress(host))) {
           return;
         }
-        session.remote = { host: host2, port };
+        session.remote = { host, port };
       };
       _rememberEndpointCandidate = new WeakSet();
-      rememberEndpointCandidate_fn = function(session, host2, port) {
+      rememberEndpointCandidate_fn = function(session, host, port) {
         const now = Date.now();
-        const next = (session.endpointCandidates ?? []).filter((candidate) => !(candidate.host === host2 && candidate.port === port));
-        next.unshift({ host: host2, port, updatedMs: now });
+        const next = (session.endpointCandidates ?? []).filter((candidate) => !(candidate.host === host && candidate.port === port));
+        next.unshift({ host, port, updatedMs: now });
         session.endpointCandidates = next.sort((a, b) => b.updatedMs - a.updatedMs).slice(0, 12);
-        if (isPrivateAddress(host2) && !isCgnatAddress(host2) && getPhysicalLanSubnets().some((s) => isInIpv4Subnet(host2, s))) {
-          session.lanRemoteHost = host2;
+        if (isPrivateAddress(host) && !isCgnatAddress(host) && getPhysicalLanSubnets().some((s) => isInIpv4Subnet(host, s))) {
+          session.lanRemoteHost = host;
         }
       };
       _gatherOwnSrflx = new WeakSet();
@@ -15874,7 +15874,7 @@ onmessage = (e) => {
       handleUdpEndpointOffer_fn = function(friendId, payload) {
         if (payload.length < 6)
           return;
-        const host2 = `${payload[0]}.${payload[1]}.${payload[2]}.${payload[3]}`;
+        const host = `${payload[0]}.${payload[1]}.${payload[2]}.${payload[3]}`;
         const port = (payload[4] << 8 | payload[5]) >>> 0;
         if (port === 0)
           return;
@@ -15906,7 +15906,7 @@ onmessage = (e) => {
           const lanPort = (payload[16] << 8 | payload[17]) >>> 0;
           const srflxHost = __privateGet(this, _srflxCache)?.addr.host;
           const weAreBehindNat = !!srflxHost && !getPhysicalLanAddresses().includes(srflxHost);
-          const samePublicNat = weAreBehindNat && srflxHost === host2;
+          const samePublicNat = weAreBehindNat && srflxHost === host;
           const sameLan = lanPort !== 0 && isPrivateAddress(lanHost) && !isCgnatAddress(lanHost) && (getPhysicalLanSubnets().some((s) => isInIpv4Subnet(lanHost, s)) || samePublicNat) && !(getPhysicalLanAddresses().includes(lanHost) && __privateGet(this, _udp).localPort() === lanPort);
           if (sameLan) {
             __privateMethod(this, _rememberEndpointCandidate, rememberEndpointCandidate_fn).call(this, session, lanHost, lanPort);
@@ -15931,21 +15931,21 @@ onmessage = (e) => {
             }
           }
         }
-        if (getLocalIpv4Addresses().includes(host2) && __privateGet(this, _udp).localPort() === port)
+        if (getLocalIpv4Addresses().includes(host) && __privateGet(this, _udp).localPort() === port)
           return;
-        __privateMethod(this, _rememberEndpointCandidate, rememberEndpointCandidate_fn).call(this, session, host2, port);
-        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `udp-endpoint offer from ${friendId}: ${host2}:${port} \u2014 punching`);
+        __privateMethod(this, _rememberEndpointCandidate, rememberEndpointCandidate_fn).call(this, session, host, port);
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `udp-endpoint offer from ${friendId}: ${host}:${port} \u2014 punching`);
         const punch = Uint8Array.of(242);
         let n = 0;
         const punchTimer = setInterval(() => {
-          __privateGet(this, _udp).sendDirectSync(Buffer2.from(punch), host2, port);
+          __privateGet(this, _udp).sendDirectSync(Buffer2.from(punch), host, port);
           if (++n >= 6)
             clearInterval(punchTimer);
         }, 120);
         const haveRealUdp = session.remote && !session.remote.host?.startsWith("tcp:") && session.remote.port !== 0;
         const haveLanCandidate = (session.endpointCandidates ?? []).some((c) => isPrivateAddress(c.host) && !isCgnatAddress(c.host) && getPhysicalLanSubnets().some((s) => isInIpv4Subnet(c.host, s)));
         if (!haveRealUdp && !haveLanCandidate) {
-          __privateMethod(this, _adoptRemote, adoptRemote_fn).call(this, session, host2, port);
+          __privateMethod(this, _adoptRemote, adoptRemote_fn).call(this, session, host, port);
         }
         if (session.established) {
           void __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_ALIVE, new Uint8Array()).catch(() => void 0);
@@ -15963,37 +15963,37 @@ onmessage = (e) => {
         const ourLocalPort = __privateGet(this, _udp).localPort();
         const seen = /* @__PURE__ */ new Set();
         const totalCount = () => sameLan.length + publicCandidates.length + otherPrivate.length;
-        const push = (host2, port) => {
-          if (!host2 || !port) {
+        const push = (host, port) => {
+          if (!host || !port) {
             return;
           }
-          if (ourLocalPort === port && ourLocalIps.includes(host2)) {
+          if (ourLocalPort === port && ourLocalIps.includes(host)) {
             return;
           }
-          const key2 = `${host2}:${port}`;
+          const key2 = `${host}:${port}`;
           if (seen.has(key2)) {
             return;
           }
           seen.add(key2);
-          if (isPrivateAddress(host2)) {
-            if (localSubnets.some((subnet) => isInIpv4Subnet(host2, subnet))) {
-              sameLan.push({ host: host2, port });
+          if (isPrivateAddress(host)) {
+            if (localSubnets.some((subnet) => isInIpv4Subnet(host, subnet))) {
+              sameLan.push({ host, port });
             } else {
-              otherPrivate.push({ host: host2, port });
+              otherPrivate.push({ host, port });
             }
           } else {
-            publicCandidates.push({ host: host2, port });
+            publicCandidates.push({ host, port });
           }
         };
         push(session?.remote?.host, session?.remote?.port);
         push(friend.remoteHost, friend.remotePort);
-        for (const host2 of LAN_SWEEP_EXTRA_HOSTS) {
+        for (const host of LAN_SWEEP_EXTRA_HOSTS) {
           for (const port of LAN_SWEEP_PORTS) {
-            const key2 = `${host2}:${port}`;
+            const key2 = `${host}:${port}`;
             if (seen.has(key2))
               continue;
             seen.add(key2);
-            sameLan.push({ host: host2, port });
+            sameLan.push({ host, port });
           }
         }
         for (const candidate of session?.endpointCandidates ?? []) {
@@ -16148,13 +16148,13 @@ onmessage = (e) => {
               if (probeNow - v.sentMs > 3e5)
                 __privateGet(this, _lanProbeTargets).delete(k);
             }
-            const probe = async (host2, port, alsoCookie) => {
-              const key2 = `${host2}:${port}`;
+            const probe = async (host, port, alsoCookie) => {
+              const key2 = `${host}:${port}`;
               __privateGet(this, _lanProbeTargets).set(key2, { friendId, sentMs: probeNow });
               try {
-                await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, lanDiscovery, { host: host2, port });
+                await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, lanDiscovery, { host, port });
                 if (alsoCookie) {
-                  await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, packet, { host: host2, port });
+                  await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, packet, { host, port });
                   selfSent += 1;
                 }
               } catch {
@@ -16171,17 +16171,17 @@ onmessage = (e) => {
             if (__privateGet(this, _ownHostProbeFriendId) === friendId || probeNow >= __privateGet(this, _ownHostProbeUntilMs)) {
               __privateSet(this, _ownHostProbeFriendId, friendId);
               __privateSet(this, _ownHostProbeUntilMs, probeNow + 1e4);
-              for (const host2 of [...getLocalIpv4Addresses(), "127.0.0.1"]) {
-                if (isOwnVirtualAddress(host2))
+              for (const host of [...getLocalIpv4Addresses(), "127.0.0.1"]) {
+                if (isOwnVirtualAddress(host))
                   continue;
                 for (const port of LAN_SWEEP_PORTS) {
                   if (port === ourLocalPort)
                     continue;
-                  const key2 = `${host2}:${port}`;
+                  const key2 = `${host}:${port}`;
                   if (tried.has(key2))
                     continue;
                   tried.add(key2);
-                  await probe(host2, port, true);
+                  await probe(host, port, true);
                 }
               }
             }
@@ -16239,12 +16239,12 @@ onmessage = (e) => {
         const ourLocalIps = getLocalIpv4Addresses();
         const ourLocalPort = __privateGet(this, _udp).localPort();
         let probes = 0;
-        for (const host2 of LAN_SWEEP_EXTRA_HOSTS) {
+        for (const host of LAN_SWEEP_EXTRA_HOSTS) {
           for (const port of LAN_SWEEP_PORTS) {
-            if (port === ourLocalPort && ourLocalIps.includes(host2))
+            if (port === ourLocalPort && ourLocalIps.includes(host))
               continue;
             try {
-              await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, packet, { host: host2, port });
+              await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, packet, { host, port });
               probes += 1;
             } catch {
             }
@@ -16257,12 +16257,12 @@ onmessage = (e) => {
           if ((~mask >>> 0 & 4294967295) > 511)
             continue;
           for (let addr = network + 1 >>> 0; addr < broadcast; addr = addr + 1 >>> 0) {
-            const host2 = `${addr >>> 24 & 255}.${addr >>> 16 & 255}.${addr >>> 8 & 255}.${addr & 255}`;
+            const host = `${addr >>> 24 & 255}.${addr >>> 16 & 255}.${addr >>> 8 & 255}.${addr & 255}`;
             for (const port of LAN_SWEEP_PORTS) {
-              if (ourLocalPort === port && ourLocalIps.includes(host2))
+              if (ourLocalPort === port && ourLocalIps.includes(host))
                 continue;
               try {
-                await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, packet, { host: host2, port });
+                await __privateMethod(this, _sendPacket, sendPacket_fn).call(this, packet, { host, port });
                 probes += 1;
               } catch {
               }
@@ -16384,8 +16384,8 @@ onmessage = (e) => {
         }
       };
       _refreshFriendDhtKeyFromDht = new WeakSet();
-      refreshFriendDhtKeyFromDht_fn = function(senderDhtPk, senderId, host2, port) {
-        const key2 = `${host2}:${port}`;
+      refreshFriendDhtKeyFromDht_fn = function(senderDhtPk, senderId, host, port) {
+        const key2 = `${host}:${port}`;
         let friendId;
         const probed = __privateGet(this, _lanProbeTargets).get(key2);
         if (probed && Date.now() - probed.sentMs < 3e5) {
@@ -16394,7 +16394,7 @@ onmessage = (e) => {
           for (const [fid, session2] of __privateGet(this, _friendSessions)) {
             if (session2.established)
               continue;
-            if (session2.endpointCandidates?.some((c) => c.host === host2 && c.port === port)) {
+            if (session2.endpointCandidates?.some((c) => c.host === host && c.port === port)) {
               friendId = fid;
               break;
             }
@@ -16428,7 +16428,7 @@ onmessage = (e) => {
         if (current && Buffer2.from(current).equals(Buffer2.from(senderDhtPk)))
           return;
         __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `dht_key_refreshed friend=${friendId} via=${key2} old=${current ? carrierIdFromPublicKey(current) : "none"} new=${senderId}`);
-        __privateMethod(this, _cacheFriendRemote, cacheFriendRemote_fn).call(this, friendId, host2, port, void 0, senderDhtPk);
+        __privateMethod(this, _cacheFriendRemote, cacheFriendRemote_fn).call(this, friendId, host, port, void 0, senderDhtPk);
         __privateGet(this, _cookieRetryCount).delete(friendId);
         void __privateMethod(this, _initiateSession, initiateSession_fn).call(this, friendId).catch(() => void 0);
       };
@@ -19490,7 +19490,7 @@ ${ts}`);
       lastTs: lm?.ts ?? 0
     };
   }
-  function createEarlyRouter({ getIdentity, profile, persist, createIdentity: createIdentity2, storageOk }) {
+  function createEarlyRouter({ getIdentity, profile, persist, createIdentity: createIdentity2, storageOk, host }) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
       const url = new URL(path, location.origin);
@@ -19529,7 +19529,13 @@ ${ts}`);
         }
         case "POST /api/identity-import": {
           try {
-            const id = await host.importBlob(body?.keyfile ?? body);
+            let body2 = {};
+            try {
+              body2 = typeof init?.body === "string" ? JSON.parse(init.body) : init?.body ?? {};
+            } catch {
+              body2 = {};
+            }
+            const id = await host.importBlob(body2?.keyfile ?? body2);
             return json({ ok: true, data: { userId: id.userid, carrier: id.address } });
           } catch (err) {
             return json({ ok: false, error: String(err?.message || err) });
@@ -19689,7 +19695,7 @@ ${ts}`);
       }
     };
   }
-  function createApiRouter(backend2, getProfile) {
+  function createApiRouter(backend2, getProfile, host) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
       const url = new URL(path, location.origin);
@@ -20111,16 +20117,16 @@ ${ts}`);
       this.lockState = await this.lock.acquire();
       const profile = { name: "", description: "" };
       this.profile = profile;
-      const host2 = this;
+      const host = this;
       globalThis.__BEAGLE_PEER_AUTH__ = {
         get pubkey() {
-          return host2.keyPair ? bytesToHex2(host2.keyPair.publicKey) : null;
+          return host.keyPair ? bytesToHex2(host.keyPair.publicKey) : null;
         },
         // The bridge can derive a userid from the proven key, but NOT an
         // address: that carries this identity's nospam, which only we know.
         // Sent so a roster entry can actually be added as a friend.
         get address() {
-          return host2.identity?.address ?? null;
+          return host.identity?.address ?? null;
         },
         get profile() {
           return {
@@ -20136,9 +20142,9 @@ ${ts}`);
         /** Detached XEdDSA over the bridge's nonce. Null when there is no
          *  identity yet, which the shim treats as "connect anonymously". */
         sign(origin, nonce) {
-          if (!host2.keyPair)
+          if (!host.keyPair)
             return null;
-          return bytesToHex2(signBridgeProof(host2.keyPair, origin, nonce));
+          return bytesToHex2(signBridgeProof(host.keyPair, origin, nonce));
         }
       };
       const profileLoaded = kvGetSafe(PROFILE_KEY2, null, noteStorageFail).then((stored) => {
@@ -20167,7 +20173,7 @@ ${ts}`);
         }
       }).then((backend2) => {
         this.backend = backend2;
-        this.routers.full = createApiRouter(backend2, () => backend2.profile());
+        this.routers.full = createApiRouter(backend2, () => backend2.profile(), this);
         backend2.call({ op: "set-profile", name: profile.name, description: profile.description }).catch(() => {
         });
         try {
@@ -20204,6 +20210,7 @@ ${ts}`);
         } catch {
         }
         this.routers.early = createEarlyRouter({
+          host: this,
           getIdentity: () => this.identity,
           profile,
           persist: (p) => kvPut2(PROFILE_KEY2, p, { timeoutMs: BOOT_TIMEOUT_MS }),
@@ -20427,22 +20434,22 @@ ${ts}`);
      * bridge. This is the step that turns the tab from a send-only express
      * client into an actual Carrier peer.
      */
-    async testRelay(host2 = "144.202.113.167", port = 33445) {
+    async testRelay(host = "144.202.113.167", port = 33445) {
       const { TcpRelayClient: TcpRelayClient2 } = await Promise.resolve().then(() => (init_tcp_relay(), tcp_relay_exports));
       const { base58ToBytes: base58ToBytes2 } = await Promise.resolve().then(() => (init_base58(), base58_exports));
       const cfg = await (await fetch("https://beagle.chat/assets/bgservers.json")).json();
-      const entry = (cfg.bootstrapNodes ?? []).find((n) => n.ipv4 === host2);
+      const entry = (cfg.bootstrapNodes ?? []).find((n) => n.ipv4 === host);
       if (!entry)
-        return { ok: false, error: `no published pk for ${host2}` };
+        return { ok: false, error: `no published pk for ${host}` };
       const t0 = Date.now();
       let client;
       try {
         client = new TcpRelayClient2({
-          host: host2,
+          host,
           port,
           serverPublicKey: base58ToBytes2(entry.publicKey),
           selfKeyPair: this.keyPair,
-          label: `${host2}:${port}`
+          label: `${host}:${port}`
         });
         await client.connect(1e4);
         const pinged = client.sendPing();
