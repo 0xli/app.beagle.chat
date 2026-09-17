@@ -2167,9 +2167,9 @@ ${peer.address}`
       pill("peer", me.peerVer, true)
     ]), !embedded && unsure && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "var(--faint)", fontFamily: "var(--ui)" } }, T.verInstalledHint), line(T.verChannel || "channel", [/* @__PURE__ */ React.createElement("span", { key: "ch" }, me.channel)])));
   }
-  function DkQrModal({ T, value, label, onClose }) {
+  function DkQr({ value, px = 248 }) {
     const qr = React.useMemo(() => {
-      if (typeof qrcode === "undefined")
+      if (typeof qrcode === "undefined" || !value)
         return null;
       try {
         const q = qrcode(0, "M");
@@ -2180,15 +2180,36 @@ ${peer.address}`
         return null;
       }
     }, [value]);
-    const count = qr ? qr.getModuleCount() : 0;
+    if (!qr)
+      return /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", padding: 48 } }, "QR unavailable");
+    const count = qr.getModuleCount();
     const quiet = 4;
     const total = count + quiet * 2;
-    const px = 248;
-    return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: 22, display: "flex", flexDirection: "column", alignItems: "center", gap: 16, maxWidth: 340 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, alignSelf: "stretch" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--faint)" } }, label), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), qr ? /* @__PURE__ */ React.createElement("svg", { width: px, height: px, viewBox: `0 0 ${total} ${total}`, shapeRendering: "crispEdges", style: { display: "block", borderRadius: 10, background: "#fff" } }, /* @__PURE__ */ React.createElement("rect", { width: total, height: total, fill: "#fff" }), Array.from({ length: count }).map(
+    return /* @__PURE__ */ React.createElement("svg", { width: px, height: px, viewBox: `0 0 ${total} ${total}`, shapeRendering: "crispEdges", style: { display: "block", borderRadius: 10, background: "#fff", maxWidth: "100%", height: "auto" } }, /* @__PURE__ */ React.createElement("rect", { width: total, height: total, fill: "#fff" }), Array.from({ length: count }).map(
       (_, r) => Array.from({ length: count }).map(
         (__, c) => qr.isDark(r, c) ? /* @__PURE__ */ React.createElement("rect", { key: `${r}-${c}`, x: c + quiet, y: r + quiet, width: 1.04, height: 1.04, fill: "#000" }) : null
       )
-    )) : /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", padding: 48 } }, "QR unavailable"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", wordBreak: "break-all", textAlign: "center", maxWidth: 280, lineHeight: 1.5 } }, value), /* @__PURE__ */ React.createElement(CopyBtn, { value, copiedText: T.copied, copyFailedText: T.copyFailed, copyTitle: T.copy })));
+    ));
+  }
+  function DkQrModal({ T, value, label, onClose }) {
+    return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: 22, display: "flex", flexDirection: "column", alignItems: "center", gap: 16, maxWidth: 340 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, alignSelf: "stretch" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "var(--faint)" } }, label), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), /* @__PURE__ */ React.createElement(DkQr, { value }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", wordBreak: "break-all", textAlign: "center", maxWidth: 280, lineHeight: 1.5 } }, value), /* @__PURE__ */ React.createElement(CopyBtn, { value, copiedText: T.copied, copyFailedText: T.copyFailed, copyTitle: T.copy })));
+  }
+  function dkShareLink(me) {
+    const ens = String(me && me.ens || "").trim();
+    const slug = ens ? ens.replace(/\.beagles\.eth$/i, "") : String(me && me.carrier || "");
+    return slug ? "https://app.beagle.chat/" + encodeURIComponent(slug) : "";
+  }
+  function DkShareSheet({ T, me, zh, onClose }) {
+    const link = dkShareLink(me);
+    const [copied, setCopied] = React.useState(false);
+    const copy = () => dkCopy(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+    const canShare = typeof navigator !== "undefined" && !!navigator.share;
+    const share = () => navigator.share({ title: (me.name || "Beagle") + " \xB7 Beagle", text: zh ? "\u5728 Beagle \u4E0A\u52A0\u6211\u4E3A\u597D\u53CB" : "Add me on Beagle", url: link }).catch(() => {
+    });
+    return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: 360, maxWidth: "100%", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: 18, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, alignSelf: "stretch" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 34, radius: 9, dot: false }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, zh ? "\u5206\u4EAB\u6211\u7684\u94FE\u63A5" : "Share my link"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, zh ? "\u5BF9\u65B9\u6253\u5F00\u5373\u53EF\u52A0\u4F60\u4E3A\u597D\u53CB" : "Anyone who opens it can add you")), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), link ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(DkQr, { value: link, px: 220 }), /* @__PURE__ */ React.createElement("div", { style: { alignSelf: "stretch", fontFamily: "var(--mono)", fontSize: 12, color: "var(--text)", wordBreak: "break-all", textAlign: "center", lineHeight: 1.5, padding: "8px 10px", borderRadius: 8, background: "var(--panel-2)", border: "1px solid var(--line)" } }, link), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, alignSelf: "stretch" } }, /* @__PURE__ */ React.createElement(Btn, { tone: "solid", icon: copied ? "check" : "copy", size: "lg", onClick: copy, style: { flex: 1 } }, copied ? zh ? "\u5DF2\u590D\u5236" : "Copied" : zh ? "\u590D\u5236\u94FE\u63A5" : "Copy link"), canShare && /* @__PURE__ */ React.createElement(Btn, { icon: "share", size: "lg", onClick: share, style: { flex: 1 } }, zh ? "\u5206\u4EAB" : "Share"))) : /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", padding: 24 } }, zh ? "\u8EAB\u4EFD\u8FD8\u6CA1\u51C6\u5907\u597D" : "Your identity is not ready yet.")));
   }
   function Card({ label, children, trailing }) {
     return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, /* @__PURE__ */ React.createElement(Section, { label, trailing }), /* @__PURE__ */ React.createElement("div", { style: { borderRadius: 11, border: "1px solid var(--line)", overflow: "hidden", background: "var(--panel)" } }, children));
@@ -2905,7 +2926,7 @@ ${peer.address}`
       setEditing(false);
     } }));
   }
-  Object.assign(window, { ProfileTab, DkPunkAvatar, DkEnsAvatar, DkPublicProfile });
+  Object.assign(window, { DkShareSheet, ProfileTab, DkPunkAvatar, DkEnsAvatar, DkPublicProfile });
   var DK_PHONE_MQ = "(max-width: 700px)";
   function useIsPhone() {
     const mq = React.useMemo(() => typeof window !== "undefined" && window.matchMedia ? window.matchMedia(DK_PHONE_MQ) : null, []);
@@ -5448,6 +5469,17 @@ ${peer.address}`
       });
     });
     const phone = useIsPhone();
+    const [sharing, setSharing] = React.useState(false);
+    const shareBtn = /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        onClick: () => setSharing(true),
+        title: t.lang === "zh" ? "\u5206\u4EAB\u6211\u7684\u94FE\u63A5" : "Share my link",
+        "aria-label": "share",
+        style: { width: 32, height: 32, flexShrink: 0, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }
+      },
+      /* @__PURE__ */ React.createElement(Icon, { name: "share", size: 16, stroke: 2, color: "var(--accent)" })
+    );
     React.useEffect(() => {
       if (!phone && !activeId && peers.length)
         setActiveId(peers[0].id);
@@ -5614,7 +5646,7 @@ ${peer.address}`
       display: "flex",
       border: "1px solid " + (tab === "profile" ? "var(--line)" : "transparent"),
       background: tab === "profile" ? "var(--panel-2)" : "transparent"
-    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, !inConversation && /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), !inConversation && /* @__PURE__ */ React.createElement("div", { style: { height: 46, boxSizing: "content-box", paddingTop: phone ? "env(safe-area-inset-top, 0px)" : 0, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: phone ? 8 : 12, paddingLeft: phone ? 12 : 16, paddingRight: phone ? 12 : 16 } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), phone ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: { padding: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 28, radius: 7, dot: false }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name)))), phone && peopleTab && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", overflowX: "auto" } }, nav.filter((n) => DK_PEOPLE_TABS.includes(n.id)).map((n) => /* @__PURE__ */ React.createElement("button", { key: n.id, onClick: () => setTab(n.id), style: {
+    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, !inConversation && /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), !inConversation && /* @__PURE__ */ React.createElement("div", { style: { height: 46, boxSizing: "content-box", paddingTop: phone ? "env(safe-area-inset-top, 0px)" : 0, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: phone ? 8 : 12, paddingLeft: phone ? 12 : 16, paddingRight: phone ? 12 : 16 } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), phone ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), shareBtn, /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: { padding: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 28, radius: 7, dot: false }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), shareBtn, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name)))), phone && peopleTab && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", overflowX: "auto" } }, nav.filter((n) => DK_PEOPLE_TABS.includes(n.id)).map((n) => /* @__PURE__ */ React.createElement("button", { key: n.id, onClick: () => setTab(n.id), style: {
       display: "inline-flex",
       alignItems: "center",
       gap: 6,
@@ -5662,7 +5694,7 @@ ${peer.address}`
           setWelcomeDone(true);
         }
       }
-    ), /* @__PURE__ */ React.createElement(IncomingCallModal, { T, ctl: callCtl, peers }), /* @__PURE__ */ React.createElement(CallOverlay, { T, ctl: callCtl, peers }), /* @__PURE__ */ React.createElement(RtcFileInbox, { T, peers, ctl: rtcFileCtl }), upd && /* @__PURE__ */ React.createElement(
+    ), sharing && /* @__PURE__ */ React.createElement(DkShareSheet, { T, me, zh: t.lang === "zh", onClose: () => setSharing(false) }), /* @__PURE__ */ React.createElement(IncomingCallModal, { T, ctl: callCtl, peers }), /* @__PURE__ */ React.createElement(CallOverlay, { T, ctl: callCtl, peers }), /* @__PURE__ */ React.createElement(RtcFileInbox, { T, peers, ctl: rtcFileCtl }), upd && /* @__PURE__ */ React.createElement(
       DkUpdateModal,
       {
         T,

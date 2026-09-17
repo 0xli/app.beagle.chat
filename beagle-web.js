@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.15","builtAt":"2026-09-17T09:33:17.358Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.164","ui":"0.2.16","builtAt":"2026-09-17T16:32:03.942Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
