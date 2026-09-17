@@ -115,11 +115,13 @@
   var hostNeedsWelcome = false;
   var hostPrefersRtcFile = false;
   var hostHasKeyBackup = false;
+  var hostEnsWrite = true;
   function setUiHost(host2) {
     H = host2 || {};
     hostNeedsWelcome = !!H.hostNeedsWelcome;
     hostPrefersRtcFile = !!H.hostPrefersRtcFile;
     hostHasKeyBackup = !!H.hostHasKeyBackup;
+    hostEnsWrite = H.hostEnsWrite !== void 0 ? !!H.hostEnsWrite : !H.hostNeedsWelcome;
   }
   function fileUrl(name) {
     return H.fileUrl ? H.fileUrl(name) : "/api/file-download?name=" + encodeURIComponent(name);
@@ -2588,7 +2590,7 @@ ${peer.address}`
         {
           value: cur,
           onChange: (e) => setDraft({ ...draft, [k]: e.target.value }),
-          disabled: busy || !st.mineOwned,
+          disabled: busy || !canWrite,
           placeholder: T.linkPlaceholder || "username or profile URL",
           onKeyDown: (e) => {
             if (e.key === "Enter")
@@ -2610,6 +2612,7 @@ ${peer.address}`
     };
     const [picking, setPicking] = React.useState(false);
     const fileRef = React.useRef(null);
+    const canWrite = hostEnsWrite && !!st.mineOwned;
     const rec = st.record;
     const boundEth = rec && rec.addresses && rec.addresses["60"];
     const boundSol = rec && rec.addresses && rec.addresses["501"];
@@ -2632,8 +2635,8 @@ ${peer.address}`
         setMsg({ tone: "err", text: m === "too-big" ? T.ensTooBig || "image too large even after scaling" : m === "bad-image" ? T.ensBadImage || "cannot read that image" : String(m || err) });
       });
     };
-    const walletRow = (lbl, chain, bound, onBind, last) => /* @__PURE__ */ React.createElement("div", { className: "dk-row", style: { ...row, borderBottom: last ? "none" : row.borderBottom } }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, lbl), bound ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, bound), /* @__PURE__ */ React.createElement(CopyBtn, { value: bound, copiedText: T.copied, copyFailedText: T.copyFailed, copyTitle: T.copy }), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !st.mineOwned, onClick: () => bind(chain, "") }, T.ensUnbind || "unbind")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotBound || "not bound"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !st.mineOwned, onClick: onBind }, T.ensBind || "bind")));
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Card, { label: T.ensCard || "Name \xB7 beagles.eth" }, st.loading ? /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.dirLoading || "loading\u2026") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensName || "name"), /* @__PURE__ */ React.createElement(
+    const walletRow = (lbl, chain, bound, onBind, last) => /* @__PURE__ */ React.createElement("div", { className: "dk-row", style: { ...row, borderBottom: last ? "none" : row.borderBottom } }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, lbl), bound ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, bound), /* @__PURE__ */ React.createElement(CopyBtn, { value: bound, copiedText: T.copied, copyFailedText: T.copyFailed, copyTitle: T.copy }), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => bind(chain, "") }, T.ensUnbind || "unbind")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotBound || "not bound"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: onBind }, T.ensBind || "bind")));
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Card, { label: T.ensCard || "Name \xB7 beagles.eth" }, st.loading ? /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.dirLoading || "loading\u2026") : /* @__PURE__ */ React.createElement(React.Fragment, null, !hostEnsWrite ? /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensName || "name"), st.registered && rec && rec.name ? /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, rec.name) : /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12, lineHeight: 1.5, color: "var(--faint)" } }, T.ensWebOnly || "Registering a beagles.eth name needs the Beagle phone or desktop app. Your avatar can be set above without one.")) : /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensName || "name"), /* @__PURE__ */ React.createElement(
       "input",
       {
         value: label,
@@ -2646,7 +2649,7 @@ ${peer.address}`
         },
         style: { ...field, minWidth: 110 }
       }
-    ), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--dim)", flexShrink: 0 } }, ".beagles.eth"), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", disabled: busy || !label.trim(), onClick: register }, busy ? "\u2026" : st.registered && st.mineOwned ? T.ensUpdate || "update" : T.ensRegister || "register")), st.registered && !st.mineOwned && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", borderBottom: "1px solid var(--line)", fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, (T.ensWalletOwned || "registered via your mobile wallet as") + " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)" } }, rec && rec.name)), st.registered && /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensAvatar || "avatar"), upAvatar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("img", { src: upAvatar, alt: "", width: 34, height: 34, style: { width: 34, height: 34, borderRadius: 9, objectFit: "cover", flexShrink: 0, background: "var(--panel-2)" } }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)" } }, T.ensCustom || "custom image"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !st.mineOwned, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : punkId != null ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punkId, size: 34, radius: 9, fallbackSeed: me.userId }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, `CryptoPunk #${punkId}`), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !st.mineOwned, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotSet || "not set"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !st.mineOwned, onClick: () => fileRef.current && fileRef.current.click() }, T.ensUpload || "upload"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !st.mineOwned, onClick: () => setPicking(true) }, T.ensChoose || "choose"), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUploadFile, style: { display: "none" } })), walletRow(T.ensEth || "ethereum", "eth", boundEth, bindEth, false), walletRow(T.ensSol || "solana", "sol", boundSol, bindSol, !msg), msg && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", fontFamily: "var(--ui)", fontSize: 12, color: msg.tone === "ok" ? "var(--online)" : "var(--danger)" } }, msg.text)), picking && /* @__PURE__ */ React.createElement(DkPunkPicker, { T, onPick: pickPunk, onClose: () => setPicking(false) })), !st.loading && st.registered && /* @__PURE__ */ React.createElement(Card, { label: T.linksCard || "Links" }, SOCIALS.map((s, i) => socialRow(s, i === SOCIALS.length - 1))));
+    ), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--dim)", flexShrink: 0 } }, ".beagles.eth"), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", disabled: busy || !label.trim(), onClick: register }, busy ? "\u2026" : st.registered && st.mineOwned ? T.ensUpdate || "update" : T.ensRegister || "register")), st.registered && !st.mineOwned && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", borderBottom: "1px solid var(--line)", fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, (T.ensWalletOwned || "registered via your mobile wallet as") + " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)" } }, rec && rec.name)), st.registered && /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensAvatar || "avatar"), upAvatar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("img", { src: upAvatar, alt: "", width: 34, height: 34, style: { width: 34, height: 34, borderRadius: 9, objectFit: "cover", flexShrink: 0, background: "var(--panel-2)" } }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)" } }, T.ensCustom || "custom image"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : punkId != null ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punkId, size: 34, radius: 9, fallbackSeed: me.userId }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, `CryptoPunk #${punkId}`), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotSet || "not set"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: () => fileRef.current && fileRef.current.click() }, T.ensUpload || "upload"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: () => setPicking(true) }, T.ensChoose || "choose"), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUploadFile, style: { display: "none" } })), walletRow(T.ensEth || "ethereum", "eth", boundEth, bindEth, false), walletRow(T.ensSol || "solana", "sol", boundSol, bindSol, !msg), msg && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", fontFamily: "var(--ui)", fontSize: 12, color: msg.tone === "ok" ? "var(--online)" : "var(--danger)" } }, msg.text)), picking && /* @__PURE__ */ React.createElement(DkPunkPicker, { T, onPick: pickPunk, onClose: () => setPicking(false) })), !st.loading && st.registered && /* @__PURE__ */ React.createElement(Card, { label: T.linksCard || "Links" }, SOCIALS.map((s, i) => socialRow(s, i === SOCIALS.length - 1))));
   }
   function DkUpdateCheck({ T }) {
     const [st, setSt] = React.useState("idle");
@@ -3079,7 +3082,7 @@ ${peer.address}`
       textAlign: "center"
     } }, n);
   }
-  function Btn({ children, icon, tone = "ghost", onClick, size = "md", title, style }) {
+  function Btn({ children, icon, tone = "ghost", onClick, size = "md", title, style, disabled }) {
     const tones = {
       ghost: { bg: "transparent", fg: "var(--text)", bd: "var(--line)" },
       solid: { bg: "var(--accent)", fg: "#fff", bd: "transparent" },
@@ -3089,12 +3092,13 @@ ${peer.address}`
     };
     const t = tones[tone] || tones.ghost;
     const h = size === "sm" ? 26 : size === "lg" ? 36 : 30;
-    return /* @__PURE__ */ React.createElement("button", { onClick, title, style: {
+    return /* @__PURE__ */ React.createElement("button", { onClick, title, disabled, style: {
+      opacity: disabled ? 0.45 : 1,
       height: h,
       padding: icon && !children ? 0 : "0 11px",
       minWidth: icon && !children ? h : "auto",
       borderRadius: 6,
-      cursor: "pointer",
+      cursor: disabled ? "default" : "pointer",
       fontFamily: "var(--mono)",
       fontWeight: 600,
       fontSize: size === "sm" ? 12 : 12.5,
@@ -4902,6 +4906,7 @@ ${peer.address}`
       ensBind: "bind",
       ensUnbind: "unbind",
       ensNotBound: "not bound",
+      ensWebOnly: "Registering a beagles.eth name needs the Beagle phone or desktop app. Your avatar can be set above without one.",
       ensAvatar: "avatar",
       ensChoose: "choose",
       ensClear: "clear",
@@ -5089,6 +5094,7 @@ ${peer.address}`
       ensBind: "\u7ED1\u5B9A",
       ensUnbind: "\u89E3\u7ED1",
       ensNotBound: "\u672A\u7ED1\u5B9A",
+      ensWebOnly: "\u6CE8\u518C beagles.eth \u540D\u5B57\u9700\u8981 Beagle \u624B\u673A\u6216\u684C\u9762\u5E94\u7528\u3002\u5934\u50CF\u4E0D\u9700\u8981\u540D\u5B57\uFF0C\u53EF\u5728\u4E0A\u65B9\u76F4\u63A5\u8BBE\u7F6E\u3002",
       ensAvatar: "\u5934\u50CF",
       ensChoose: "\u9009\u62E9",
       ensClear: "\u6E05\u9664",
