@@ -6336,12 +6336,16 @@ ${peer.address}`
       // the storage model is the specific thing that differs here, and saying it
       // is more use than "support is incomplete".
       localStore: "This browser keeps Beagle in local storage rather than a database: your identity and recent messages are saved, older history and stored files are not. A private window forgets everything when you close it \u2014 export your key backup to keep this identity.",
+      useDb: "Expected your friends and messages here? Use the database instead",
+      useDbTitle: "Opens app.beagle.chat/?storage=idb \u2014 the database, where an identity from before the switch still is",
       dismiss: "dismiss"
     },
     zh: {
       edge: "Edge \u7684\u6D4B\u8BD5\u4E0D\u5982 Chrome \u548C Firefox \u5145\u5206\u3002\u5982\u679C\u6D88\u606F\u4E00\u76F4\u6392\u961F\u6216\u6536\u4E0D\u5230\u597D\u53CB\u8BF7\u6C42\uFF0C\u5148\u5237\u65B0\u4E00\u6B21 \u2014\u2014 \u901A\u5E38\u662F\u7F13\u5B58\u4E86\u65E7\u7248\u672C \u2014\u2014 \u518D\u4E0D\u884C\u8BF7\u6539\u7528 Chrome \u6216 Firefox\u3002",
       other: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u6CA1\u6709\u6D4B\u8BD5\u8FC7\u3002Beagle \u7F51\u9875\u7248\u662F\u9488\u5BF9 Chrome \u548C Firefox \u5F00\u53D1\u7684\u3002",
       localStore: "\u8FD9\u4E2A\u6D4F\u89C8\u5668\u7528 local storage \u4FDD\u5B58 Beagle\uFF0C\u800C\u4E0D\u662F\u6570\u636E\u5E93\uFF1A\u8EAB\u4EFD\u548C\u8FD1\u671F\u6D88\u606F\u4F1A\u4FDD\u7559\uFF0C\u66F4\u65E9\u7684\u8BB0\u5F55\u548C\u6536\u5230\u7684\u6587\u4EF6\u4E0D\u4F1A\u3002\u65E0\u75D5\u7A97\u53E3\u5173\u95ED\u540E\u5168\u90E8\u6E05\u7A7A \u2014\u2014 \u60F3\u4FDD\u7559\u8EAB\u4EFD\uFF0C\u8BF7\u5BFC\u51FA\u5BC6\u94A5\u5907\u4EFD\u3002",
+      useDb: "\u672C\u8BE5\u770B\u5230\u4F60\u7684\u597D\u53CB\u548C\u6D88\u606F\uFF1F\u6539\u7528\u6570\u636E\u5E93",
+      useDbTitle: "\u6253\u5F00 app.beagle.chat/?storage=idb \u2014\u2014 \u5207\u6362\u4E4B\u524D\u7684\u8EAB\u4EFD\u8FD8\u5728\u6570\u636E\u5E93\u91CC",
       dismiss: "\u77E5\u9053\u4E86"
     }
   };
@@ -6378,7 +6382,18 @@ ${peer.address}`
       background: "var(--chip)",
       borderBottom: "1px solid var(--line)",
       flexShrink: 0
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 15, stroke: 2, color: "var(--faint)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 } }, msg), /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: "alert", size: 15, stroke: 2, color: "var(--faint)" }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", lineHeight: 1.5 } }, msg, kind === "localStore" && // The way back. A latch from one slow moment parks a returning
+    // user on an empty store while everything sits in the database;
+    // ?storage=idb clears the latch and boots from it (store.js).
+    /* @__PURE__ */ React.createElement(React.Fragment, null, " ", " ", /* @__PURE__ */ React.createElement(
+      "a",
+      {
+        href: `${location.pathname}?storage=idb`,
+        title: W.useDbTitle,
+        style: { color: "var(--accent, #7c5cff)", textDecoration: "underline" }
+      },
+      W.useDb
+    ))), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: () => {

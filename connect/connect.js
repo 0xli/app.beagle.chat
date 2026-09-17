@@ -4787,6 +4787,33 @@ ${nonce2}`);
       return false;
     }
   })();
+  var RESCUE_DELAY_MS = 2500;
+  var RESCUE_BUDGET_MS = 8e3;
+  var rescued = [];
+  var rescueTimer = null;
+  function rescueLater(cause, { fromBoot = false } = {}) {
+    if (!fromBoot && (backend !== "ls" || !lsUsable))
+      return;
+    migration = new Promise((resolve) => {
+      rescueTimer = setTimeout(async () => {
+        let copied = null;
+        try {
+          copied = await withTimeout(migrate(cause, RESCUE_BUDGET_MS), RESCUE_BUDGET_MS * 6);
+        } catch {
+          copied = null;
+        }
+        if (copied && (copied.kv || copied.friends || copied.messages)) {
+          for (const cb of rescued) {
+            try {
+              cb(copied);
+            } catch {
+            }
+          }
+        }
+        resolve(copied);
+      }, RESCUE_DELAY_MS);
+    });
+  }
   var backend = (() => {
     if (forced === "mem")
       return "mem";
@@ -4798,8 +4825,10 @@ ${nonce2}`);
       return "idb";
     }
     if (lsUsable && latched()) {
-      if (WEBKIT)
+      if (WEBKIT) {
+        rescueLater("latched boot", { fromBoot: true });
         return "ls";
+      }
       unlatch();
     }
     return "idb";
@@ -4811,7 +4840,7 @@ ${nonce2}`);
     return backend === "ls";
   }
   var memKv = /* @__PURE__ */ new Map();
-  var migration = null;
+  var migration;
   function degrade(err) {
     if (backend !== "idb")
       return;
@@ -4822,6 +4851,8 @@ ${nonce2}`);
       if (err?.stage !== "open") {
         migration = withTimeout(migrate(err), MIGRATE_TIMEOUT_MS).catch(() => {
         });
+      } else {
+        rescueLater(err);
       }
     }
     try {
@@ -4830,22 +4861,23 @@ ${nonce2}`);
     } catch {
     }
   }
-  async function migrate(cause) {
-    const db = await withTimeout(openDB(), BOOT_TIMEOUT_MS).catch(() => null);
+  async function migrate(cause, budget = BOOT_TIMEOUT_MS) {
+    const db = await withTimeout(openDB(), budget).catch(() => null);
     if (!db)
-      return;
-    const copied = { kv: 0, friends: 0, messages: 0 };
+      return null;
+    const copied = { kv: 0, friends: 0, messages: 0, keys: [] };
     try {
-      const keys = await tx(db, KV2, "readonly", (s) => s.getAllKeys(), BOOT_TIMEOUT_MS) || [];
+      const keys = await tx(db, KV2, "readonly", (s) => s.getAllKeys(), budget) || [];
       for (const k of keys) {
         if (kvGet(k) !== void 0)
           continue;
-        const v = await tx(db, KV2, "readonly", (s) => s.get(k), BOOT_TIMEOUT_MS);
+        const v = await tx(db, KV2, "readonly", (s) => s.get(k), budget);
         if (v === void 0)
           continue;
         try {
           kvPut(k, v);
           copied.kv++;
+          copied.keys.push(k);
         } catch {
         }
       }
@@ -4853,7 +4885,7 @@ ${nonce2}`);
     }
     try {
       if (!listFriends().length) {
-        const friends = await tx(db, FRIENDS2, "readonly", (s) => s.getAll(), BOOT_TIMEOUT_MS) || [];
+        const friends = await tx(db, FRIENDS2, "readonly", (s) => s.getAll(), budget) || [];
         if (friends.length) {
           putFriends(friends);
           copied.friends = friends.length;
@@ -4863,7 +4895,7 @@ ${nonce2}`);
     }
     try {
       if (!peers().length) {
-        const msgs = await tx(db, MESSAGES, "readonly", (s) => s.getAll(), BOOT_TIMEOUT_MS) || [];
+        const msgs = await tx(db, MESSAGES, "readonly", (s) => s.getAll(), budget) || [];
         for (const m of msgs.slice(-MAX_MSGS_PER_PEER * 8)) {
           try {
             appendMessage(m);
@@ -4876,6 +4908,11 @@ ${nonce2}`);
     } catch {
     }
     console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
+    try {
+      db.close?.();
+    } catch {
+    }
+    return copied;
   }
   var LATE_SLACK_MS = 3e3;
   function deadline(ms, onExpire) {
