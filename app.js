@@ -6742,6 +6742,53 @@ ${peer.address}`
   // src/ui/entry.jsx
   setUiHost(host);
   mount(document.getElementById("root"));
+  var BRAND_URL = "https://beagle.chat";
+  var BRAND_TITLE = "beagle.chat \u2014 what Beagle is";
+  function brandElements() {
+    const root = document.getElementById("root");
+    if (!root)
+      return [];
+    const out = [];
+    const divs = [...root.querySelectorAll("div")];
+    const rail = divs.find((d) => d.style.width === "68px");
+    if (rail == null ? void 0 : rail.firstElementChild)
+      out.push(rail.firstElementChild);
+    for (const span of root.querySelectorAll("span")) {
+      if (span.textContent !== "beagle" || span.style.fontWeight !== "700")
+        continue;
+      out.push(span);
+      const svg = span.previousElementSibling;
+      if (svg && svg.tagName.toLowerCase() === "svg")
+        out.push(svg);
+    }
+    return out;
+  }
+  function linkBrands() {
+    for (const el of brandElements()) {
+      if (el.dataset.beagleBrand)
+        continue;
+      el.dataset.beagleBrand = "1";
+      el.style.cursor = "pointer";
+      el.setAttribute("role", "link");
+      el.setAttribute("tabindex", "0");
+      el.setAttribute("title", BRAND_TITLE);
+      const go = () => {
+        try {
+          window.open(BRAND_URL, "_blank", "noopener");
+        } catch (e) {
+        }
+      };
+      el.addEventListener("click", go);
+      el.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" && e.key !== " ")
+          return;
+        e.preventDefault();
+        go();
+      });
+    }
+  }
+  setInterval(linkBrands, 1500);
+  linkBrands();
   var TWEAKS_KEY = "decentlan.tweaks";
   var hostLang = () => {
     try {
