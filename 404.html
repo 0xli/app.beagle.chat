@@ -24,8 +24,8 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
 <meta name="apple-itunes-app" content="app-id=1597429120">
 <!-- The tab icon: the site's mark until the person's face is known, then the
      face (profile.js swaps it), so a card is recognisable in the tab strip. -->
-<link id="icon" rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%237c5cff'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6.5 16.5 5-4.5-5-4.5'/%3E%3Cpath d='M12.5 17h5'/%3E%3C/g%3E%3C/svg%3E">
-<link id="touchIcon" rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%237c5cff'/%3E%3Cg fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6.5 16.5 5-4.5-5-4.5'/%3E%3Cpath d='M12.5 17h5'/%3E%3C/g%3E%3C/svg%3E">
+<link id="icon" rel="icon" href="/logo.png">
+<link id="touchIcon" rel="apple-touch-icon" href="/logo.png">
 <!--
   The public profile page: https://app.beagle.chat/<address>, or /<name>.beagles.eth.
 
@@ -49,7 +49,7 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
        display:flex;flex-direction:column;align-items:center;padding:0 16px 40px}
   a{color:#9b83ff;text-decoration:none}
   .top{width:100%;max-width:480px;display:flex;align-items:center;gap:9px;padding:16px 2px 6px}
-  .top .d{width:18px;height:18px;border-radius:5px;background:var(--accent)}
+  .top .d{width:22px;height:22px;border-radius:6px;display:block}
   .top .b{font-family:var(--mono);font-size:13px;color:var(--text2)}
   .top .sp{flex:1}
   .top .lang{display:flex;gap:2px;background:var(--field);border:1px solid var(--border);border-radius:8px;padding:2px}
@@ -109,7 +109,11 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
 </style></head>
 <body>
   <div class="top">
-    <a href="/" style="display:flex;align-items:center;gap:9px"><span class="d"></span><span class="b">beagle</span></a>
+    <a id="brand" href="https://beagle.chat" target="_blank" rel="noopener"
+       style="display:flex;align-items:center;gap:9px">
+      <img class="d" src="/logo.png" alt="" width="22" height="22" />
+      <span class="b">beagle chat</span>
+    </a>
     <span class="sp"></span>
     <div class="lang"><button id="langEn" class="on">EN</button><button id="langZh">中文</button></div>
   </div>
