@@ -116,12 +116,14 @@
   var hostPrefersRtcFile = false;
   var hostHasKeyBackup = false;
   var hostEnsWrite = true;
+  var hostBrandHref = "";
   function setUiHost(host2) {
     H = host2 || {};
     hostNeedsWelcome = !!H.hostNeedsWelcome;
     hostPrefersRtcFile = !!H.hostPrefersRtcFile;
     hostHasKeyBackup = !!H.hostHasKeyBackup;
     hostEnsWrite = H.hostEnsWrite !== void 0 ? !!H.hostEnsWrite : !H.hostNeedsWelcome;
+    hostBrandHref = typeof H.hostBrandHref === "string" ? H.hostBrandHref : "";
   }
   function fileUrl(name) {
     return H.fileUrl ? H.fileUrl(name) : "/api/file-download?name=" + encodeURIComponent(name);
@@ -4955,6 +4957,7 @@ ${peer.address}`
       pubRecSent: "sent \u2713",
       updTitle: "Update available",
       updLater: "Later",
+      brandAbout: "What is Beagle?",
       updNow: "Update now",
       updRestart: "Restart",
       updBusy: "Updating\u2026 (about a minute)",
@@ -4969,9 +4972,10 @@ ${peer.address}`
       updCheckLabel: "updates",
       updLatest: "up to date \u2713",
       updLanNow: "Update lan",
+      updDaemonNote: "The network daemon (agentnet) is behind. Update reinstalls it and restarts it \u2014 messages pause for a few seconds.",
       updManualHint: "Run it in a terminal, then click Restart to apply.",
       updLanDone: "lan updated \u2014 daemon restarted with the new version \u2713",
-      updLanNoRestart: "lan updated, but the daemon was not running (or refused) \u2014 the new version applies on its next start.",
+      updLanNoRestart: "Installed, but the daemon did not come back within a minute \u2014 the new version applies on its next start.",
       pubOpen: "View public profile",
       pubNone: "No public profile \u2014 this user has not registered a beagles.eth name.",
       ensNoEthWallet: "no Ethereum wallet extension found (MetaMask\u2026)",
@@ -5143,6 +5147,7 @@ ${peer.address}`
       pubRecSent: "\u5DF2\u53D1\u9001 \u2713",
       updTitle: "\u53D1\u73B0\u65B0\u7248\u672C",
       updLater: "\u7A0D\u540E",
+      brandAbout: "Beagle \u662F\u4EC0\u4E48?",
       updNow: "\u7ACB\u5373\u66F4\u65B0",
       updRestart: "\u91CD\u542F",
       updBusy: "\u66F4\u65B0\u4E2D\u2026(\u7EA6\u4E00\u5206\u949F)",
@@ -5157,9 +5162,10 @@ ${peer.address}`
       updCheckLabel: "\u66F4\u65B0",
       updLatest: "\u5DF2\u662F\u6700\u65B0\u7248\u672C \u2713",
       updLanNow: "\u66F4\u65B0 lan",
+      updDaemonNote: "\u7F51\u7EDC\u5B88\u62A4\u8FDB\u7A0B(agentnet)\u6709\u65B0\u7248\u672C\u3002\u70B9\u300C\u7ACB\u5373\u66F4\u65B0\u300D\u4F1A\u91CD\u88C5\u5E76\u91CD\u542F\u5B83,\u6D88\u606F\u4F1A\u6682\u505C\u51E0\u79D2\u3002",
       updManualHint: "\u5728\u7EC8\u7AEF\u91CC\u6267\u884C\u4E0A\u9762\u7684\u547D\u4EE4,\u5B8C\u6210\u540E\u70B9\u300C\u91CD\u542F\u300D\u751F\u6548\u3002",
       updLanDone: "lan \u5DF2\u66F4\u65B0\u2014\u2014daemon \u5DF2\u7528\u65B0\u7248\u91CD\u542F \u2713",
-      updLanNoRestart: "lan \u5DF2\u66F4\u65B0,\u4F46 daemon \u672A\u5728\u8FD0\u884C(\u6216\u91CD\u542F\u88AB\u62D2)\u2014\u2014\u4E0B\u6B21\u542F\u52A8\u65F6\u751F\u6548\u3002",
+      updLanNoRestart: "\u5DF2\u5B89\u88C5,\u4F46 daemon \u4E00\u5206\u949F\u5185\u6CA1\u6709\u91CD\u65B0\u8D77\u6765\u2014\u2014\u4E0B\u6B21\u542F\u52A8\u65F6\u751F\u6548\u3002",
       pubOpen: "\u67E5\u770B\u516C\u5F00\u8D44\u6599",
       pubNone: "\u6682\u65E0\u516C\u5F00\u8D44\u6599\u2014\u2014\u5BF9\u65B9\u8FD8\u6CA1\u6709\u6CE8\u518C beagles.eth \u540D\u5B57\u3002",
       ensNoEthWallet: "\u672A\u68C0\u6D4B\u5230\u4EE5\u592A\u574A\u94B1\u5305\u63D2\u4EF6(MetaMask \u7B49)",
@@ -5231,6 +5237,21 @@ ${peer.address}`
     } }, /* @__PURE__ */ React.createElement(Icon, { name: icon, size: 22, stroke: active ? 2.1 : 1.8, color: active ? "var(--accent)" : "var(--dim)" }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: active ? "var(--accent)" : "var(--faint)", whiteSpace: "nowrap" } }, label), badge ? /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 4, left: "50%", marginLeft: 6 } }, /* @__PURE__ */ React.createElement(Unread, { n: badge })) : null);
   }
   var DK_PEOPLE_TABS = ["here", "recommended", "registered"];
+  function Brand({ T, children, style }) {
+    if (!hostBrandHref)
+      return /* @__PURE__ */ React.createElement("span", { style }, children);
+    return /* @__PURE__ */ React.createElement(
+      "a",
+      {
+        href: hostBrandHref,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        title: T.brandAbout || "What is Beagle?",
+        style: { textDecoration: "none", color: "inherit", display: "flex", alignItems: "center", ...style }
+      },
+      children
+    );
+  }
   function DkUpdateModal({ T, info, onClose }) {
     const [phase, setPhase] = React.useState("idle");
     const [err, setErr] = React.useState(null);
@@ -5318,10 +5339,17 @@ ${peer.address}`
       padding: "8px 10px",
       userSelect: "all",
       wordBreak: "break-all"
-    } }, ownershipFix(info)), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "copy", title: T.copy || "Copy", onClick: () => dkCopy(ownershipFix(info)) })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6, fontSize: 11.5, color: "var(--faint)" } }, T.updNoPermAlt || "Do not widen permissions there to make this button work \u2014 a group-writable bin directory lets any admin user replace programs that root later runs. For one-click updates, move npm out of the system prefix instead: `npm config set prefix ~/.npm-global`, then put `~/.npm-global/bin` first on your PATH.")), phase === "idle" && appBehind && info.mode === "dev" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updDev || "Running from a source checkout \u2014 update with:", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("code", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--text)" } }, "git pull && npm run build")), phase === "idle" && appBehind && info.mode === "unknown" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updUnknown || "Update now runs the global install. If that is not how this was installed, run:", /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("code", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--text)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", userSelect: "all", wordBreak: "break-all" } }, "npm i -g @decentnetwork/beagle@latest"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "copy", title: T.copy || "Copy", onClick: () => dkCopy("npm i -g @decentnetwork/beagle@latest") }))), phase === "idle" && appBehind && info.mode === "npx" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updNpx || "Running via npx \u2014 restarting picks up the latest version automatically."), daemonPeerBehind && phase === "idle" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updPeerDaemon || "The peer version belongs to the running agentnet daemon, not to this app. Update it with:", /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("code", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--text)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", userSelect: "all", wordBreak: "break-all" } }, "npm i -g @decentnetwork/lan@latest && agentnet restart"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "copy", title: T.copy || "Copy", onClick: () => dkCopy("npm i -g @decentnetwork/lan@latest && agentnet restart") }))), lanBehind && phase === "idle" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updLanNote || "agentnet (lan): one click reinstalls it and asks the running daemon to restart itself. Manual equivalent:", /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("code", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--text)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", userSelect: "all", wordBreak: "break-all" } }, "npm i -g @decentnetwork/lan@latest && agentnet restart"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "copy", title: T.copy || "Copy", onClick: () => dkCopy("npm i -g @decentnetwork/lan@latest && agentnet restart") }))), phase === "lan-done" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--online)" } }, T.updLanDone || "lan updated \u2014 daemon restarted with the new version \u2713"), phase === "lan-norestart" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--warn, #f59e0b)" } }, T.updLanNoRestart || "lan updated, but the daemon was not running (or refused) \u2014 the new version applies on its next start."), phase === "running" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)" } }, T.updBusy || "Updating\u2026 (about a minute)"), phase === "done" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--online)" } }, T.updDone || "Updated \u2014 restart to apply."), phase === "restarting" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)" } }, T.updRestarting || "Restarting\u2026 this page reloads when it\u2019s back. (If beagle was started by hand in a terminal, run it again.)"), phase === "error" && (() => {
+    } }, ownershipFix(info)), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "copy", title: T.copy || "Copy", onClick: () => dkCopy(ownershipFix(info)) })), /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6, fontSize: 11.5, color: "var(--faint)" } }, T.updNoPermAlt || "Do not widen permissions there to make this button work \u2014 a group-writable bin directory lets any admin user replace programs that root later runs. For one-click updates, move npm out of the system prefix instead: `npm config set prefix ~/.npm-global`, then put `~/.npm-global/bin` first on your PATH.")), phase === "idle" && appBehind && info.mode === "dev" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updDev || "Running from a source checkout \u2014 update with:", /* @__PURE__ */ React.createElement("br", null), /* @__PURE__ */ React.createElement("code", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--text)" } }, "git pull && npm run build")), phase === "idle" && appBehind && info.mode === "unknown" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updUnknown || "Update now runs the global install. If that is not how this was installed, run:", /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6 } }, /* @__PURE__ */ React.createElement("code", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--text)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", userSelect: "all", wordBreak: "break-all" } }, "npm i -g @decentnetwork/beagle@latest"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "copy", title: T.copy || "Copy", onClick: () => dkCopy("npm i -g @decentnetwork/beagle@latest") }))), phase === "idle" && appBehind && info.mode === "npx" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updNpx || "Running via npx \u2014 restarting picks up the latest version automatically."), (daemonPeerBehind || lanBehind) && phase === "idle" && // One button, no terminal. The command this used to print ran the
+    // shell's npm, which on an nvm machine is often a different node from
+    // the one launchd runs the daemon with — it installed where nothing
+    // looks, and the daemon kept the old peer (Weili's two Macs,
+    // 2026-09-18). The server's update runs with the app's own node and
+    // restarts the daemon the launchd-safe way. Reinstalling lan also
+    // pulls the newest peer it allows, which is what moves the peer row.
+    /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)", lineHeight: 1.5 } }, T.updDaemonNote || "The network daemon (agentnet) is behind. Update reinstalls it and restarts it \u2014 messages pause for a few seconds."), phase === "lan-done" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--online)" } }, T.updLanDone || "lan updated \u2014 daemon restarted with the new version \u2713"), phase === "lan-norestart" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--warn, #f59e0b)" } }, T.updLanNoRestart || "Installed, but the daemon did not come back within a minute \u2014 the new version applies on its next start."), phase === "running" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)" } }, T.updBusy || "Updating\u2026 (about a minute)"), phase === "done" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--online)" } }, T.updDone || "Updated \u2014 restart to apply."), phase === "restarting" && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)" } }, T.updRestarting || "Restarting\u2026 this page reloads when it\u2019s back. (If beagle was started by hand in a terminal, run it again.)"), phase === "error" && (() => {
       const m = /`([^`]+)`/.exec(err || "");
       return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--danger)", wordBreak: "break-word" } }, m ? err.replace("`" + m[1] + "`", "") : err), m && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement("code", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--text)", background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", userSelect: "all", wordBreak: "break-all" } }, m[1]), /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "copy", title: T.copy || "Copy", onClick: () => dkCopy(m[1]) })), m && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--dim)" } }, T.updManualHint || "Run it in a terminal, then click Restart to apply."));
-    })(), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, (phase === "idle" || phase === "error" || phase === "lan-done" || phase === "lan-norestart") && btn(phase === "idle" ? T.updLater || "Later" : T.receivedClose || "Close", onClose), phase === "idle" && lanBehind && btn(T.updLanNow || "Update lan", doLanUpdate, !appBehind), phase === "idle" && appBehind && (info.mode === "global" || info.mode === "unknown") && btn(T.updNow || "Update now", doUpdate, true), phase === "idle" && appBehind && info.mode === "npx" && btn(T.updRestart || "Restart", doRestart, true), phase === "error" && btn(T.updRestart || "Restart", doRestart, true), phase === "done" && btn(T.updRestart || "Restart", doRestart, true))));
+    })(), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, (phase === "idle" || phase === "error" || phase === "lan-done" || phase === "lan-norestart") && btn(phase === "idle" ? T.updLater || "Later" : T.receivedClose || "Close", onClose), phase === "idle" && (lanBehind || daemonPeerBehind) && btn(appBehind ? T.updLanNow || "Update lan" : T.updNow || "Update now", doLanUpdate, !appBehind), phase === "idle" && appBehind && (info.mode === "global" || info.mode === "unknown") && btn(T.updNow || "Update now", doUpdate, true), phase === "idle" && appBehind && info.mode === "npx" && btn(T.updRestart || "Restart", doRestart, true), phase === "error" && btn(T.updRestart || "Restart", doRestart, true), phase === "done" && btn(T.updRestart || "Restart", doRestart, true))));
   }
   function DkApp() {
     const [t, setTweak] = useTweaks({ ...DK_DEFAULTS, lang: dkDetectLang() });
@@ -5639,14 +5667,14 @@ ${peer.address}`
       { id: "profile", icon: "userRound", label: T.profile, active: tab === "profile", go: () => setTab("profile") }
     ];
     const inConversation = phone && tab === "chat" && !!activeId && (peers || []).some((p) => p.id === activeId);
-    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", flexDirection: phone ? "column" : "row", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement(DkPhoneStyles, null), !phone && /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: {
+    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", flexDirection: phone ? "column" : "row", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement(DkPhoneStyles, null), !phone && /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement(Brand, { T, style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: {
       padding: 4,
       borderRadius: 12,
       cursor: "pointer",
       display: "flex",
       border: "1px solid " + (tab === "profile" ? "var(--line)" : "transparent"),
       background: tab === "profile" ? "var(--panel-2)" : "transparent"
-    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, !inConversation && /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), !inConversation && /* @__PURE__ */ React.createElement("div", { style: { height: 46, boxSizing: "content-box", paddingTop: phone ? "env(safe-area-inset-top, 0px)" : 0, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: phone ? 8 : 12, paddingLeft: phone ? 12 : 16, paddingRight: phone ? 12 : 16 } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), phone ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), shareBtn, /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: { padding: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 28, radius: 7, dot: false }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), shareBtn, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name)))), phone && peopleTab && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", overflowX: "auto" } }, nav.filter((n) => DK_PEOPLE_TABS.includes(n.id)).map((n) => /* @__PURE__ */ React.createElement("button", { key: n.id, onClick: () => setTab(n.id), style: {
+    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, !inConversation && /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), !inConversation && /* @__PURE__ */ React.createElement("div", { style: { height: 46, boxSizing: "content-box", paddingTop: phone ? "env(safe-area-inset-top, 0px)" : 0, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: phone ? 8 : 12, paddingLeft: phone ? 12 : 16, paddingRight: phone ? 12 : 16 } }, /* @__PURE__ */ React.createElement(Brand, { T, style: { gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle")), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), phone ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), shareBtn, /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: { padding: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 28, radius: 7, dot: false }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), shareBtn, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name)))), phone && peopleTab && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", overflowX: "auto" } }, nav.filter((n) => DK_PEOPLE_TABS.includes(n.id)).map((n) => /* @__PURE__ */ React.createElement("button", { key: n.id, onClick: () => setTab(n.id), style: {
       display: "inline-flex",
       alignItems: "center",
       gap: 6,
@@ -6736,59 +6764,16 @@ ${peer.address}`
     hostPrefersRtcFile: true,
     // The key lives in IndexedDB and nothing can reissue it — clearing site data
     // destroys the account, so the UI has to offer an export.
-    hostHasKeyBackup: true
+    hostHasKeyBackup: true,
+    // The marks the app draws — the rail square, the header glyph and
+    // wordmark — lead to the product's own site. Someone who arrives here from
+    // a friend's link otherwise has no way to read what Beagle is.
+    hostBrandHref: "https://beagle.chat"
   };
 
   // src/ui/entry.jsx
   setUiHost(host);
   mount(document.getElementById("root"));
-  var BRAND_URL = "https://beagle.chat";
-  var BRAND_TITLE = "beagle.chat \u2014 what Beagle is";
-  function brandElements() {
-    const root = document.getElementById("root");
-    if (!root)
-      return [];
-    const out = [];
-    const divs = [...root.querySelectorAll("div")];
-    const rail = divs.find((d) => d.style.width === "68px");
-    if (rail == null ? void 0 : rail.firstElementChild)
-      out.push(rail.firstElementChild);
-    for (const span of root.querySelectorAll("span")) {
-      if (span.textContent !== "beagle" || span.style.fontWeight !== "700")
-        continue;
-      out.push(span);
-      const svg = span.previousElementSibling;
-      if (svg && svg.tagName.toLowerCase() === "svg")
-        out.push(svg);
-    }
-    return out;
-  }
-  function linkBrands() {
-    for (const el of brandElements()) {
-      if (el.dataset.beagleBrand)
-        continue;
-      el.dataset.beagleBrand = "1";
-      el.style.cursor = "pointer";
-      el.setAttribute("role", "link");
-      el.setAttribute("tabindex", "0");
-      el.setAttribute("title", BRAND_TITLE);
-      const go = () => {
-        try {
-          window.open(BRAND_URL, "_blank", "noopener");
-        } catch (e) {
-        }
-      };
-      el.addEventListener("click", go);
-      el.addEventListener("keydown", (e) => {
-        if (e.key !== "Enter" && e.key !== " ")
-          return;
-        e.preventDefault();
-        go();
-      });
-    }
-  }
-  setInterval(linkBrands, 1500);
-  linkBrands();
   var TWEAKS_KEY = "decentlan.tweaks";
   var hostLang = () => {
     try {
