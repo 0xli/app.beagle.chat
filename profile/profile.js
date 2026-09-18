@@ -161,6 +161,9 @@
       copied: "copied",
       add: "Add me as a friend",
       about: "What is Beagle?",
+      qrCap: "Show this to add me in person",
+      qrTap: "Tap for a bigger one",
+      qrClose: "Tap anywhere to close",
       online: "online now",
       seen: "on Beagle",
       hintNew: "No account needed. You pick a name and a face, and the request goes out.",
@@ -187,6 +190,9 @@
       copied: "\u5DF2\u590D\u5236",
       add: "\u52A0\u6211\u4E3A\u597D\u53CB",
       about: "Beagle \u662F\u4EC0\u4E48\uFF1F",
+      qrCap: "\u5F53\u9762\u52A0\u597D\u53CB\uFF1A\u628A\u8FD9\u4E2A\u7ED9\u5BF9\u65B9\u626B",
+      qrTap: "\u70B9\u4E00\u4E0B\u653E\u5927",
+      qrClose: "\u70B9\u51FB\u4EFB\u610F\u5904\u5173\u95ED",
       online: "\u73B0\u5728\u5728\u7EBF",
       seen: "\u5728 Beagle \u4E0A",
       hintNew: "\u4E0D\u7528\u6CE8\u518C\u3002\u53D6\u4E2A\u540D\u5B57\u3001\u9009\u4E2A\u5934\u50CF\uFF0C\u597D\u53CB\u8BF7\u6C42\u5C31\u53D1\u51FA\u53BB\u4E86\u3002",
@@ -295,6 +301,61 @@
       }
     }
     return null;
+  }
+  function qrSvg(value) {
+    const qrcode = globalThis.qrcode;
+    if (typeof qrcode !== "function" || !value)
+      return null;
+    let q;
+    try {
+      q = qrcode(0, "M");
+      q.addData(value);
+      q.make();
+    } catch {
+      return null;
+    }
+    const n = q.getModuleCount(), quiet = 4, total = n + quiet * 2;
+    let d = "";
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++)
+        if (q.isDark(r, c))
+          d += `M${c + quiet} ${r + quiet}h1v1h-1z`;
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges"><rect width="${total}" height="${total}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+  }
+  var profileUrl = (p) => `${location.origin}/${p.ens || p.address}`;
+  function showQr(p, t) {
+    const url = profileUrl(p);
+    const svg = qrSvg(url);
+    if (!svg)
+      return false;
+    $("qr").innerHTML = svg;
+    $("qrUrl").textContent = url.replace(/^https?:\/\//, "");
+    $("qrCap").textContent = `${t.qrCap} \xB7 ${t.qrTap}`;
+    $("qrBox").hidden = false;
+    const full = $("qrFull");
+    const open = () => {
+      $("qrFullImg").innerHTML = svg;
+      $("qrFullUrl").textContent = url.replace(/^https?:\/\//, "");
+      $("qrFullName").textContent = p.name || p.ens || "";
+      $("qrFullClose").textContent = t.qrClose;
+      full.hidden = false;
+    };
+    $("qr").onclick = open;
+    $("qr").onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    };
+    full.onclick = () => {
+      full.hidden = true;
+    };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape")
+        full.hidden = true;
+    });
+    return true;
   }
   function setPageIcon(src) {
     try {
@@ -443,6 +504,17 @@
     add.disabled = !p.address;
     $("hint").textContent = p.address ? hasIdentityHere() ? t.hintHave : `${t.hintNew} ${t.hintApp}` : t.noAddr;
     add.onclick = () => addMe(p);
+    if (p.address) {
+      if (!showQr(p, t)) {
+        const at = Date.now();
+        const poll = setInterval(() => {
+          if (showQr(p, t) || Date.now() - at > 8e3)
+            clearInterval(poll);
+        }, 150);
+      }
+    } else {
+      $("qrBox").hidden = true;
+    }
     const phone = phonePlatform();
     const box = $("appBox");
     if (phone && p.address) {

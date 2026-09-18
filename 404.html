@@ -103,6 +103,18 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
   .foot{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:22px;text-align:center}
   .foot a{color:var(--faint);border-bottom:1px solid var(--border)}
   .foot a#about{color:var(--text2)}
+  .qr{margin-top:20px;padding-top:18px;border-top:1px solid var(--hair);display:flex;flex-direction:column;align-items:center;gap:9px}
+  .qr-img{width:148px;height:148px;background:#fff;border-radius:12px;padding:8px;cursor:pointer;line-height:0}
+  .qr-img svg{width:100%;height:100%;display:block}
+  .qr-url{font-family:var(--mono);font-size:11.5px;color:var(--text2);word-break:break-all;text-align:center;line-height:1.4}
+  .qr-cap{font-size:12.5px;color:var(--faint);text-align:center}
+  .qr-full{position:fixed;inset:0;z-index:50;background:#fff;display:flex;flex-direction:column;
+           align-items:center;justify-content:center;gap:18px;padding:24px;cursor:pointer}
+  .qr-full #qrFullImg{width:min(78vw,78vh);height:min(78vw,78vh);line-height:0}
+  .qr-full #qrFullImg svg{width:100%;height:100%;display:block}
+  .qr-full-name{font-family:var(--ui);font-size:19px;font-weight:600;color:#111;text-align:center}
+  .qr-full-url{font-family:var(--mono);font-size:13px;color:#555;text-align:center;word-break:break-all}
+  .qr-full-close{position:absolute;bottom:26px;font-family:var(--ui);font-size:12.5px;color:#999}
   [hidden]{display:none !important}
   .skel{color:transparent!important;background:var(--subtle);border-radius:6px;animation:sk 1.2s ease-in-out infinite}
   @keyframes sk{50%{opacity:.45}}
@@ -143,10 +155,29 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
 
     <button id="add" class="btn" disabled>Add me as a friend</button>
     <p id="hint" class="hint"></p>
+
+    <!-- Face to face: the page's own address as a QR, to hold up. Tap it for
+         a full-screen one that scans across a table. -->
+    <div id="qrBox" class="qr" hidden>
+      <div id="qr" class="qr-img" role="button" tabindex="0"></div>
+      <div id="qrUrl" class="qr-url"></div>
+      <div id="qrCap" class="qr-cap"></div>
+    </div>
+  </div>
+
+  <!-- Full screen, white, nothing else: what a camera across a table needs. -->
+  <div id="qrFull" class="qr-full" hidden>
+    <div id="qrFullImg"></div>
+    <div id="qrFullUrl" class="qr-full-url"></div>
+    <div id="qrFullName" class="qr-full-name"></div>
+    <div id="qrFullClose" class="qr-full-close"></div>
   </div>
 
   <p class="foot"><a id="about" href="https://beagle.chat" target="_blank" rel="noopener">What is Beagle?</a> · <a href="/">app.beagle.chat</a> · <a href="/privacy.html">privacy</a></p>
 
+<!-- The QR generator the app already ships (src/ui/vendor). Deferred: the
+     card must not wait on 56 KB to draw a person. -->
+<script defer src="/vendor/qrcode.js"></script>
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="/profile/profile.js?v=bb09cf44a6"></script>
+<script src="/profile/profile.js?v=9b4c4926c8"></script>
 </body></html>
