@@ -160,6 +160,7 @@
       copy: "copy",
       copied: "copied",
       add: "Add me as a friend",
+      about: "What is Beagle?",
       online: "online now",
       seen: "on Beagle",
       hintNew: "No account needed. You pick a name and a face, and the request goes out.",
@@ -185,6 +186,7 @@
       copy: "\u590D\u5236",
       copied: "\u5DF2\u590D\u5236",
       add: "\u52A0\u6211\u4E3A\u597D\u53CB",
+      about: "Beagle \u662F\u4EC0\u4E48\uFF1F",
       online: "\u73B0\u5728\u5728\u7EBF",
       seen: "\u5728 Beagle \u4E0A",
       hintNew: "\u4E0D\u7528\u6CE8\u518C\u3002\u53D6\u4E2A\u540D\u5B57\u3001\u9009\u4E2A\u5934\u50CF\uFF0C\u597D\u53CB\u8BF7\u6C42\u5C31\u53D1\u51FA\u53BB\u4E86\u3002",
@@ -417,6 +419,7 @@
       const a = document.createElement("a");
       links.appendChild(chip(p.url, "web", p.url.replace(/^https?:\/\//, "").replace(/\/+$/, ""), p.url));
     }
+    $("about").textContent = t.about;
     $("addrLbl").textContent = t.addr;
     $("copy").textContent = t.copy;
     if (p.address) {
