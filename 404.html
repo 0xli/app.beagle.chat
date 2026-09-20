@@ -90,8 +90,14 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
        font:600 16px var(--ui);cursor:pointer}
   .btn:hover{background:#9179ff}
   .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn.second{background:var(--subtle);color:var(--text2);border:1px solid var(--border);font-weight:500;font-size:14.5px;padding:12px}
-  .btn.second:hover{background:var(--hair);color:var(--text)}
+  /* The second way of doing the same thing, so it must still look like a
+     button: same height and weight as the filled one, lifted off the card,
+     and in the accent colour. At --subtle on --field it was a bordered
+     paragraph (Weili, on a phone, 2026-09-19). */
+  .btn.second{display:flex;align-items:center;justify-content:center;gap:9px;
+              background:#1c1c26;color:#b9a8ff;border:1.5px solid #3b3358}
+  .btn.second:hover{background:#24243040;border-color:var(--accent);color:#d2c6ff}
+  .btn.second .store-i{color:currentColor}
   a.store{display:flex;align-items:center;justify-content:center;gap:9px;text-decoration:none;color:#fff}
   .hint.ok{color:var(--online)}
   .store-i{display:inline-flex;width:20px;height:20px}
@@ -179,5 +185,5 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
      card must not wait on 56 KB to draw a person. -->
 <script defer src="/vendor/qrcode.js"></script>
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="/profile/profile.js?v=726f69dc19"></script>
+<script src="/profile/profile.js?v=1fd47f9114"></script>
 </body></html>

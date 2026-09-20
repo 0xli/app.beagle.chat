@@ -543,7 +543,8 @@
           store.onclick = null;
         });
       };
-      add.textContent = t.addBrowser;
+      add.innerHTML = `<span class="store-i">${ICON.web}</span>`;
+      add.appendChild(document.createTextNode(t.addBrowser));
       add.classList.add("second");
       $("hint").textContent = "";
     } else {
