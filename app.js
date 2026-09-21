@@ -339,6 +339,42 @@
     channel: "@next",
     wire: "163"
   };
+  var DK_PAGE = 30;
+  function dkMsgKey(m) {
+    return m.id || m.ts + ":" + m.dir;
+  }
+  function dkThreadMsg(m) {
+    return {
+      id: m.id,
+      from: m.dir === "out" ? "me" : "them",
+      time: dkClock(m.ts),
+      text: m.text,
+      file: m.file ? {
+        name: m.file.name,
+        size: dkFileSize(m.file.size),
+        dir: m.dir,
+        media: dkFileMediaKind(m.file.name),
+        status: m.file.status,
+        pct: m.file.status === "sending" && m.file.size ? Math.min(100, (m.file.sent || 0) / m.file.size * 100) : void 0,
+        kbps: m.file.kbps
+      } : void 0,
+      // Pass the real state through. Collapsing everything that was not
+      // 'queued' to 'read' meant a message still in flight — or one that
+      // never went out at all — rendered as delivered.
+      status: m.dir === "out" ? m.status === "queued" || m.status === "sending" || m.status === "failed" || m.status === "sent" ? m.status : "read" : void 0,
+      error: m.error,
+      // false = went to a live session but nobody acknowledged it (one tick).
+      // Dropped here before, so that state could never render.
+      confirmed: m.confirmed,
+      // Delivery path: "online" = live session, "offline" = express relay.
+      // Both directions carry it now; the bubble labels them the same way.
+      via: m.via,
+      // Brief 30: a validated component form, already whitelisted host-side.
+      // Passed through untouched — the renderer treats every string as text,
+      // never markup.
+      components: m.components
+    };
+  }
   function useDaemonData() {
     const [snap, setSnap] = React.useState({
       me: DK_ME_FALLBACK,
@@ -384,49 +420,74 @@
       return () => clearInterval(t);
     }, [refresh]);
     const inFlight = React.useRef(/* @__PURE__ */ new Set());
-    const loadThread = React.useCallback(async (peerId) => {
-      if (!peerId || inFlight.current.has(peerId))
+    const cache = React.useRef({});
+    const [earlier, setEarlier] = React.useState({});
+    const publish = React.useCallback((peerId) => {
+      const c = cache.current[peerId];
+      if (!c)
+        return;
+      const arr = [...c.byId.values()].sort((a, b) => a.ts - b.ts);
+      const msgs = arr.map(dkThreadMsg);
+      const withDay = msgs.length ? [{ day: dkDayLabel(arr[0].ts) }].concat(msgs) : [];
+      setThreads((t) => Object.assign({}, t, { [peerId]: withDay }));
+      setEarlier((e) => e[peerId] === c.more ? e : Object.assign({}, e, { [peerId]: c.more }));
+    }, []);
+    const loadThread = React.useCallback(async (peerId, opts) => {
+      if (!peerId)
+        return;
+      if (opts && opts.reset)
+        delete cache.current[peerId];
+      if (inFlight.current.has(peerId))
         return;
       inFlight.current.add(peerId);
       try {
-        const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId) + "&limit=200");
+        const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId) + "&limit=" + DK_PAGE);
         const arr = d.chats && d.chats[peerId] || [];
         await prefetchThreadFiles(arr);
-        const msgs = arr.map((m) => ({
-          id: m.id,
-          from: m.dir === "out" ? "me" : "them",
-          time: dkClock(m.ts),
-          text: m.text,
-          file: m.file ? {
-            name: m.file.name,
-            size: dkFileSize(m.file.size),
-            dir: m.dir,
-            media: dkFileMediaKind(m.file.name),
-            status: m.file.status,
-            pct: m.file.status === "sending" && m.file.size ? Math.min(100, (m.file.sent || 0) / m.file.size * 100) : void 0,
-            kbps: m.file.kbps
-          } : void 0,
-          // Pass the real state through. Collapsing everything that was not
-          // 'queued' to 'read' meant a message still in flight — or one that
-          // never went out at all — rendered as delivered.
-          status: m.dir === "out" ? m.status === "queued" || m.status === "sending" || m.status === "failed" ? m.status : "read" : void 0,
-          error: m.error,
-          // Delivery path: "online" = live session, "offline" = express relay.
-          // Incoming messages carry this; the bubble colors them differently.
-          via: m.via,
-          // Brief 30: a validated component form, already whitelisted host-side.
-          // Passed through untouched — the renderer treats every string as text,
-          // never markup.
-          components: m.components
-        }));
-        const withDay = msgs.length ? [{ day: dkDayLabel(arr[0].ts) }].concat(msgs) : [];
-        setThreads((t) => Object.assign({}, t, { [peerId]: withDay }));
+        let c = cache.current[peerId];
+        if (!c)
+          c = cache.current[peerId] = { byId: /* @__PURE__ */ new Map(), more: arr.length >= DK_PAGE };
+        if (arr.length) {
+          const from = arr[0].ts;
+          for (const [k, m] of c.byId)
+            if (m.ts >= from)
+              c.byId.delete(k);
+        }
+        for (const m of arr)
+          c.byId.set(dkMsgKey(m), m);
+        publish(peerId);
       } catch (e) {
       } finally {
         inFlight.current.delete(peerId);
       }
-    }, []);
-    return Object.assign({}, snap, { threads, refresh, loadThread });
+    }, [publish]);
+    const loadEarlier = React.useCallback(async (peerId) => {
+      const c = cache.current[peerId];
+      if (!c || !c.more || c.loadingEarlier)
+        return;
+      let oldest = Infinity;
+      for (const m of c.byId.values())
+        if (m.ts < oldest)
+          oldest = m.ts;
+      if (!Number.isFinite(oldest))
+        return;
+      c.loadingEarlier = true;
+      try {
+        const d = await dkGet("/api/chat-history?peer=" + encodeURIComponent(peerId) + "&limit=" + DK_PAGE + "&before=" + oldest);
+        const arr = d.chats && d.chats[peerId] || [];
+        await prefetchThreadFiles(arr);
+        if (cache.current[peerId] !== c)
+          return;
+        for (const m of arr)
+          c.byId.set(dkMsgKey(m), m);
+        c.more = arr.length >= DK_PAGE;
+        publish(peerId);
+      } catch (e) {
+      } finally {
+        c.loadingEarlier = false;
+      }
+    }, [publish]);
+    return Object.assign({}, snap, { threads, earlier, refresh, loadThread, loadEarlier });
   }
   Object.assign(window, {
     dkHash,
@@ -1363,6 +1424,8 @@
             {
               src: dkFileUrl(m.file.name),
               alt: m.file.name,
+              loading: "lazy",
+              decoding: "async",
               onError: (e) => {
                 const w = e.currentTarget.closest("[data-media]");
                 if (w)
@@ -1566,14 +1629,14 @@
           letterSpacing: -0.1,
           wordBreak: "break-word"
         } }, /* @__PURE__ */ React.createElement(MarkdownText, { text: read.text, onNameCard })));
-      })(), read.form && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement(DkChatForm, { form: read.form, submitted, peer, onSubmit: onFormSubmit })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, margin: "3px 3px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--faint)" } }, m.time), !mine && m.via && /* @__PURE__ */ React.createElement(
-        "span",
-        {
-          title: m.via === "offline" ? "delivered via express relay (offline)" : "delivered over a live session (online)",
-          style: { fontFamily: "var(--mono)", fontSize: 9, color: m.via === "offline" ? "#f59e0b" : "var(--faint)" }
-        },
-        m.via === "offline" ? "\u79BB\u7EBF" : "\u5728\u7EBF"
-      ), !selMode && m.id && /* @__PURE__ */ React.createElement(
+      })(), read.form && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement(DkChatForm, { form: read.form, submitted, peer, onSubmit: onFormSubmit })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, margin: "3px 3px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--faint)" } }, m.time), (() => {
+        const sentDone = mine && m.status && m.status !== "queued" && m.status !== "sending" && m.status !== "failed";
+        const via = !mine ? m.via : sentDone ? m.via === "offline" ? "offline" : "online" : null;
+        if (!via)
+          return null;
+        const title = mine ? via === "offline" ? T.viaOutOffline || "posted to the offline relay \u2014 they get it when they come online" : T.viaOutOnline || "sent over a live session (online)" : via === "offline" ? "delivered via express relay (offline)" : "delivered over a live session (online)";
+        return /* @__PURE__ */ React.createElement("span", { title, style: { fontFamily: "var(--mono)", fontSize: 9, color: via === "offline" ? "#f59e0b" : "var(--faint)" } }, via === "offline" ? "\u79BB\u7EBF" : "\u5728\u7EBF");
+      })(), !selMode && m.id && /* @__PURE__ */ React.createElement(
         "button",
         {
           title: T.delete || "delete",
@@ -1608,11 +1671,13 @@
         },
         /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 11, stroke: 2.2, color: "var(--faint)" }),
         /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--faint)" } }, m.status === "sending" ? T.sendingMsg || "sending" : T.queued || "queued")
-      ) : mine && m.status === "sent" && m.confirmed === false ? /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, stroke: 2.2, color: "var(--faint)", title: T.sentUnconfirmed || "sent \u2014 not confirmed by the peer" }) : mine && m.status && /* @__PURE__ */ React.createElement(Icon, { name: "checkCheck", size: 12, stroke: 2.2, color: m.status === "read" ? "var(--accent)" : "var(--faint)" })))
+      ) : mine && m.via === "offline" && m.status !== "queued" && m.status !== "sending" ? /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, stroke: 2.2, color: "#f59e0b", title: T.viaOutOffline || "posted to the offline relay \u2014 they get it when they come online" }) : mine && m.status === "sent" && m.confirmed === false ? /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, stroke: 2.2, color: "var(--faint)", title: T.sentUnconfirmed || "sent \u2014 not confirmed by the peer" }) : mine && m.status && /* @__PURE__ */ React.createElement(Icon, { name: "checkCheck", size: 12, stroke: 2.2, color: m.status === "read" ? "var(--accent)" : "var(--faint)" })))
     );
   }
-  function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, muted, onToggleMute, phone, onBack }) {
+  function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, muted, onToggleMute, phone, onBack }) {
     const scrollRef = React.useRef(null);
+    const prependRef = React.useRef(null);
+    const [earlierBusy, setEarlierBusy] = React.useState(false);
     const isGroup = React.useMemo(() => dkThreadIsGroup(threadProp), [threadProp]);
     const followScrollRef = React.useRef(true);
     const fileRef = React.useRef(null);
@@ -1690,9 +1755,30 @@
       followScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     };
     React.useLayoutEffect(() => {
+      const el = scrollRef.current;
+      const pre = prependRef.current;
+      if (pre && el && el.scrollHeight !== pre.h) {
+        el.scrollTop = pre.top + (el.scrollHeight - pre.h);
+        prependRef.current = null;
+        return;
+      }
       if (followScrollRef.current)
         scrollToBottom();
     }, [peer.id, thread]);
+    React.useEffect(() => {
+      prependRef.current = null;
+      setEarlierBusy(false);
+    }, [peer.id]);
+    const loadEarlier = () => {
+      const el = scrollRef.current;
+      if (!onLoadEarlier || earlierBusy)
+        return;
+      if (el)
+        prependRef.current = { h: el.scrollHeight, top: el.scrollTop };
+      followScrollRef.current = false;
+      setEarlierBusy(true);
+      Promise.resolve(onLoadEarlier()).finally(() => setEarlierBusy(false));
+    };
     const toggleSel = (id) => setSel((s) => {
       const n = new Set(s);
       n.has(id) ? n.delete(id) : n.add(id);
@@ -1952,7 +2038,7 @@ ${peer.address}`
         fontSize: 12.5,
         color: "var(--text)"
       } }, /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 13, stroke: 2.2, color: "#d29922" }), /* @__PURE__ */ React.createElement("span", null, T.pendingFriend || "Waiting for them to accept your friend request \u2014 messages will queue and deliver once they do.")),
-      /* @__PURE__ */ React.createElement("div", { ref: scrollRef, onScroll: updateFollowScroll, style: { flex: 1, overflow: "auto", padding: phone ? "12px 10px" : "18px 22px", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1200, margin: "0 auto" } }, thread.filter((m) => m.day || !hidden.has(m.id)).map((m, i) => m.day ? /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", justifyContent: "center", margin: "14px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, fontWeight: 600, color: "var(--faint)", background: "var(--chip)", padding: "3px 10px", borderRadius: 999 } }, m.day)) : /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { ref: scrollRef, onScroll: updateFollowScroll, style: { flex: 1, overflow: "auto", padding: phone ? "12px 10px" : "18px 22px", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1200, margin: "0 auto" } }, hasEarlier && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", margin: "4px 0 10px" } }, /* @__PURE__ */ React.createElement(Btn, { size: "sm", onClick: loadEarlier, disabled: earlierBusy }, earlierBusy ? T.loadingEarlier || "Loading\u2026" : T.loadEarlier || "Load earlier messages")), thread.filter((m) => m.day || !hidden.has(m.id)).map((m, i) => m.day ? /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", justifyContent: "center", margin: "14px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, fontWeight: 600, color: "var(--faint)", background: "var(--chip)", padding: "3px 10px", borderRadius: 999 } }, m.day)) : /* @__PURE__ */ React.createElement(
         Msg,
         {
           key: m.id || i,
@@ -2112,12 +2198,12 @@ ${peer.address}`
   function ChatEmpty({ T }) {
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "var(--faint)", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "message", size: 40, stroke: 1.4, color: "var(--line)" }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13 } }, T.pickPeer));
   }
-  function ChatTab({ T, lang, peers, requests, activeId, thread, onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, prefillAddr, onPrefillConsumed, muted, onToggleMute, phone, onBack }) {
+  function ChatTab({ T, lang, peers, requests, activeId, thread, onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, prefillAddr, onPrefillConsumed, muted, onToggleMute, phone, onBack }) {
     const peer = peers.find((p) => p.id === activeId);
     if (phone) {
-      return peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, muted: !!muted && muted.includes(peer.id), onToggleMute, phone: true, onBack }) : /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, wide: true });
+      return peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, muted: !!muted && muted.includes(peer.id), onToggleMute, phone: true, onBack }) : /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, wide: true });
     }
-    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, muted: !!muted && muted.includes(peer.id), onToggleMute }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
+    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, muted: !!muted && muted.includes(peer.id), onToggleMute }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
   }
   Object.assign(window, { ChatTab });
   function CopyBtn({ value, copiedText = "Copied", copyFailedText = "Copy failed", copyTitle = "Copy" }) {
@@ -4880,6 +4966,8 @@ ${peer.address}`
       autoAcceptLabel: "Auto-accept friend requests",
       autoAcceptSub: "Off: requests wait in the sidebar for your approval.",
       groupSenderUnknown: "The group relays only this display name. Register Beagle as a group agent (/agent add <beagle address> in the group) to receive full member identities you can add as friends.",
+      loadEarlier: "Load earlier messages",
+      loadingEarlier: "Loading\u2026",
       pendingFriend: "Waiting for them to accept your friend request \u2014 messages will queue and deliver once they do.",
       cancelling: "Cancelling\u2026",
       cancelled: "Transfer cancelled",
@@ -4958,6 +5046,8 @@ ${peer.address}`
       updTitle: "Update available",
       updLater: "Later",
       brandAbout: "What is Beagle?",
+      viaOutOffline: "posted to the offline relay \u2014 they get it when they come online",
+      viaOutOnline: "sent over a live session (online)",
       updNow: "Update now",
       updRestart: "Restart",
       updBusy: "Updating\u2026 (about a minute)",
@@ -5070,6 +5160,8 @@ ${peer.address}`
       autoAcceptLabel: "\u81EA\u52A8\u63A5\u53D7\u597D\u53CB\u8BF7\u6C42",
       autoAcceptSub: "\u5173\u95ED\u540E\uFF0C\u597D\u53CB\u8BF7\u6C42\u4F1A\u7B49\u5F85\u4F60\u5728\u4FA7\u8FB9\u680F\u624B\u52A8\u786E\u8BA4\u3002",
       groupSenderUnknown: "\u7FA4\u670D\u52A1\u53EA\u8F6C\u53D1\u4E86\u663E\u793A\u540D\uFF0C\u62FF\u4E0D\u5230\u8BE5\u6210\u5458\u7684\u5B8C\u6574\u8EAB\u4EFD\u3002\u5728\u7FA4\u91CC\u6267\u884C /agent add <beagle \u5730\u5740> \u628A Beagle \u6CE8\u518C\u4E3A\u7FA4 agent \u540E\uFF0C\u5373\u53EF\u6536\u5230\u5B8C\u6574\u8EAB\u4EFD\u5E76\u4E00\u952E\u52A0\u597D\u53CB\u3002",
+      loadEarlier: "\u52A0\u8F7D\u66F4\u65E9\u7684\u6D88\u606F",
+      loadingEarlier: "\u52A0\u8F7D\u4E2D\u2026",
       pendingFriend: "\u7B49\u5F85\u5BF9\u65B9\u63A5\u53D7\u597D\u53CB\u8BF7\u6C42 \u2014 \u6D88\u606F\u4F1A\u5148\u6392\u961F\uFF0C\u5BF9\u65B9\u63A5\u53D7\u540E\u81EA\u52A8\u9001\u8FBE\u3002",
       cancelling: "\u6B63\u5728\u53D6\u6D88\u2026",
       cancelled: "\u5DF2\u53D6\u6D88\u4F20\u8F93",
@@ -5148,6 +5240,8 @@ ${peer.address}`
       updTitle: "\u53D1\u73B0\u65B0\u7248\u672C",
       updLater: "\u7A0D\u540E",
       brandAbout: "Beagle \u662F\u4EC0\u4E48?",
+      viaOutOffline: "\u5DF2\u5B58\u5230\u79BB\u7EBF\u4E2D\u8F6C\u2014\u2014\u5BF9\u65B9\u4E0A\u7EBF\u540E\u6536\u5230",
+      viaOutOnline: "\u5728\u7EBF\u76F4\u63A5\u9001\u8FBE",
       updNow: "\u7ACB\u5373\u66F4\u65B0",
       updRestart: "\u91CD\u542F",
       updBusy: "\u66F4\u65B0\u4E2D\u2026(\u7EA6\u4E00\u5206\u949F)",
@@ -5538,7 +5632,7 @@ ${peer.address}`
     React.useEffect(() => {
       if (!activeId)
         return;
-      data.loadThread(activeId);
+      data.loadThread(activeId, { reset: true });
       dkApi.markRead(activeId).then(data.refresh);
       const iv = setInterval(() => {
         data.loadThread(activeId);
@@ -5688,7 +5782,7 @@ ${peer.address}`
       fontWeight: 600,
       background: tab === n.id ? "var(--accent)" : "transparent",
       color: tab === n.id ? "#fff" : "var(--dim)"
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: n.icon, size: 14, stroke: 2, color: tab === n.id ? "#fff" : "var(--dim)" }), n.label))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, phone, onBack: closeConversation, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr(""), muted: mutedIds, onToggleMute }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak, onSetAvatar: (p) => dkApi.setProfileFull(p).then((r) => {
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: n.icon, size: 14, stroke: 2, color: tab === n.id ? "#fff" : "var(--dim)" }), n.label))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, phone, onBack: closeConversation, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), hasEarlier: !!(activeId && data.earlier[activeId]), onLoadEarlier: () => activeId && data.loadEarlier(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr(""), muted: mutedIds, onToggleMute }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak, onSetAvatar: (p) => dkApi.setProfileFull(p).then((r) => {
       data.refresh();
       return r;
     }) })), phone && !inConversation && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", borderTop: "1px solid var(--line)", background: "var(--rail)", paddingBottom: "env(safe-area-inset-bottom, 0px)" } }, phoneNav.map((n) => /* @__PURE__ */ React.createElement(TabBarBtn, { key: n.id, icon: n.icon, label: n.label, active: n.active, badge: n.badge, onClick: n.go }))), data.locked && /* @__PURE__ */ React.createElement(

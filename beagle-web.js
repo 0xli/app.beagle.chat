@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.18","builtAt":"2026-09-20T03:38:08.452Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.20","builtAt":"2026-09-21T06:32:04.974Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -17523,8 +17523,10 @@ ${ts}`);
     put(SEQ, seq);
     return id;
   }
-  function historyFor(peer, limit = 200) {
-    return thread(peer).slice(-limit);
+  function historyFor(peer, limit = 200, before) {
+    const all = thread(peer);
+    const page = Number.isFinite(before) ? all.filter((m) => m.ts < before) : all;
+    return page.slice(-limit);
   }
   function allMessages() {
     const all = [];
@@ -17955,7 +17957,30 @@ ${ts}`);
       () => []
     );
   }
-  async function appendMessage2(msg) {
+  var lastTs = /* @__PURE__ */ new Map();
+  function stampUnique(msg) {
+    const prev = lastTs.get(msg.peer) ?? -Infinity;
+    const given = Number(msg.ts);
+    const ts = Number.isFinite(given) ? given : Date.now();
+    const next = ts > prev ? ts : prev + 1;
+    lastTs.set(msg.peer, next);
+    return next === ts ? msg : { ...msg, ts: next };
+  }
+  async function primeTimestamps() {
+    try {
+      for (const m of await allMessages2()) {
+        const prev = lastTs.get(m.peer) ?? -Infinity;
+        if (m.ts > prev)
+          lastTs.set(m.peer, m.ts);
+      }
+    } catch {
+    }
+  }
+  var primed = null;
+  async function appendMessage2(message) {
+    primed = primed || primeTimestamps();
+    await primed;
+    const msg = stampUnique(message);
     return withStore(
       async () => idb(MESSAGES, "readwrite", (s) => s.add(msg)),
       () => appendMessage(msg),
@@ -17968,14 +17993,15 @@ ${ts}`);
       }
     );
   }
-  async function historyFor2(peer, limit = 200) {
+  async function historyFor2(peer, limit = 200, before) {
+    const upper = Number.isFinite(before) ? before : Number.MAX_SAFE_INTEGER;
     return withStore(
       async () => {
-        const all = await idb(MESSAGES, "readonly", (s) => s.index("peer_ts").getAll(IDBKeyRange.bound([peer, 0], [peer, Number.MAX_SAFE_INTEGER])));
+        const all = await idb(MESSAGES, "readonly", (s) => s.index("peer_ts").getAll(IDBKeyRange.bound([peer, 0], [peer, upper], false, Number.isFinite(before))));
         return (all || []).slice(-limit);
       },
-      () => historyFor(peer, limit),
-      () => memMsgs.filter((m) => m.peer === peer).slice(-limit)
+      () => historyFor(peer, limit, before),
+      () => memMsgs.filter((m) => m.peer === peer && (!Number.isFinite(before) || m.ts < before)).slice(-limit)
     );
   }
   async function allMessages2() {
@@ -19069,7 +19095,7 @@ ${ts}`);
           return ok({ id: req.id, status: "sending" });
         }
         case "chat-history":
-          return ok({ messages: await historyFor2(req.userid, req.limit ?? 200) });
+          return ok({ messages: await historyFor2(req.userid, req.limit ?? 200, req.before) });
         case "chat-log-local":
           return ok(await recordMessage(req.userid, req.dir === "out" ? "out" : "in", req.text ?? "", "local"));
         case "chat-mark-read":
@@ -19514,6 +19540,14 @@ ${ts}`);
     const d = new Date(ts);
     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
+  function historyPage(url, fallbackLimit) {
+    const n = Number(url.searchParams.get("limit"));
+    const b = Number(url.searchParams.get("before"));
+    return {
+      limit: Number.isFinite(n) && n > 0 ? Math.min(n, 1e3) : fallbackLimit,
+      before: Number.isFinite(b) && b > 0 ? b : void 0
+    };
+  }
   function peerFrom(f, ens) {
     const dir = ens?.byUserid.get(f.userid);
     const lm = f.lastMessage;
@@ -19725,7 +19759,8 @@ ${ts}`);
           const peer = url.searchParams.get("peer") || void 0;
           if (!peer)
             return json({ chats: {} });
-          return json({ chats: { [peer]: await historyFor2(peer, 500) } });
+          const { limit, before } = historyPage(url, 500);
+          return json({ chats: { [peer]: await historyFor2(peer, limit, before) } });
         }
         case "GET /api/punk-list": {
           const type2 = (url.searchParams.get("type") || "any").toLowerCase().replace(/[^a-z]/g, "") || "any";
@@ -19906,7 +19941,8 @@ ${ts}`);
         }
         case "GET /api/chat-history": {
           const peer = url.searchParams.get("peer") || void 0;
-          const r = await call2("chat-history", { userid: peer });
+          const { limit, before } = historyPage(url, 200);
+          const r = await call2("chat-history", { userid: peer, limit, before });
           const messages = r.data?.messages ?? [];
           return json({ chats: peer ? { [peer]: messages } : {} });
         }
