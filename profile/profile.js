@@ -90,6 +90,80 @@
     return (bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16 | bytes[offset + 3] << 24) >>> 0;
   }
 
+  // src/fetch-json.js
+  var CONFIG_TIMEOUT_MS = 6e3;
+  var CACHE_PREFIX = "beagle-web:cfg:";
+  var inflight = /* @__PURE__ */ new Map();
+  function remember(url, data) {
+    try {
+      localStorage.setItem(CACHE_PREFIX + url, JSON.stringify({ at: Date.now(), data }));
+    } catch {
+    }
+  }
+  function recall(url) {
+    try {
+      const raw = localStorage.getItem(CACHE_PREFIX + url);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+  var KEPT_GRACE_MS = 1500;
+  function fetchJsonWithTimeout(url, ms = CONFIG_TIMEOUT_MS, { keep = true } = {}) {
+    const key = `${keep ? "k" : "n"}:${url}`;
+    if (inflight.has(key))
+      return inflight.get(key);
+    const kept = keep ? recall(url) : null;
+    const network = (async () => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), ms);
+      try {
+        const res = await fetch(url, { cache: "no-store", signal: ctl.signal });
+        if (!res.ok)
+          throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (keep)
+          remember(url, data);
+        return data;
+      } catch (err) {
+        throw new Error(`${url}: ${err?.name === "AbortError" ? `no answer in ${ms} ms` : String(err?.message || err)}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+    const p = new Promise((resolve, reject) => {
+      let done = false;
+      const useKept = (why) => {
+        if (done)
+          return;
+        done = true;
+        console.warn(`beagle-web: ${url}: ${why}; using the copy from ${new Date(kept.at).toISOString()}`);
+        resolve(kept.data);
+      };
+      const grace = kept ? setTimeout(() => useKept(`no answer in ${KEPT_GRACE_MS} ms`), Math.min(KEPT_GRACE_MS, ms)) : null;
+      network.then(
+        (data) => {
+          clearTimeout(grace);
+          if (!done) {
+            done = true;
+            resolve(data);
+          }
+        },
+        (err) => {
+          clearTimeout(grace);
+          if (kept)
+            useKept(err.message.slice(url.length + 2));
+          else if (!done) {
+            done = true;
+            reject(err);
+          }
+        }
+      );
+    }).finally(() => inflight.delete(key));
+    inflight.set(key, p);
+    return p;
+  }
+
   // src/profile.js
   var ENS_GATEWAY = "https://ens-gateway.beaglechat.workers.dev";
   var REF_KEY = "beagle-web:ref";
@@ -255,10 +329,7 @@
   };
   async function ensByKey(key) {
     try {
-      const r = await fetch(`${ENS_GATEWAY}/getAddress/${encodeURIComponent(key)}`, { cache: "no-store" });
-      if (!r.ok)
-        return null;
-      const rec = await r.json();
+      const rec = await fetchJsonWithTimeout(`${ENS_GATEWAY}/getAddress/${encodeURIComponent(key)}`, void 0, { keep: false });
       return rec && rec.name && !rec.error ? rec : null;
     } catch {
       return null;
@@ -266,10 +337,7 @@
   }
   async function ensByName(name) {
     try {
-      const r = await fetch(`${ENS_GATEWAY}/names`, { cache: "no-store" });
-      if (!r.ok)
-        return null;
-      const all = await r.json();
+      const all = await fetchJsonWithTimeout(`${ENS_GATEWAY}/names`, void 0, { keep: false });
       const norm = (x) => String(x || "").toLowerCase().replace(/\s+/g, "");
       const hit = Object.entries(all || {}).find(([k]) => norm(k) === norm(name));
       return hit ? { name: hit[0], ...hit[1] } : null;

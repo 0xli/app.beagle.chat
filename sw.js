@@ -54,9 +54,18 @@
         resolve(null);
         return;
       }
-      const g = store.get(`file:${name}`);
-      g.onsuccess = () => resolve(g.result || null);
-      g.onerror = () => resolve(null);
+      const get = (key) => new Promise((ok) => {
+        const g = store.get(key);
+        g.onsuccess = () => ok(g.result ?? null);
+        g.onerror = () => ok(null);
+      });
+      (async () => {
+        const [scope, legacyOwner] = await Promise.all([get("scope"), get("legacy-owner")]);
+        const own = scope ? await get(`u/${scope}/file:${name}`) : null;
+        if (own)
+          return own;
+        return !scope || scope === legacyOwner ? get(`file:${name}`) : null;
+      })().then(resolve, () => resolve(null));
     });
     return Promise.race([read, deadline(DB_TIMEOUT_MS)]);
   }

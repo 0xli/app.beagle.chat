@@ -4535,9 +4535,16 @@ ${nonce2}`);
   var PREFIX = "beagle-web:";
   var BACKEND_KEY = `${PREFIX}backend`;
   var KV = `${PREFIX}kv:`;
-  var FRIENDS = `${PREFIX}friends`;
-  var MSGS = `${PREFIX}messages:`;
   var SEQ = `${PREFIX}msgseq`;
+  var scope = null;
+  var base = (sc) => sc ? `${PREFIX}u/${sc}/` : PREFIX;
+  var friendsKey = (sc = scope) => `${base(sc)}friends`;
+  var msgsPrefix = (sc = scope) => `${base(sc)}messages:`;
+  var ANY_THREAD = /^beagle-web:(u\/[^/]+\/)?messages:/;
+  var ANY_FILE = /^beagle-web:kv:(u\/[^/]+\/)?file:/;
+  function setScope(userid) {
+    scope = userid || null;
+  }
   var MAX_MSGS_PER_PEER = 500;
   var MAX_BLOB_BYTES = 256 * 1024;
   function available() {
@@ -4598,20 +4605,20 @@ ${nonce2}`);
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(prefix))
+      if (k && (typeof prefix === "string" ? k.startsWith(prefix) : prefix.test(k)))
         keys.push(k);
     }
     return keys;
   }
   function evict() {
-    const files = ourKeys(`${KV}file:`);
+    const files = ourKeys(ANY_FILE);
     if (files.length) {
       for (const k of files)
         localStorage.removeItem(k);
       return true;
     }
     let freed = false;
-    for (const k of ourKeys(MSGS)) {
+    for (const k of ourKeys(ANY_THREAD)) {
       const list = decode(localStorage.getItem(k));
       if (!Array.isArray(list) || list.length < 2)
         continue;
@@ -4642,7 +4649,7 @@ ${nonce2}`);
   var kvGet = (key) => get(KV + key);
   var kvPut = (key, value) => put(KV + key, value);
   function listFriends() {
-    const all = get(FRIENDS);
+    const all = get(friendsKey());
     return all ? Object.values(all) : [];
   }
   function putFriends(list) {
@@ -4650,14 +4657,15 @@ ${nonce2}`);
     for (const f of list || [])
       if (f && f.userid)
         all[f.userid] = f;
-    put(FRIENDS, all);
+    put(friendsKey(), all);
   }
-  var threadKey = (peer) => MSGS + peer;
-  var thread = (peer) => {
-    const list = get(threadKey(peer));
+  var threadKey = (peer, sc = scope) => msgsPrefix(sc) + peer;
+  var thread = (peer, sc = scope) => {
+    const list = get(threadKey(peer, sc));
     return Array.isArray(list) ? list : [];
   };
-  var peers = () => ourKeys(MSGS).map((k) => k.slice(MSGS.length));
+  var peersOf = (sc) => ourKeys(msgsPrefix(sc)).map((k) => k.slice(msgsPrefix(sc).length));
+  var peers = () => peersOf(scope);
   function appendMessage(msg) {
     const seq = (Number(get(SEQ)) || 0) + 1;
     const id = `ls-${seq}`;
@@ -4668,6 +4676,47 @@ ${nonce2}`);
     put(threadKey(msg.peer), list);
     put(SEQ, seq);
     return id;
+  }
+  function claimLegacy(userid, isGlobal) {
+    if (!userid)
+      return { friends: 0, threads: 0, kv: 0 };
+    const moved = { friends: 0, threads: 0, kv: 0 };
+    const legacyFriends = get(friendsKey(null));
+    if (legacyFriends && typeof legacyFriends === "object") {
+      const mine2 = get(friendsKey(userid)) || {};
+      for (const [id, f] of Object.entries(legacyFriends))
+        if (!(id in mine2)) {
+          mine2[id] = f;
+          moved.friends++;
+        }
+      put(friendsKey(userid), mine2);
+      localStorage.removeItem(friendsKey(null));
+    }
+    for (const peer of peersOf(null)) {
+      const legacy = thread(peer, null);
+      const mine2 = thread(peer, userid);
+      const have = new Set(mine2.map((m) => m.id));
+      const merged = mine2.concat(legacy.filter((m) => !have.has(m.id))).sort((a, b) => a.ts - b.ts).slice(-MAX_MSGS_PER_PEER);
+      put(threadKey(peer, userid), merged);
+      localStorage.removeItem(threadKey(peer, null));
+      moved.threads++;
+    }
+    for (const k of ourKeys(KV)) {
+      const key = k.slice(KV.length);
+      if (key.startsWith("u/") || isGlobal(key))
+        continue;
+      const target2 = `${KV}u/${userid}/${key}`;
+      if (localStorage.getItem(target2) == null) {
+        try {
+          localStorage.setItem(target2, localStorage.getItem(k));
+        } catch {
+          continue;
+        }
+      }
+      localStorage.removeItem(k);
+      moved.kv++;
+    }
+    return moved;
   }
   function latch() {
     try {
@@ -4693,10 +4742,10 @@ ${nonce2}`);
   var DB_NAME = "beagle-web";
   var DB_VERSION = 2;
   var KV2 = "kv";
-  var FRIENDS2 = "friends";
+  var FRIENDS = "friends";
   var MESSAGES = "messages";
   var dbPromise = null;
-  var STORES = [KV2, FRIENDS2, MESSAGES];
+  var STORES = [KV2, FRIENDS, MESSAGES];
   var missingStores = (db) => STORES.filter((n) => !db.objectStoreNames.contains(n));
   function recreate() {
     return new Promise((resolve, reject) => {
@@ -4732,8 +4781,8 @@ ${nonce2}`);
         const db = req.result;
         if (!db.objectStoreNames.contains(KV2))
           db.createObjectStore(KV2);
-        if (!db.objectStoreNames.contains(FRIENDS2))
-          db.createObjectStore(FRIENDS2, { keyPath: "userid" });
+        if (!db.objectStoreNames.contains(FRIENDS))
+          db.createObjectStore(FRIENDS, { keyPath: "userid" });
         if (!db.objectStoreNames.contains(MESSAGES)) {
           const s = db.createObjectStore(MESSAGES, { keyPath: "id", autoIncrement: true });
           s.createIndex("peer_ts", ["peer", "ts"]);
@@ -4885,7 +4934,7 @@ ${nonce2}`);
     }
     try {
       if (!listFriends().length) {
-        const friends = await tx(db, FRIENDS2, "readonly", (s) => s.getAll(), budget) || [];
+        const friends = (await tx(db, FRIENDS, "readonly", (s) => s.getAll(), budget) || []).filter(mine);
         if (friends.length) {
           putFriends(friends);
           copied.friends = friends.length;
@@ -4895,7 +4944,7 @@ ${nonce2}`);
     }
     try {
       if (!peers().length) {
-        const msgs = await tx(db, MESSAGES, "readonly", (s) => s.getAll(), budget) || [];
+        const msgs = (await tx(db, MESSAGES, "readonly", (s) => s.getAll(), budget) || []).filter(mine);
         for (const m of msgs.slice(-MAX_MSGS_PER_PEER * 8)) {
           try {
             appendMessage(m);
@@ -4907,6 +4956,7 @@ ${nonce2}`);
       }
     } catch {
     }
+    claimLs();
     console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
     try {
       db.close?.();
@@ -5012,20 +5062,68 @@ ${nonce2}`);
     }
     return tx(db, store, mode, fn, left());
   };
-  var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile"]);
+  var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile", "legacy-owner"]);
+  var mirrored = (key) => MIRRORED.has(key) || /^u\/[^/]+\/profile$/.test(key);
   var mirror = (key, value) => {
-    if (backend === "mem" || !lsUsable || !MIRRORED.has(key))
+    if (backend === "mem" || !lsUsable || !mirrored(key))
       return;
     try {
       kvPut(key, value);
     } catch {
     }
   };
-  async function kvGet2(key, { timeoutMs } = {}) {
+  var LEGACY_OWNER_KEY = "legacy-owner";
+  var SCOPE_KEY = "scope";
+  var GLOBAL = /* @__PURE__ */ new Set(["identity", LEGACY_OWNER_KEY, SCOPE_KEY]);
+  var scope2 = null;
+  var legacyOwner = null;
+  var scopeReady = Promise.resolve();
+  var scopedKey = (key) => scope2 && !GLOBAL.has(key) ? `u/${scope2}/${key}` : key;
+  var ownerOf = (rec) => rec?.owner || legacyOwner || null;
+  var mine = (rec) => ownerOf(rec) === scope2;
+  function claimLs() {
+    if (!legacyOwner || !lsUsable || backend === "mem")
+      return;
+    try {
+      claimLegacy(legacyOwner, (k) => GLOBAL.has(k));
+    } catch (err) {
+      console.warn("beagle-web: could not file legacy localStorage under its identity", err?.message || err);
+    }
+  }
+  function setScope2(userid) {
+    if (!userid || userid === scope2)
+      return scopeReady;
+    scope2 = userid;
+    setScope(userid);
+    scopeReady = (async () => {
+      let owner = await kvGet2(LEGACY_OWNER_KEY, { timeoutMs: BOOT_TIMEOUT_MS }).catch(() => null);
+      if (owner === void 0) {
+        owner = userid;
+        await kvPut2(LEGACY_OWNER_KEY, owner, { timeoutMs: BOOT_TIMEOUT_MS }).catch(() => {
+        });
+      }
+      legacyOwner = owner || null;
+      claimLs();
+      void kvPut2(SCOPE_KEY, userid).catch(() => {
+      });
+    })().catch(() => {
+    });
+    return scopeReady;
+  }
+  async function kvGet2(key, opts = {}) {
+    if (GLOBAL.has(key))
+      return kvGetRaw(key, opts);
+    await scopeReady;
+    const v = await kvGetRaw(scopedKey(key), opts);
+    if (v === void 0 && scope2 && scope2 === legacyOwner)
+      return kvGetRaw(key, opts);
+    return v;
+  }
+  async function kvGetRaw(key, { timeoutMs } = {}) {
     return withStore(
       async () => {
         const v = await idb(KV2, "readonly", (s) => s.get(key), timeoutMs);
-        if (v === void 0 && lsUsable && MIRRORED.has(key))
+        if (v === void 0 && lsUsable && mirrored(key))
           return kvGet(key);
         return v;
       },
@@ -5033,7 +5131,7 @@ ${nonce2}`);
       // The memory floor for a MIRRORED key is the mirror: a boot read of the
       // identity that failed twice must not turn a returning user into a
       // stranger with a fresh key.
-      () => lsUsable && MIRRORED.has(key) ? kvGet(key) ?? memKv.get(key) : memKv.get(key)
+      () => lsUsable && mirrored(key) ? kvGet(key) ?? memKv.get(key) : memKv.get(key)
     );
   }
   async function kvGetSafe(key, fallback = null, onFail) {
@@ -5045,7 +5143,14 @@ ${nonce2}`);
       return fallback;
     }
   }
-  async function kvPut2(key, value, { timeoutMs } = {}) {
+  async function kvPut2(key, value, opts = {}) {
+    if (!GLOBAL.has(key)) {
+      await scopeReady;
+      key = scopedKey(key);
+    }
+    return kvPutRaw(key, value, opts);
+  }
+  async function kvPutRaw(key, value, { timeoutMs } = {}) {
     mirror(key, value);
     return withStore(
       async () => idb(KV2, "readwrite", (s) => s.put(value, key), timeoutMs),
@@ -5054,6 +5159,80 @@ ${nonce2}`);
         memKv.set(key, value);
       }
     );
+  }
+
+  // src/fetch-json.js
+  var CONFIG_TIMEOUT_MS = 6e3;
+  var CACHE_PREFIX = "beagle-web:cfg:";
+  var inflight = /* @__PURE__ */ new Map();
+  function remember(url, data) {
+    try {
+      localStorage.setItem(CACHE_PREFIX + url, JSON.stringify({ at: Date.now(), data }));
+    } catch {
+    }
+  }
+  function recall(url) {
+    try {
+      const raw = localStorage.getItem(CACHE_PREFIX + url);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+  var KEPT_GRACE_MS = 1500;
+  function fetchJsonWithTimeout(url, ms = CONFIG_TIMEOUT_MS, { keep = true } = {}) {
+    const key = `${keep ? "k" : "n"}:${url}`;
+    if (inflight.has(key))
+      return inflight.get(key);
+    const kept = keep ? recall(url) : null;
+    const network = (async () => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), ms);
+      try {
+        const res = await fetch(url, { cache: "no-store", signal: ctl.signal });
+        if (!res.ok)
+          throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (keep)
+          remember(url, data);
+        return data;
+      } catch (err) {
+        throw new Error(`${url}: ${err?.name === "AbortError" ? `no answer in ${ms} ms` : String(err?.message || err)}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+    const p = new Promise((resolve, reject) => {
+      let done = false;
+      const useKept = (why) => {
+        if (done)
+          return;
+        done = true;
+        console.warn(`beagle-web: ${url}: ${why}; using the copy from ${new Date(kept.at).toISOString()}`);
+        resolve(kept.data);
+      };
+      const grace = kept ? setTimeout(() => useKept(`no answer in ${KEPT_GRACE_MS} ms`), Math.min(KEPT_GRACE_MS, ms)) : null;
+      network.then(
+        (data) => {
+          clearTimeout(grace);
+          if (!done) {
+            done = true;
+            resolve(data);
+          }
+        },
+        (err) => {
+          clearTimeout(grace);
+          if (kept)
+            useKept(err.message.slice(url.length + 2));
+          else if (!done) {
+            done = true;
+            reject(err);
+          }
+        }
+      );
+    }).finally(() => inflight.delete(key));
+    inflight.set(key, p);
+    return p;
   }
 
   // src/connect.js
@@ -5151,10 +5330,7 @@ ${nonce2}`);
     if (!userid)
       return null;
     try {
-      const r = await fetch(`${ENS_GATEWAY}/getAddress/${encodeURIComponent(userid)}`);
-      if (!r.ok)
-        return null;
-      const rec = await r.json();
+      const rec = await fetchJsonWithTimeout(`${ENS_GATEWAY}/getAddress/${encodeURIComponent(userid)}`, void 0, { keep: false });
       const t = rec?.texts ?? {};
       if (t.avatar)
         return t.avatar;
@@ -5282,6 +5458,7 @@ ${nonce2}`);
       try {
         const kp = createIdentity();
         await kvPut2("identity", exportIdentity(kp));
+        await setScope2(describeIdentity(kp).userid);
         await kvPut2("profile", { name, punkId, onboarded: true });
         if (isStorageWedged()) {
           showNoStorage();
@@ -5328,6 +5505,7 @@ ${nonce2}`);
       }
       identity = importIdentity(stored);
       noteLocalStorage();
+      await setScope2(describeIdentity(identity).userid);
       profile = await kvGetSafe("profile", null);
       const { userid } = describeIdentity(identity);
       $("userid").textContent = userid;

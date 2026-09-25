@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.20","builtAt":"2026-09-21T07:20:04.590Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.20","builtAt":"2026-09-25T09:11:36.602Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -7670,10 +7670,10 @@ onmessage = (e) => {
         if (b * FEC_K >= totalChunks)
           return;
         const k = fecBlockK(b, totalChunks);
-        const base = b * FEC_K;
+        const base2 = b * FEC_K;
         const missing = [];
         for (let i = 0; i < k; i++)
-          if (!st.got[base + i])
+          if (!st.got[base2 + i])
             missing.push(i);
         if (missing.length === 0) {
           st.fecParity.delete(b);
@@ -7687,8 +7687,8 @@ onmessage = (e) => {
           return;
         const shards = [];
         for (let i = 0; i < k; i++) {
-          if (st.got[base + i]) {
-            const off = (base + i) * MAX_FILE_DATA_SIZE;
+          if (st.got[base2 + i]) {
+            const off = (base2 + i) * MAX_FILE_DATA_SIZE;
             const chunk = st.buf.subarray(off, Math.min(off + MAX_FILE_DATA_SIZE, st.size));
             if (chunk.length === MAX_FILE_DATA_SIZE)
               shards.push(chunk);
@@ -7706,12 +7706,12 @@ onmessage = (e) => {
         if (!recovered)
           return;
         for (const i of missing) {
-          const off = (base + i) * MAX_FILE_DATA_SIZE;
+          const off = (base2 + i) * MAX_FILE_DATA_SIZE;
           const realLen = Math.min(MAX_FILE_DATA_SIZE, st.size - off);
           if (realLen <= 0)
             continue;
           st.buf.set(recovered[i].subarray(0, realLen), off);
-          st.got[base + i] = 1;
+          st.got[base2 + i] = 1;
           if (off + realLen > st.maxByte)
             st.maxByte = off + realLen;
         }
@@ -8964,8 +8964,8 @@ onmessage = (e) => {
   }
   function bridgeUrl(host, port, attempt = 0) {
     const bridges = configuredBridges();
-    const base = bridges[(bridgeCursor + attempt) % bridges.length];
-    return `${base}?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
+    const base2 = bridges[(bridgeCursor + attempt) % bridges.length];
+    return `${base2}?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
   }
   function rotateBridge() {
     const n = configuredBridges().length;
@@ -9092,7 +9092,7 @@ onmessage = (e) => {
           if (!pubkey)
             return;
           const p = auth.profile || {};
-          const base = configuredBridges()[(bridgeCursor + attempt) % configuredBridges().length];
+          const base2 = configuredBridges()[(bridgeCursor + attempt) % configuredBridges().length];
           try {
             __privateGet(this, _ws).send(JSON.stringify({
               t: "hello",
@@ -9104,7 +9104,7 @@ onmessage = (e) => {
               punk: p.punk ?? void 0,
               listed: p.listed === false ? false : void 0,
               ref: p.ref || void 0,
-              ticket: bridgeTickets.get(base) || void 0
+              ticket: bridgeTickets.get(base2) || void 0
             }));
           } catch {
           }
@@ -10975,14 +10975,14 @@ onmessage = (e) => {
     return toTurnServerInfo(creds);
   }
   function iceServersFromTurnInfo(info, opts) {
-    const base = `${info.server}:${info.port}`;
+    const base2 = `${info.server}:${info.port}`;
     const auth = { username: info.username, credential: info.password };
     const out = [
-      { urls: `stun:${base}`, ...auth },
-      { urls: `turn:${base}`, ...auth }
+      { urls: `stun:${base2}`, ...auth },
+      { urls: `turn:${base2}`, ...auth }
     ];
     if (opts?.includeTcpTurn !== false) {
-      out.push({ urls: `turn:${base}?transport=tcp`, ...auth });
+      out.push({ urls: `turn:${base2}?transport=tcp`, ...auth });
     }
     return out;
   }
@@ -13427,12 +13427,12 @@ onmessage = (e) => {
         async sendInlineFile(pubkey, opts) {
           const dot = opts.name.lastIndexOf(".");
           const ext = dot > 0 ? opts.name.slice(dot).toLowerCase() : "";
-          const base = dot > 0 ? opts.name.slice(0, dot) : opts.name;
+          const base2 = dot > 0 ? opts.name.slice(0, dot) : opts.name;
           const type2 = opts.fileType ?? inlineFileTypeFor(opts.name);
           const envelope = JSON.stringify({
             data: Buffer2.from(opts.data).toString("base64"),
             fileExtension: ext,
-            fileName: base,
+            fileName: base2,
             type: type2
           });
           if (envelope.length > CARRIER_MAX_APP_BULKMSG_LEN) {
@@ -17389,9 +17389,16 @@ ${ts}`);
   var PREFIX = "beagle-web:";
   var BACKEND_KEY = `${PREFIX}backend`;
   var KV = `${PREFIX}kv:`;
-  var FRIENDS = `${PREFIX}friends`;
-  var MSGS = `${PREFIX}messages:`;
   var SEQ = `${PREFIX}msgseq`;
+  var scope = null;
+  var base = (sc) => sc ? `${PREFIX}u/${sc}/` : PREFIX;
+  var friendsKey = (sc = scope) => `${base(sc)}friends`;
+  var msgsPrefix = (sc = scope) => `${base(sc)}messages:`;
+  var ANY_THREAD = /^beagle-web:(u\/[^/]+\/)?messages:/;
+  var ANY_FILE = /^beagle-web:kv:(u\/[^/]+\/)?file:/;
+  function setScope(userid) {
+    scope = userid || null;
+  }
   var MAX_MSGS_PER_PEER = 500;
   var MAX_BLOB_BYTES = 256 * 1024;
   function available() {
@@ -17452,20 +17459,20 @@ ${ts}`);
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(prefix))
+      if (k && (typeof prefix === "string" ? k.startsWith(prefix) : prefix.test(k)))
         keys.push(k);
     }
     return keys;
   }
   function evict() {
-    const files = ourKeys(`${KV}file:`);
+    const files = ourKeys(ANY_FILE);
     if (files.length) {
       for (const k of files)
         localStorage.removeItem(k);
       return true;
     }
     let freed = false;
-    for (const k of ourKeys(MSGS)) {
+    for (const k of ourKeys(ANY_THREAD)) {
       const list = decode(localStorage.getItem(k));
       if (!Array.isArray(list) || list.length < 2)
         continue;
@@ -17496,7 +17503,7 @@ ${ts}`);
   var kvGet = (key2) => get(KV + key2);
   var kvPut = (key2, value) => put(KV + key2, value);
   function listFriends() {
-    const all = get(FRIENDS);
+    const all = get(friendsKey());
     return all ? Object.values(all) : [];
   }
   function putFriends(list) {
@@ -17504,14 +17511,15 @@ ${ts}`);
     for (const f of list || [])
       if (f && f.userid)
         all[f.userid] = f;
-    put(FRIENDS, all);
+    put(friendsKey(), all);
   }
-  var threadKey = (peer) => MSGS + peer;
-  var thread = (peer) => {
-    const list = get(threadKey(peer));
+  var threadKey = (peer, sc = scope) => msgsPrefix(sc) + peer;
+  var thread = (peer, sc = scope) => {
+    const list = get(threadKey(peer, sc));
     return Array.isArray(list) ? list : [];
   };
-  var peers = () => ourKeys(MSGS).map((k) => k.slice(MSGS.length));
+  var peersOf = (sc) => ourKeys(msgsPrefix(sc)).map((k) => k.slice(msgsPrefix(sc).length));
+  var peers = () => peersOf(scope);
   function appendMessage(msg) {
     const seq = (Number(get(SEQ)) || 0) + 1;
     const id = `ls-${seq}`;
@@ -17559,6 +17567,47 @@ ${ts}`);
     if (changed)
       put(threadKey(peer), list);
   }
+  function claimLegacy(userid, isGlobal) {
+    if (!userid)
+      return { friends: 0, threads: 0, kv: 0 };
+    const moved = { friends: 0, threads: 0, kv: 0 };
+    const legacyFriends = get(friendsKey(null));
+    if (legacyFriends && typeof legacyFriends === "object") {
+      const mine2 = get(friendsKey(userid)) || {};
+      for (const [id, f] of Object.entries(legacyFriends))
+        if (!(id in mine2)) {
+          mine2[id] = f;
+          moved.friends++;
+        }
+      put(friendsKey(userid), mine2);
+      localStorage.removeItem(friendsKey(null));
+    }
+    for (const peer of peersOf(null)) {
+      const legacy = thread(peer, null);
+      const mine2 = thread(peer, userid);
+      const have = new Set(mine2.map((m) => m.id));
+      const merged = mine2.concat(legacy.filter((m) => !have.has(m.id))).sort((a, b) => a.ts - b.ts).slice(-MAX_MSGS_PER_PEER);
+      put(threadKey(peer, userid), merged);
+      localStorage.removeItem(threadKey(peer, null));
+      moved.threads++;
+    }
+    for (const k of ourKeys(KV)) {
+      const key2 = k.slice(KV.length);
+      if (key2.startsWith("u/") || isGlobal(key2))
+        continue;
+      const target = `${KV}u/${userid}/${key2}`;
+      if (localStorage.getItem(target) == null) {
+        try {
+          localStorage.setItem(target, localStorage.getItem(k));
+        } catch {
+          continue;
+        }
+      }
+      localStorage.removeItem(k);
+      moved.kv++;
+    }
+    return moved;
+  }
   function latch() {
     try {
       localStorage.setItem(BACKEND_KEY, "ls");
@@ -17583,10 +17632,10 @@ ${ts}`);
   var DB_NAME = "beagle-web";
   var DB_VERSION = 2;
   var KV2 = "kv";
-  var FRIENDS2 = "friends";
+  var FRIENDS = "friends";
   var MESSAGES = "messages";
   var dbPromise = null;
-  var STORES = [KV2, FRIENDS2, MESSAGES];
+  var STORES = [KV2, FRIENDS, MESSAGES];
   var missingStores = (db) => STORES.filter((n) => !db.objectStoreNames.contains(n));
   function recreate() {
     return new Promise((resolve2, reject) => {
@@ -17622,8 +17671,8 @@ ${ts}`);
         const db = req.result;
         if (!db.objectStoreNames.contains(KV2))
           db.createObjectStore(KV2);
-        if (!db.objectStoreNames.contains(FRIENDS2))
-          db.createObjectStore(FRIENDS2, { keyPath: "userid" });
+        if (!db.objectStoreNames.contains(FRIENDS))
+          db.createObjectStore(FRIENDS, { keyPath: "userid" });
         if (!db.objectStoreNames.contains(MESSAGES)) {
           const s = db.createObjectStore(MESSAGES, { keyPath: "id", autoIncrement: true });
           s.createIndex("peer_ts", ["peer", "ts"]);
@@ -17780,7 +17829,7 @@ ${ts}`);
     }
     try {
       if (!listFriends().length) {
-        const friends = await tx(db, FRIENDS2, "readonly", (s) => s.getAll(), budget) || [];
+        const friends = (await tx(db, FRIENDS, "readonly", (s) => s.getAll(), budget) || []).filter(mine);
         if (friends.length) {
           putFriends(friends);
           copied.friends = friends.length;
@@ -17790,7 +17839,7 @@ ${ts}`);
     }
     try {
       if (!peers().length) {
-        const msgs = await tx(db, MESSAGES, "readonly", (s) => s.getAll(), budget) || [];
+        const msgs = (await tx(db, MESSAGES, "readonly", (s) => s.getAll(), budget) || []).filter(mine);
         for (const m of msgs.slice(-MAX_MSGS_PER_PEER * 8)) {
           try {
             appendMessage(m);
@@ -17802,6 +17851,7 @@ ${ts}`);
       }
     } catch {
     }
+    claimLs();
     console.info("beagle-web: storage moved to localStorage", { cause: String(cause?.message || cause || ""), copied });
     try {
       db.close?.();
@@ -17907,20 +17957,68 @@ ${ts}`);
     }
     return tx(db, store, mode, fn, left());
   };
-  var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile"]);
+  var MIRRORED = /* @__PURE__ */ new Set(["identity", "profile", "legacy-owner"]);
+  var mirrored = (key2) => MIRRORED.has(key2) || /^u\/[^/]+\/profile$/.test(key2);
   var mirror = (key2, value) => {
-    if (backend === "mem" || !lsUsable || !MIRRORED.has(key2))
+    if (backend === "mem" || !lsUsable || !mirrored(key2))
       return;
     try {
       kvPut(key2, value);
     } catch {
     }
   };
-  async function kvGet2(key2, { timeoutMs } = {}) {
+  var LEGACY_OWNER_KEY = "legacy-owner";
+  var SCOPE_KEY = "scope";
+  var GLOBAL = /* @__PURE__ */ new Set(["identity", LEGACY_OWNER_KEY, SCOPE_KEY]);
+  var scope2 = null;
+  var legacyOwner = null;
+  var scopeReady = Promise.resolve();
+  var scopedKey = (key2) => scope2 && !GLOBAL.has(key2) ? `u/${scope2}/${key2}` : key2;
+  var ownerOf = (rec) => rec?.owner || legacyOwner || null;
+  var mine = (rec) => ownerOf(rec) === scope2;
+  function claimLs() {
+    if (!legacyOwner || !lsUsable || backend === "mem")
+      return;
+    try {
+      claimLegacy(legacyOwner, (k) => GLOBAL.has(k));
+    } catch (err) {
+      console.warn("beagle-web: could not file legacy localStorage under its identity", err?.message || err);
+    }
+  }
+  function setScope2(userid) {
+    if (!userid || userid === scope2)
+      return scopeReady;
+    scope2 = userid;
+    setScope(userid);
+    scopeReady = (async () => {
+      let owner = await kvGet2(LEGACY_OWNER_KEY, { timeoutMs: BOOT_TIMEOUT_MS }).catch(() => null);
+      if (owner === void 0) {
+        owner = userid;
+        await kvPut2(LEGACY_OWNER_KEY, owner, { timeoutMs: BOOT_TIMEOUT_MS }).catch(() => {
+        });
+      }
+      legacyOwner = owner || null;
+      claimLs();
+      void kvPut2(SCOPE_KEY, userid).catch(() => {
+      });
+    })().catch(() => {
+    });
+    return scopeReady;
+  }
+  async function kvGet2(key2, opts = {}) {
+    if (GLOBAL.has(key2))
+      return kvGetRaw(key2, opts);
+    await scopeReady;
+    const v = await kvGetRaw(scopedKey(key2), opts);
+    if (v === void 0 && scope2 && scope2 === legacyOwner)
+      return kvGetRaw(key2, opts);
+    return v;
+  }
+  async function kvGetRaw(key2, { timeoutMs } = {}) {
     return withStore(
       async () => {
         const v = await idb(KV2, "readonly", (s) => s.get(key2), timeoutMs);
-        if (v === void 0 && lsUsable && MIRRORED.has(key2))
+        if (v === void 0 && lsUsable && mirrored(key2))
           return kvGet(key2);
         return v;
       },
@@ -17928,7 +18026,7 @@ ${ts}`);
       // The memory floor for a MIRRORED key is the mirror: a boot read of the
       // identity that failed twice must not turn a returning user into a
       // stranger with a fresh key.
-      () => lsUsable && MIRRORED.has(key2) ? kvGet(key2) ?? memKv.get(key2) : memKv.get(key2)
+      () => lsUsable && mirrored(key2) ? kvGet(key2) ?? memKv.get(key2) : memKv.get(key2)
     );
   }
   async function kvGetSafe(key2, fallback = null, onFail) {
@@ -17940,7 +18038,14 @@ ${ts}`);
       return fallback;
     }
   }
-  async function kvPut2(key2, value, { timeoutMs } = {}) {
+  async function kvPut2(key2, value, opts = {}) {
+    if (!GLOBAL.has(key2)) {
+      await scopeReady;
+      key2 = scopedKey(key2);
+    }
+    return kvPutRaw(key2, value, opts);
+  }
+  async function kvPutRaw(key2, value, { timeoutMs } = {}) {
     mirror(key2, value);
     return withStore(
       async () => idb(KV2, "readwrite", (s) => s.put(value, key2), timeoutMs),
@@ -17951,8 +18056,9 @@ ${ts}`);
     );
   }
   async function listFriends2() {
+    await scopeReady;
     return withStore(
-      async () => await idb(FRIENDS2, "readonly", (s) => s.getAll()) || [],
+      async () => (await idb(FRIENDS, "readonly", (s) => s.getAll()) || []).filter(mine),
       () => listFriends(),
       () => []
     );
@@ -17978,9 +18084,10 @@ ${ts}`);
   }
   var primed = null;
   async function appendMessage2(message) {
+    await scopeReady;
     primed = primed || primeTimestamps();
     await primed;
-    const msg = stampUnique(message);
+    const msg = stampUnique(scope2 ? { ...message, owner: scope2 } : message);
     return withStore(
       async () => idb(MESSAGES, "readwrite", (s) => s.add(msg)),
       () => appendMessage(msg),
@@ -17995,20 +18102,22 @@ ${ts}`);
   }
   async function historyFor2(peer, limit = 200, before) {
     const upper = Number.isFinite(before) ? before : Number.MAX_SAFE_INTEGER;
+    await scopeReady;
     return withStore(
       async () => {
         const all = await idb(MESSAGES, "readonly", (s) => s.index("peer_ts").getAll(IDBKeyRange.bound([peer, 0], [peer, upper], false, Number.isFinite(before))));
-        return (all || []).slice(-limit);
+        return (all || []).filter(mine).slice(-limit);
       },
       () => historyFor(peer, limit, before),
-      () => memMsgs.filter((m) => m.peer === peer && (!Number.isFinite(before) || m.ts < before)).slice(-limit)
+      () => memMsgs.filter((m) => m.peer === peer && mine(m) && (!Number.isFinite(before) || m.ts < before)).slice(-limit)
     );
   }
   async function allMessages2() {
+    await scopeReady;
     return withStore(
-      async () => await idb(MESSAGES, "readonly", (s) => s.getAll()) || [],
+      async () => (await idb(MESSAGES, "readonly", (s) => s.getAll()) || []).filter(mine),
       () => allMessages(),
-      () => memMsgs
+      () => memMsgs.filter(mine)
     );
   }
   async function messageStats() {
@@ -18078,6 +18187,7 @@ ${ts}`);
     );
   }
   async function markRead2(peer) {
+    await scopeReady;
     return withStore(
       async () => idb(MESSAGES, "readwrite", (s) => {
         const req = s.index("peer_ts").openCursor(
@@ -18088,7 +18198,7 @@ ${ts}`);
           if (!cur)
             return;
           const v = cur.value;
-          if (v.dir === "in" && !v.read) {
+          if (v.dir === "in" && !v.read && mine(v)) {
             v.read = true;
             cur.update(v);
           }
@@ -18099,7 +18209,7 @@ ${ts}`);
       () => markRead(peer),
       () => {
         for (const m of memMsgs)
-          if (m.peer === peer && m.dir === "in")
+          if (m.peer === peer && m.dir === "in" && mine(m))
             m.read = true;
       }
     );
@@ -18419,6 +18529,85 @@ ${ts}`);
   init_process_global();
   init_worker_timers();
   init_express();
+
+  // src/fetch-json.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  var CONFIG_TIMEOUT_MS = 6e3;
+  var CACHE_PREFIX = "beagle-web:cfg:";
+  var inflight = /* @__PURE__ */ new Map();
+  function remember(url, data) {
+    try {
+      localStorage.setItem(CACHE_PREFIX + url, JSON.stringify({ at: Date.now(), data }));
+    } catch {
+    }
+  }
+  function recall(url) {
+    try {
+      const raw = localStorage.getItem(CACHE_PREFIX + url);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+  var KEPT_GRACE_MS = 1500;
+  function fetchJsonWithTimeout(url, ms2 = CONFIG_TIMEOUT_MS, { keep = true } = {}) {
+    const key2 = `${keep ? "k" : "n"}:${url}`;
+    if (inflight.has(key2))
+      return inflight.get(key2);
+    const kept = keep ? recall(url) : null;
+    const network = (async () => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), ms2);
+      try {
+        const res = await fetch(url, { cache: "no-store", signal: ctl.signal });
+        if (!res.ok)
+          throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (keep)
+          remember(url, data);
+        return data;
+      } catch (err) {
+        throw new Error(`${url}: ${err?.name === "AbortError" ? `no answer in ${ms2} ms` : String(err?.message || err)}`);
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+    const p = new Promise((resolve2, reject) => {
+      let done = false;
+      const useKept = (why) => {
+        if (done)
+          return;
+        done = true;
+        console.warn(`beagle-web: ${url}: ${why}; using the copy from ${new Date(kept.at).toISOString()}`);
+        resolve2(kept.data);
+      };
+      const grace = kept ? setTimeout(() => useKept(`no answer in ${KEPT_GRACE_MS} ms`), Math.min(KEPT_GRACE_MS, ms2)) : null;
+      network.then(
+        (data) => {
+          clearTimeout(grace);
+          if (!done) {
+            done = true;
+            resolve2(data);
+          }
+        },
+        (err) => {
+          clearTimeout(grace);
+          if (kept)
+            useKept(err.message.slice(url.length + 2));
+          else if (!done) {
+            done = true;
+            reject(err);
+          }
+        }
+      );
+    }).finally(() => inflight.delete(key2));
+    inflight.set(key2, p);
+    return p;
+  }
+
+  // src/express-client.js
   function normalizeExpressNodes(entries) {
     return (entries || []).map((e) => ({
       host: e.ipv4 ?? e.host,
@@ -18429,10 +18618,7 @@ ${ts}`);
     }));
   }
   async function fetchExpressNodes(configUrl = "https://beagle.chat/assets/bgservers.json") {
-    const res = await fetch(configUrl, { cache: "no-store" });
-    if (!res.ok)
-      throw new Error(`bgservers.json: HTTP ${res.status}`);
-    const cfg = await res.json();
+    const cfg = await fetchJsonWithTimeout(configUrl);
     return normalizeExpressNodes(cfg.expressNodes);
   }
 
@@ -18446,7 +18632,7 @@ ${ts}`);
   var KEY_FILE = "/browser/keypair.json";
   var CONFIG_URL = "https://beagle.chat/assets/bgservers.json";
   async function loadBootstrapNodes() {
-    const cfg = await (await fetch(CONFIG_URL, { cache: "no-store" })).json();
+    const cfg = await fetchJsonWithTimeout(CONFIG_URL);
     return (cfg.bootstrapNodes ?? []).map((n) => ({
       host: n.ipv4,
       port: Number(n.port),
@@ -18500,18 +18686,17 @@ ${ts}`);
     }
     await seedVfs();
     installVfsPersistence();
+    const [boot, express] = await Promise.allSettled([loadBootstrapNodes(), fetchExpressNodes()]);
     let bootstrapNodes = [];
-    try {
-      bootstrapNodes = await loadBootstrapNodes();
-    } catch (err) {
-      onEvent?.({ type: "config-error", error: String(err?.message || err) });
-    }
+    if (boot.status === "fulfilled")
+      bootstrapNodes = boot.value;
+    else
+      onEvent?.({ type: "config-error", error: String(boot.reason?.message || boot.reason) });
     let expressNodes = [];
-    try {
-      expressNodes = await fetchExpressNodes();
-    } catch (err) {
-      onEvent?.({ type: "config-error", error: "expressNodes: " + String(err?.message || err) });
-    }
+    if (express.status === "fulfilled")
+      expressNodes = express.value;
+    else
+      onEvent?.({ type: "config-error", error: "expressNodes: " + String(express.reason?.message || express.reason) });
     const peer = await Peer.create({
       keyFile: KEY_FILE,
       keyPair,
@@ -18640,10 +18825,10 @@ ${ts}`);
         return name;
       }
       const dot = name.lastIndexOf(".");
-      const base = dot > 0 ? name.slice(0, dot) : name;
+      const base2 = dot > 0 ? name.slice(0, dot) : name;
       const ext = dot > 0 ? name.slice(dot) : "";
       for (let i = 1; ; i++) {
-        const cand = `${base} (${i})${ext}`;
+        const cand = `${base2} (${i})${ext}`;
         if (!takenNames.has(cand)) {
           takenNames.add(cand);
           return cand;
@@ -18809,7 +18994,15 @@ ${ts}`);
     };
     peer.onInvite(onInvite);
     peer.onInviteResponse(onInvite);
-    await peer.start();
+    try {
+      await peer.start();
+    } catch (err) {
+      try {
+        await peer.stop();
+      } catch {
+      }
+      throw err;
+    }
     let joined = false;
     void peer.joinNetwork().then(() => {
       joined = true;
@@ -19248,7 +19441,7 @@ ${ts}`);
   var apiPromise = null;
   function apiBase() {
     if (!apiPromise) {
-      apiPromise = fetch(CONFIG_URL2, { cache: "no-store" }).then((r) => r.ok ? r.json() : null).then((cfg) => {
+      apiPromise = fetchJsonWithTimeout(CONFIG_URL2).then((cfg) => {
         const u = cfg?.punksApi?.[0]?.url;
         return typeof u === "string" && u ? u.replace(/\/+$/, "") : null;
       }).catch(() => null);
@@ -19256,13 +19449,13 @@ ${ts}`);
     return apiPromise;
   }
   async function apiGet(path) {
-    const base = await apiBase();
-    if (!base)
+    const base2 = await apiBase();
+    if (!base2)
       return null;
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), API_TIMEOUT_MS);
     try {
-      const r = await fetch(base + path, { signal: ctl.signal });
+      const r = await fetch(base2 + path, { signal: ctl.signal });
       return r.ok ? await r.json() : null;
     } catch {
       return null;
@@ -19366,10 +19559,7 @@ ${ts}`);
     const norm = (s) => s.toLowerCase().replace(/\s+/g, "");
     let names;
     try {
-      const res = await fetch(ENS_NAMES, { cache: "no-store" });
-      if (!res.ok)
-        throw new Error(`HTTP ${res.status}`);
-      names = await res.json();
+      names = await fetchJsonWithTimeout(ENS_NAMES, void 0, { keep: false });
     } catch (err) {
       throw new Error(`name directory unreachable: ${err.message}`);
     }
@@ -19390,7 +19580,7 @@ ${ts}`);
     if (_iceCache)
       return _iceCache;
     try {
-      const cfg = await (await fetch("https://beagle.chat/assets/bgservers.json", { cache: "no-store" })).json();
+      const cfg = await fetchJsonWithTimeout("https://beagle.chat/assets/bgservers.json");
       _iceCache = (cfg.iceServers ?? []).map((s) => ({
         urls: s.urls || s.url,
         ...s.username ? { username: s.username } : {},
@@ -19408,10 +19598,7 @@ ${ts}`);
     if (_ensCache && Date.now() - _ensAt < ENS_TTL_MS)
       return _ensCache;
     try {
-      const res = await fetch(ENS_NAMES, { cache: "no-store" });
-      if (!res.ok)
-        throw new Error(`HTTP ${res.status}`);
-      const raw = await res.json();
+      const raw = await fetchJsonWithTimeout(ENS_NAMES, void 0, { keep: false });
       const byUserid = /* @__PURE__ */ new Map();
       const recByUserid = /* @__PURE__ */ new Map();
       const list = [];
@@ -19460,18 +19647,18 @@ ${ts}`);
   ]);
   function meFrom(diag, profile, autoAccept, ens) {
     const id = diag?.identity ?? {};
-    const mine = ens?.byUserid.get(id.userid);
+    const mine2 = ens?.byUserid.get(id.userid);
     return {
       userId: id.userid ?? "",
       carrier: id.address ?? "",
       // Local profile name wins; otherwise fall back to the beagles.eth display
       // name so a registered user's own name/avatar shows without setting one.
-      name: profile?.name || mine?.name || "",
-      description: profile?.description || mine?.description || "",
+      name: profile?.name || mine2?.name || "",
+      description: profile?.description || mine2?.description || "",
       // A locally-picked punk wins over the published one, same rule as the name.
       // Until beagles.eth registration works from the browser this is what makes
       // the avatar visible at all — in this client. See onboarding.jsx.
-      punkId: profile?.punkId ?? mine?.punkId ?? null,
+      punkId: profile?.punkId ?? mine2?.punkId ?? null,
       listed: profile?.listed !== false,
       // An uploaded picture is this client's own, so it outranks anything
       // published — same precedence as the name.
@@ -19486,8 +19673,8 @@ ${ts}`);
       // reached storage stays flagged once the peer is up, or the warning would
       // vanish the moment the backend took over.
       ephemeral: !!diag?.ephemeral,
-      avatarUrl: profile?.avatarDataUrl ?? mine?.avatarUrl ?? null,
-      ens: mine?.ens ?? "",
+      avatarUrl: profile?.avatarDataUrl ?? mine2?.avatarUrl ?? null,
+      ens: mine2?.ens ?? "",
       handle: "",
       ip: "",
       // no TUN in a browser
@@ -19866,15 +20053,15 @@ ${ts}`);
         }
         case "GET /api/bridge-roster": {
           const st = globalThis.__BEAGLE_BRIDGE_STATE__;
-          const base = st?.httpBase?.();
+          const base2 = st?.httpBase?.();
           const ticket = st?.ticket?.();
-          if (!base)
+          if (!base2)
             return json({ ok: false, error: "no bridge configured" });
           if (!ticket) {
-            return json({ ok: true, list: [], pending: true, bridge: base });
+            return json({ ok: true, list: [], pending: true, bridge: base2 });
           }
           try {
-            const res = await fetch(`${base}/roster`, {
+            const res = await fetch(`${base2}/roster`, {
               headers: { authorization: `Bearer ${ticket}` },
               cache: "no-store"
             });
@@ -19883,7 +20070,7 @@ ${ts}`);
             const d = await res.json();
             return json({
               ok: true,
-              bridge: d.bridge || base,
+              bridge: d.bridge || base2,
               online: d.online || 0,
               list: (d.peers || []).map((p2) => ({ ...p2, punkId: p2.punk ?? null }))
             });
@@ -20143,6 +20330,8 @@ ${ts}`);
       };
       const keyPair = await loadIdentity(noteStorageFail);
       this.keyPair = keyPair;
+      if (keyPair)
+        setScope2(describeIdentity(keyPair).userid);
       if (keyPair) {
         try {
           const raw = localStorage.getItem("beagle-web:ref");
@@ -20250,7 +20439,7 @@ ${ts}`);
           return bytesToHex2(signBridgeProof(host.keyPair, origin, nonce));
         }
       };
-      const profileLoaded = kvGetSafe(PROFILE_KEY2, null, noteStorageFail).then((stored) => {
+      const profileLoaded = (keyPair ? kvGetSafe(PROFILE_KEY2, null, noteStorageFail) : Promise.resolve(null)).then((stored) => {
         if (stored)
           Object.assign(profile, stored);
       }).catch(() => {
@@ -20263,6 +20452,18 @@ ${ts}`);
         const promise = startBackendOnce(kp);
         started = { pk, promise };
         return promise;
+      };
+      let retryMs = 15e3;
+      const retryBackend = (kp) => {
+        const pk = bytesToHex2(kp.publicKey);
+        setTimeout(() => {
+          if (this.backend || !started || started.pk !== pk)
+            return;
+          started = null;
+          if (!this.readOnly)
+            startBackend(kp);
+        }, retryMs);
+        retryMs = Math.min(retryMs * 2, 24e4);
       };
       const startBackendOnce = (kp) => createBackendC({
         keyPair: kp,
@@ -20285,7 +20486,8 @@ ${ts}`);
         }
         this.onEvent?.({ type: "backend-ready" });
       }).catch((err) => {
-        this.events.push({ type: "backend-failed", error: String(err?.message || err) });
+        this.events.push({ type: "backend-failed", error: String(err?.message || err), retryInMs: retryMs });
+        retryBackend(kp);
       });
       this.mintIdentity = async () => {
         if (this.identity)
@@ -20301,6 +20503,9 @@ ${ts}`);
         }
         this.keyPair = kp;
         this.identity = { ...describeIdentity(kp), ephemeral };
+        setScope2(this.identity.userid);
+        void kvPut2(PROFILE_KEY2, profile, { timeoutMs: BOOT_TIMEOUT_MS }).catch(() => {
+        });
         startBackend(kp);
         return this.identity;
       };
@@ -20316,7 +20521,8 @@ ${ts}`);
           host: this,
           getIdentity: () => this.identity,
           profile,
-          persist: (p) => kvPut2(PROFILE_KEY2, p, { timeoutMs: BOOT_TIMEOUT_MS }),
+          // Not before there is an identity to own it: mintIdentity writes it then.
+          persist: (p) => this.identity ? kvPut2(PROFILE_KEY2, p, { timeoutMs: BOOT_TIMEOUT_MS }) : void 0,
           createIdentity: () => this.mintIdentity(),
           storageOk: () => this.storageOk !== false && !isStorageWedged()
         });
@@ -20540,7 +20746,7 @@ ${ts}`);
     async testRelay(host = "144.202.113.167", port = 33445) {
       const { TcpRelayClient: TcpRelayClient2 } = await Promise.resolve().then(() => (init_tcp_relay(), tcp_relay_exports));
       const { base58ToBytes: base58ToBytes2 } = await Promise.resolve().then(() => (init_base58(), base58_exports));
-      const cfg = await (await fetch("https://beagle.chat/assets/bgservers.json")).json();
+      const cfg = await fetchJsonWithTimeout("https://beagle.chat/assets/bgservers.json");
       const entry = (cfg.bootstrapNodes ?? []).find((n) => n.ipv4 === host);
       if (!entry)
         return { ok: false, error: `no published pk for ${host}` };
@@ -20576,7 +20782,10 @@ ${ts}`);
      *  Deliberately does NOT try to hot-swap the running backend: the peer, its
      *  friend list and every open relay socket are bound to the old key. It
      *  writes the new key and the caller reloads, which is the only way to get a
-     *  coherent client and is cheap on a page that boots in seconds. */
+     *  coherent client and is cheap on a page that boots in seconds. The reload
+     *  binds the store to the new identity, so it starts with its own (empty)
+     *  roster, history and profile rather than the previous key's; switching back to the
+     *  previous key finds them again. */
     async importBlob(parsed) {
       const kp = importIdentity(parsed);
       await kvPut2(IDENTITY_KEY, exportIdentity(kp), { timeoutMs: BOOT_TIMEOUT_MS });
@@ -20599,7 +20808,7 @@ ${ts}`);
       try {
         const { Peer: Peer2 } = await Promise.resolve().then(() => (init_peer(), peer_exports));
         step("module loaded");
-        const cfg = await (await fetch("https://beagle.chat/assets/bgservers.json")).json();
+        const cfg = await fetchJsonWithTimeout("https://beagle.chat/assets/bgservers.json");
         const bootstrapNodes = (cfg.bootstrapNodes ?? []).map((n) => ({
           host: n.ipv4,
           port: Number(n.port),
