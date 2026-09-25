@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.20","builtAt":"2026-09-25T09:11:36.602Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.20","builtAt":"2026-09-25T18:29:29.761Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -17549,9 +17549,10 @@ ${ts}`);
       if (i < 0)
         continue;
       const m = list[i];
+      const file = patch.file && m.file ? { ...m.file, ...patch.file } : patch.file;
       Object.assign(m, patch);
-      if (patch.file && m.file)
-        m.file = { ...m.file, ...patch.file };
+      if (file)
+        m.file = file;
       put(threadKey(p), list);
       return;
     }
@@ -18166,9 +18167,10 @@ ${ts}`);
     const patchLocal = (m) => {
       if (!m)
         return;
+      const file = patch.file && m.file ? { ...m.file, ...patch.file } : patch.file;
       Object.assign(m, patch);
-      if (patch.file && m.file)
-        m.file = { ...m.file, ...patch.file };
+      if (file)
+        m.file = file;
     };
     return withStore(
       async () => idb(MESSAGES, "readwrite", (s) => {
