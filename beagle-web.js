@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.20","builtAt":"2026-09-25T18:29:29.761Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.20","builtAt":"2026-09-28T08:11:01.571Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -18138,10 +18138,11 @@ ${ts}`);
     }
     return byPeer;
   }
+  var inOutbox = (m) => m.dir === "out" && !m.file && m.status === "queued";
   async function queuedOutgoing(peer) {
     try {
       const all = await historyFor2(peer, 1e3);
-      return (all || []).filter((m) => m.dir === "out" && !m.file && (m.status === "queued" || m.status === "sending"));
+      return (all || []).filter(inOutbox);
     } catch {
       return [];
     }
@@ -18149,11 +18150,20 @@ ${ts}`);
   async function queuedPeers() {
     const all = await allMessages2();
     const peers2 = /* @__PURE__ */ new Set();
-    for (const m of all || []) {
-      if (m.dir === "out" && !m.file && (m.status === "queued" || m.status === "sending"))
+    for (const m of all || [])
+      if (inOutbox(m))
         peers2.add(m.peer);
-    }
     return [...peers2];
+  }
+  async function requeueInterrupted() {
+    let n = 0;
+    for (const m of await allMessages2() || []) {
+      if (m.dir === "out" && !m.file && m.status === "sending") {
+        await updateMessage2(m.id, { status: "queued" });
+        n++;
+      }
+    }
+    return n;
   }
   async function usedFileNames() {
     const all = await allMessages2();
@@ -19036,6 +19046,12 @@ ${ts}`);
         return false;
       }
     };
+    try {
+      const requeued = await requeueInterrupted();
+      if (requeued)
+        onEvent?.({ type: "outbox-requeued", count: requeued });
+    } catch {
+    }
     const SWEEP_MS = 8e3;
     let sweeping = false;
     const sweepTimer = setInterval(() => {
