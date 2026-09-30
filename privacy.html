@@ -115,13 +115,13 @@
 
 <main>
   <h1>Privacy</h1>
-  <p class="updated">Last updated 10 September 2026 · beagle.chat</p>
+  <p class="updated">Last updated 29 September 2026 · beagle.chat</p>
 
   <p class="lede">
     Beagle runs on your phone and on your computer. You open it from the app, from
     a browser, or from a terminal — three doors into the same program: a peer that
     talks to other peers. There is no account to create
-    and no server holding your messages, because there is nowhere for one to be
+    and no server holding your conversations, because there is nowhere for one to be
     held — your key is made on the device in front of you and stays there. This
     page says what is kept on that device, what leaves it, and who can see what.
   </p>
@@ -130,13 +130,14 @@
     <span>iPhone</span><span>Android</span><span>macOS</span>
     <span>Windows</span><span>Linux</span>
   </div>
-  <p class="doors">Opened from <b>the app</b>, <b>a browser</b> or <b>a terminal</b>.</p>
+  <p class="doors">Opened from <b>the app</b>, <b>a browser</b> or <b>a terminal</b> — and in Chrome and Firefox, from the <b>Beagle Chat extension</b> (section 6).</p>
 
   <div class="card keep">
     <ul>
       <li>Your private key is generated <b>on your own device</b> — your phone or your computer — and is <b>never sent anywhere</b>.</li>
       <li>Message and file contents are <b>encrypted end to end</b>; the servers in between carry bytes they cannot read.</li>
       <li>Your messages, contacts and files are stored <b>only on your device</b>. No copy is kept for you anywhere else.</li>
+      <li>One exception, and only when you choose it: pressing <b>Fill with Beagle</b> in the browser extension sends that page and form to our Fill agent, which keeps the conversation for 30 days. Section 6 says exactly what.</li>
       <li>What is unavoidably visible is <b>metadata</b> — your IP address, and the fact that you connected. Section 3 is specific about it.</li>
     </ul>
   </div>
@@ -146,7 +147,9 @@
   <p>
     The same things in every case — your identity, your profile, your contacts,
     your message history and the files you have sent or received. Only where they
-    sit differs, and none of it leaves the device.
+    sit differs. None of it is copied anywhere else: what leaves the device is what
+    you send — section 3 — and, in the extension, what you send by pressing Fill,
+    section 6.
   </p>
 
   <div class="scroll">
@@ -164,6 +167,10 @@
         <tr>
           <td>A browser<br><span class="who">any of them, nothing to install</span></td>
           <td>That browser's own storage for this site, on that same device — IndexedDB, or <code>localStorage</code> where IndexedDB cannot be used, as in Safari. <b>It survives closing the tab</b>, closing the browser and restarting the machine; it is there when you come back. A private window is the exception, and says so.</td>
+        </tr>
+        <tr>
+          <td>The extension<br><span class="who">Chrome, Firefox</span></td>
+          <td>The extension's own storage in that browser, on that device. Removing the extension removes it — export your key and your wallet's recovery phrase first.</td>
         </tr>
       </tbody>
     </table>
@@ -192,8 +199,12 @@
 
   <ul>
     <li>No account, no email address, no password, no phone number — in any version.</li>
-    <li>No server-side copy of your messages, your contacts or your files.</li>
-    <li>No profile sold, shared or handed to anyone, because none is collected.</li>
+    <li>No server-side copy of your conversations with people, your contacts or your files.</li>
+    <li>
+      No profile of you built, sold or shared: the messenger collects none. The one
+      service that ever receives profile fields is the extension's Fill agent — only
+      when you press Fill, only the fields you allow, to fill that form (section 6).
+    </li>
     <li>
       No analytics, telemetry, session recording, advertising or data brokers,
       and no cookies.
@@ -333,7 +344,104 @@
     with it is up to them — as with any messenger, and as with any conversation.
   </p>
 
-  <h2><span class="n">06</span> Changes</h2>
+  <h2><span class="n">06</span> The browser extension, and Fill with Beagle</h2>
+  <p>
+    The Beagle Chat extension for Chrome and Firefox runs the same peer inside the
+    browser, so everything above applies to it: the key is made on the device,
+    messages are end-to-end encrypted, and your identity, contacts and history are
+    kept in the extension's own storage on that device. It also holds three things
+    the other versions do not, all on the device as well:
+  </p>
+  <ul>
+    <li><b>A Solana wallet</b> — seed phrases and keys encrypted under a password you choose; signing happens on the device.</li>
+    <li><b>A private profile</b> — fields such as email or company, each with a policy you set: <i>public</i>, <i>contacts</i>, <i>ask each time</i> or <i>private</i>.</li>
+    <li><b>An answer bank</b> — the questions and answers from forms you filled, and the names and checksums of files you used, so the next form can reuse them.</li>
+  </ul>
+
+  <h3>Reading web pages: only when you press</h3>
+  <p>
+    The extension reads the page you are on in two cases, both started by you:
+    <b>Share this page</b> reads its title and address, and <b>Fill with Beagle</b>
+    reads its form and visible text. On F6S, Fill also reads your own F6S member and
+    company pages as your browser shows them. It does not read page content
+    otherwise. Web pages can also ask the wallet to connect, which you approve.
+  </p>
+
+  <h3>What pressing Fill sends</h3>
+  <p>
+    Fill is done by the <b>Fill agent</b>, <code>fill.beagles.eth</code>, operated by
+    Decent Network. Pressing Fill sends it one request, end-to-end encrypted over
+    the Beagle network like a message to a friend:
+  </p>
+  <div class="card warn">
+    <ul>
+      <li>the page's <b>address, title and visible text</b>, up to 32,000 characters;</li>
+      <li>the <b>form's fields and their current values</b>, except phone and email fields, and private-profile fields set to <i>private</i> or <i>ask each time</i>;</li>
+      <li>your <b>answer bank</b>, and your <b>profile and private-profile fields</b> set to <i>public</i> or <i>contacts</i>.</li>
+    </ul>
+  </div>
+  <p>
+    It answers with proposed values and a price in points. The extension writes the
+    answers you accept into the page, and you submit the form yourself. Replies you
+    type to the agent, and files you attach, go to it the same way.
+    Private-profile fields set to <i>private</i> never leave the device, Fill included.
+  </p>
+
+  <h3>What the Fill agent does with it</h3>
+  <p>
+    A language model running on <b>Decent Network's own hardware</b> reads the
+    request; it reads the first 6,000 characters of the page text. <b>No
+    third-party AI provider</b> receives your page, your answers or your profile.
+    The agent stores what it keeps on that one machine, in no cloud service, and
+    sends no analytics or telemetry.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>What the agent keeps</th><th>Contents</th><th>For how long</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Conversation</td>
+          <td>Each request as received, its answers, the chat in both directions, and a per-field note of what was filled and why. Also the form in progress, and files you attached.</td>
+          <td>30 days, then deleted</td>
+        </tr>
+        <tr>
+          <td>Service logs</td>
+          <td>Times, request ids, field types, counts. Not your values — only their length and a one-way hash.</td>
+          <td>7 days</td>
+        </tr>
+        <tr>
+          <td>Billing record</td>
+          <td>Your Beagle ID, request ids, points, the model and token counts, and the form's website name. <b>No form content.</b></td>
+          <td>Kept, for billing</td>
+        </tr>
+        <tr>
+          <td>Contact record</td>
+          <td>Your Beagle ID, when you first met the agent, and the greeting on your friend request.</td>
+          <td>Until you ask</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    Send <code>/forget</code> to the Fill agent in chat at any time: it deletes
+    your conversation, the form in progress, your attached files and your contact
+    record at once, and tells you what it removed. Only the billing record, which
+    holds no form content, stays. Nothing is sold, or shared with advertisers or
+    analytics services. Your answer bank stays on your device; remove entries with
+    <code>/bank drop</code> or in the extension's settings.
+  </p>
+
+  <h3>Other services the extension talks to</h3>
+  <p>
+    Besides the hosts in section 04: a <b>Solana RPC</b> node for the wallet's
+    balance, history and transactions (public blockchain data, on the network you
+    choose), and <code>wallet.licode.fun</code> for the wallet's optional
+    signed-in features, with a session token you can clear in its settings.
+    Offline mail to a friend waits encrypted on Decent Network's relay until they
+    connect.
+  </p>
+
+  <h2><span class="n">07</span> Changes</h2>
   <p>
     This page is versioned alongside the code it describes, so its history is the
     record of what changed and when. If an app starts doing something this page
