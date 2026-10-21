@@ -2423,10 +2423,10 @@
     return word << 32 - shift | word >>> shift;
   }
   function checkOpts(defaults, opts, title = "opts") {
-    aobject(defaults, "defaults");
+    aopts(defaults, "defaults");
     if (opts !== void 0)
-      aobject(opts, title);
-    const merged = Object.assign(defaults, opts);
+      aopts(opts, title);
+    const merged = Object.assign(/* @__PURE__ */ Object.create(null), defaults, opts);
     return merged;
   }
   function createHasher(hashCons, info = {}) {
@@ -2442,13 +2442,21 @@
     Object.assign(hashC, info);
     return Object.freeze(hashC);
   }
-  var atitle, aobject, oidNist;
+  var atitle, aobject, aopts, oidNist;
   var init_utils = __esm({
     "node_modules/@noble/hashes/utils.js"() {
       atitle = (title) => title ? `"${title}" ` : "";
       aobject = (value, label) => {
         if (value === null || typeof value !== "object" || Array.isArray(value))
           throw new TypeError((label === "object" ? "" : `"${label}" `) + "expected object, got type=" + typeof value);
+      };
+      aopts = (value, label) => {
+        aobject(value, label);
+        const proto = Object.getPrototypeOf(value);
+        if (proto !== Object.prototype && proto !== null)
+          throw new TypeError(`"${label}" expected plain object`);
+        if (Object.hasOwn(value, "__proto__"))
+          throw new TypeError(`"${label}.__proto__" is not allowed`);
       };
       oidNist = (suffix) => ({
         // Current NIST hashAlgs suffixes used here fit in one DER subidentifier octet.

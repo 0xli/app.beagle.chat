@@ -66,8 +66,8 @@
     speaker: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M16 9a3 3 0 0 1 0 6"/><path d="M19 7a6 6 0 0 1 0 10"/>',
     micFill: '<rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5v3.5"/>'
   };
-  function Icon({ name, size = 24, stroke = 1.75, color = "currentColor", fill = "none", style }) {
-    const d = ICON_PATHS[name];
+  function Icon({ name, size = 24, stroke = 1.75, color = "currentColor", fill = "none", style, svgPath }) {
+    const d = svgPath || ICON_PATHS[name];
     if (!d)
       return null;
     return /* @__PURE__ */ React.createElement(
@@ -109,20 +109,41 @@
     zap: '<path d="M13 2 4 13h7l-1 9 9-11h-7l1-9Z"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
     bellOff: '<path d="M8.7 3.4A6 6 0 0 1 18 8.5c0 3 .5 5 1.1 6.3M6.1 6.1A6 6 0 0 0 6 8.5c0 6.5-2.5 8-2.5 8H16"/><path d="M13.7 20.5a2 2 0 0 1-3.4 0"/><path d="m3 3 18 18"/>',
-    plug: '<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8Z"/><path d="M12 16v6"/>'
+    plug: '<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8Z"/><path d="M12 16v6"/>',
+    // A form with a filled-in field: the glyph for "Fill with Beagle" and any
+    // other host app that puts your identity into someone else's page.
+    // A pane pinned to the right edge — "keep this beside the page".
+    dock: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/><path d="M17 9.5h1.5M17 13h1.5"/>',
+    form: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h5"/><path d="M8 16h3"/><path d="m14.5 17.5 1.6 1.6 3.4-3.6"/>'
   });
   var H = {};
   var hostNeedsWelcome = false;
   var hostPrefersRtcFile = false;
   var hostHasKeyBackup = false;
   var hostEnsWrite = true;
+  var hostWalletBind = true;
+  var hostAssistant = true;
   var hostBrandHref = "";
+  var hostTabs = null;
+  var hostHideApps = null;
+  var hostApps = null;
+  var hostProfileSections = null;
+  var hostHeaderActions = null;
+  var hostIsProtocolMessage = null;
   function setUiHost(host2) {
     H = host2 || {};
+    hostTabs = Array.isArray(H.hostTabs) ? H.hostTabs : null;
+    hostHideApps = Array.isArray(H.hideApps) ? H.hideApps : null;
+    hostApps = Array.isArray(H.hostApps) ? H.hostApps : null;
+    hostProfileSections = Array.isArray(H.hostProfileSections) ? H.hostProfileSections : null;
+    hostHeaderActions = Array.isArray(H.hostHeaderActions) ? H.hostHeaderActions : null;
+    hostIsProtocolMessage = typeof H.isProtocolMessage === "function" ? H.isProtocolMessage : null;
     hostNeedsWelcome = !!H.hostNeedsWelcome;
     hostPrefersRtcFile = !!H.hostPrefersRtcFile;
     hostHasKeyBackup = !!H.hostHasKeyBackup;
     hostEnsWrite = H.hostEnsWrite !== void 0 ? !!H.hostEnsWrite : !H.hostNeedsWelcome;
+    hostWalletBind = H.hostWalletBind !== void 0 ? !!H.hostWalletBind : hostEnsWrite;
+    hostAssistant = H.hostAssistant !== void 0 ? !!H.hostAssistant : true;
     hostBrandHref = typeof H.hostBrandHref === "string" ? H.hostBrandHref : "";
   }
   function fileUrl(name) {
@@ -143,6 +164,140 @@
   }
   function DkBrowserNotice(props) {
     return H.DkBrowserNotice ? /* @__PURE__ */ React.createElement(H.DkBrowserNotice, { ...props }) : null;
+  }
+  function protocolTest(rule) {
+    if (typeof rule !== "function")
+      return () => false;
+    return (msg) => {
+      if (!msg)
+        return false;
+      try {
+        const v = rule(msg);
+        return typeof v === "string" ? v || true : !!v;
+      } catch (e) {
+        return false;
+      }
+    };
+  }
+  function stripOwnPrefix(text) {
+    return String(text == null ? "" : text).replace(/^you:\s*/i, "");
+  }
+  function lastMessageOf(peer) {
+    const raw = String(peer && peer.lastMsg || "");
+    return {
+      text: stripOwnPrefix(raw),
+      dir: peer && peer.lastDir || (/^you:\s*/i.test(raw) ? "out" : "in"),
+      ts: peer && peer.lastTs || 0
+    };
+  }
+  function lastIsProtocol(peer, isProto) {
+    const last = lastMessageOf(peer);
+    if (!last.text)
+      return false;
+    return isProto(last);
+  }
+  function newestHumanMessage(msgs, isProto) {
+    const arr = msgs || [];
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const m = arr[i];
+      if (!m)
+        continue;
+      if (m.file)
+        return m;
+      if (!m.text)
+        continue;
+      if (isProto({ text: m.text, dir: m.dir, ts: m.ts }))
+        continue;
+      return m;
+    }
+    return null;
+  }
+  function humanUnread(msgs, unread, isProto) {
+    const want = Number(unread) || 0;
+    if (want <= 0)
+      return { count: 0, exact: true };
+    const arr = msgs || [];
+    const window2 = arr.slice(Math.max(0, arr.length - want));
+    let n = 0;
+    for (const m of window2) {
+      if (!m || m.dir !== "in")
+        continue;
+      if (m.text && !m.file && isProto({ text: m.text, dir: m.dir, ts: m.ts }))
+        continue;
+      n++;
+    }
+    return { count: n, exact: window2.length >= want };
+  }
+  function rosterRow(peer, isProto, fix) {
+    const hidden = lastIsProtocol(peer, isProto);
+    if (!hidden) {
+      return {
+        preview: peer && peer.lastMsg || "",
+        lastTime: peer && peer.lastTime || "",
+        unread: Number(peer && peer.unread || 0),
+        activityTs: Number(peer && peer.lastTs || 0),
+        hidden: false
+      };
+    }
+    return {
+      preview: fix && fix.preview || "",
+      lastTime: fix && fix.lastTime || "",
+      unread: fix && fix.unreadExact ? fix.unread : 0,
+      activityTs: fix && fix.ts || 0,
+      hidden: true,
+      pending: !fix
+    };
+  }
+  function rosterUnreadTotal(peers, isProto, fixes) {
+    return (peers || []).reduce((n, p) => n + rosterRow(p, isProto, fixes && fixes[p.id]).unread, 0);
+  }
+  function collapseProtocol(thread, isProto, lang) {
+    const out = [];
+    let run = null;
+    const flush = () => {
+      if (!run)
+        return;
+      out.push({
+        protocol: true,
+        id: `proto-${run.first.id || run.startIndex}`,
+        count: run.items.length,
+        label: run.label,
+        dir: run.first.from === "me" ? "out" : "in",
+        text: run.items.map((m) => m.text).join("\n"),
+        line: protocolLine(run, lang)
+      });
+      run = null;
+    };
+    (thread || []).forEach((m, i) => {
+      const hit = m && !m.day ? isProto({ text: m.text, dir: m && m.from === "me" ? "out" : "in", ts: m && m.ts }) : false;
+      if (!hit || m && m.file) {
+        flush();
+        out.push(m);
+        return;
+      }
+      if (!run)
+        run = { first: m, startIndex: i, items: [], label: typeof hit === "string" ? hit : "" };
+      if (!run.label && typeof hit === "string")
+        run.label = hit;
+      run.items.push(m);
+    });
+    flush();
+    return out;
+  }
+  function protocolLine(run, lang) {
+    const arrow = run.first.from === "me" ? "\u2192" : "\u2190";
+    const n = run.items.length;
+    if (run.label) {
+      return `\u2699 ${arrow} ${run.label}${n > 1 ? ` \xB7 ${n}` : ""}`;
+    }
+    if (n > 1) {
+      return lang === "zh" ? `\u2699 ${arrow} ${n} \u6761\u534F\u8BAE\u6D88\u606F` : `\u2699 ${arrow} ${n} protocol messages`;
+    }
+    return `\u2699 ${arrow} ${protocolSummary(run.first.text)}`;
+  }
+  function protocolSummary(text, max = 72) {
+    const s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
+    return s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
   }
   function dkHash(s) {
     let h = 2166136261;
@@ -375,6 +530,48 @@
       components: m.components
     };
   }
+  var DK_TAIL_MIN = 30;
+  var DK_TAIL_MAX = 200;
+  function useProtocolTails(peers, isProtocol, enabled) {
+    const [fixes, setFixes] = React.useState({});
+    const cache = React.useRef(/* @__PURE__ */ new Map());
+    const inFlight = React.useRef(/* @__PURE__ */ new Set());
+    React.useEffect(() => {
+      if (!enabled)
+        return;
+      for (const p of peers || []) {
+        if (!p || !lastIsProtocol(p, isProtocol))
+          continue;
+        const unread = Number(p.unread) || 0;
+        const key = `${p.lastTs || 0}:${unread}`;
+        const had = cache.current.get(p.id);
+        if (had && had.key === key)
+          continue;
+        if (inFlight.current.has(p.id))
+          continue;
+        const limit = Math.min(DK_TAIL_MAX, Math.max(DK_TAIL_MIN, unread + 5));
+        inFlight.current.add(p.id);
+        dkGet("/api/chat-history?peer=" + encodeURIComponent(p.id) + "&limit=" + limit).then((d) => {
+          const msgs = d && d.chats && d.chats[p.id] || [];
+          const human = newestHumanMessage(msgs, isProtocol);
+          const count = humanUnread(msgs, unread, isProtocol);
+          const fix = {
+            preview: human ? (human.dir === "out" ? "you: " : "") + (human.file ? human.file.name : human.text || "") : "",
+            lastTime: human ? dkClock(human.ts) : "",
+            ts: human ? human.ts : 0,
+            unread: count.count,
+            unreadExact: count.exact
+          };
+          cache.current.set(p.id, { key, fix });
+          setFixes((f) => Object.assign({}, f, { [p.id]: fix }));
+        }).catch(() => {
+        }).finally(() => {
+          inFlight.current.delete(p.id);
+        });
+      }
+    }, [peers, isProtocol, enabled]);
+    return fixes;
+  }
   function useDaemonData() {
     const [snap, setSnap] = React.useState({
       me: DK_ME_FALLBACK,
@@ -499,6 +696,1007 @@
     DK_ME_FALLBACK,
     dkCopy
   });
+  var actions_default = {
+    version: 1,
+    scope: "assistant",
+    note: "The Assistant's action list. /help is generated from it, the router dispatches from it, and iOS/Android implement it. A later natural-language layer translates a sentence into one of these actions and nothing else. See docs/assistant/SPEC.md.",
+    actions: [
+      {
+        name: "help",
+        usage: "/help",
+        summary: "List what the Assistant can do.",
+        params: {
+          type: "object",
+          properties: {},
+          required: []
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "friends-list",
+        usage: "/friends list [filter\u2026]",
+        summary: "Show friends as a list: name, last heard from, messages in/out. With no filter, everyone. Service peers are never included \u2014 they are /nodes.",
+        params: {
+          type: "object",
+          properties: {
+            filters: {
+              type: "array",
+              items: {
+                enum: [
+                  "never-messaged",
+                  "never-replied",
+                  "silent",
+                  "pending"
+                ]
+              },
+              description: "Several filters are OR'd together."
+            },
+            silentDays: {
+              type: "integer",
+              minimum: 1,
+              default: 90,
+              description: "Argument of the silent filter: nothing from them in this many days."
+            }
+          },
+          required: []
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "friends-remove",
+        usage: "/friends remove <filter\u2026>",
+        summary: "Same list with a tick per row and a Remove button. Nothing is removed by typing alone. Service peers are never matched.",
+        params: {
+          type: "object",
+          properties: {
+            filters: {
+              type: "array",
+              items: {
+                enum: [
+                  "never-messaged",
+                  "never-replied",
+                  "silent",
+                  "pending"
+                ]
+              },
+              minItems: 1
+            },
+            silentDays: {
+              type: "integer",
+              minimum: 1,
+              default: 90
+            }
+          },
+          required: [
+            "filters"
+          ]
+        },
+        confirm: "list",
+        scope: "assistant"
+      },
+      {
+        name: "nodes-list",
+        usage: "/nodes list [filter\u2026]",
+        summary: "Service peers \u2014 network nodes and agents \u2014 with their kind and role. The same filters as /friends list.",
+        params: {
+          type: "object",
+          properties: {
+            filters: {
+              type: "array",
+              items: {
+                enum: [
+                  "never-messaged",
+                  "never-replied",
+                  "silent",
+                  "pending"
+                ]
+              },
+              description: "Several filters are OR'd together."
+            },
+            silentDays: {
+              type: "integer",
+              minimum: 1,
+              default: 90
+            }
+          },
+          required: []
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "nodes-remove",
+        usage: "/nodes remove <filter\u2026>",
+        summary: "The same table with a tick per row and a Remove button, over service peers only.",
+        params: {
+          type: "object",
+          properties: {
+            filters: {
+              type: "array",
+              items: {
+                enum: [
+                  "never-messaged",
+                  "never-replied",
+                  "silent",
+                  "pending"
+                ]
+              },
+              description: "Several filters are OR'd together.",
+              minItems: 1
+            },
+            silentDays: {
+              type: "integer",
+              minimum: 1,
+              default: 90
+            }
+          },
+          required: [
+            "filters"
+          ]
+        },
+        confirm: "list",
+        scope: "assistant"
+      },
+      {
+        name: "nodes-refresh",
+        usage: "/nodes refresh",
+        summary: "Look for friends that are provably service peers (the shipped exit table, this machine's dora roster) and offer to reclassify them. Nothing changes until you tick and confirm.",
+        params: {
+          type: "object",
+          properties: {},
+          required: []
+        },
+        confirm: "list",
+        scope: "assistant"
+      },
+      {
+        name: "find",
+        usage: "/find <text>",
+        summary: "Friends whose name, alias, description or ens name contains the text.",
+        params: {
+          type: "object",
+          properties: {
+            text: {
+              type: "string",
+              minLength: 1
+            }
+          },
+          required: [
+            "text"
+          ]
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "rename",
+        usage: "/rename <friend> <new name>",
+        summary: "Set a friend's alias \u2014 what you see them as, on this device.",
+        params: {
+          type: "object",
+          properties: {
+            friend: {
+              type: "string",
+              description: "Matches name, alias or userid prefix. Ambiguous = nothing happens, the candidates are listed."
+            },
+            alias: {
+              type: "string",
+              minLength: 1
+            }
+          },
+          required: [
+            "friend",
+            "alias"
+          ]
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "mute",
+        usage: "/mute <friend>",
+        summary: "Stop alerts from one conversation.",
+        params: {
+          type: "object",
+          properties: {
+            friend: {
+              type: "string"
+            }
+          },
+          required: [
+            "friend"
+          ]
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "unmute",
+        usage: "/unmute <friend>",
+        summary: "Alerts from that conversation again.",
+        params: {
+          type: "object",
+          properties: {
+            friend: {
+              type: "string"
+            }
+          },
+          required: [
+            "friend"
+          ]
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "sound",
+        usage: "/sound on|off",
+        summary: "Sound on a new message.",
+        params: {
+          type: "object",
+          properties: {
+            on: {
+              type: "boolean"
+            }
+          },
+          required: [
+            "on"
+          ]
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "flash",
+        usage: "/flash on|off",
+        summary: "Flash the window on a new message.",
+        params: {
+          type: "object",
+          properties: {
+            on: {
+              type: "boolean"
+            }
+          },
+          required: [
+            "on"
+          ]
+        },
+        confirm: "none",
+        scope: "assistant"
+      },
+      {
+        name: "status",
+        usage: "/status",
+        summary: "Friends and service peers counted separately, pending requests, how far back the history on this device goes, app version.",
+        params: {
+          type: "object",
+          properties: {},
+          required: []
+        },
+        confirm: "none",
+        scope: "assistant"
+      }
+    ],
+    filters: [
+      {
+        name: "never-messaged",
+        usage: "never-messaged",
+        summary: "No message either way.",
+        guarded: true
+      },
+      {
+        name: "never-replied",
+        usage: "never-replied",
+        summary: "You wrote at least once, they never did.",
+        guarded: true
+      },
+      {
+        name: "silent",
+        usage: "silent [days]",
+        summary: "Nothing from them for this many days (default 90).",
+        guarded: true,
+        arg: {
+          name: "days",
+          type: "integer",
+          default: 90,
+          minimum: 1
+        }
+      },
+      {
+        name: "pending",
+        usage: "pending",
+        summary: "A request you sent that was never accepted.",
+        guarded: false
+      }
+    ],
+    dropped: [
+      {
+        name: "never-called",
+        reason: "The message store holds no call records on any platform, so the predicate cannot be evaluated. /api/assistant/friends returns lastCallTs: null and the filter is not offered."
+      }
+    ],
+    guard: {
+      recentDays: 14,
+      applies: "Filters marked guarded never match a friend accepted (or, with no acceptance stamp, requested) less than recentDays ago; the result says how many were skipped."
+    },
+    servicePeers: {
+      file: "service-peers.json",
+      loader: "loadServicePeers()",
+      rule: "A peer is a service peer if and only if its userid is in this list. The Assistant never infers it from a name or from having no messages. /friends excludes them entirely; /nodes is only them.",
+      later: "A dora / ENS / bridge / directory service returns the same shape; the bundled file is v1.",
+      refresh: "/nodes refresh asks GET /api/assistant/service-candidates for evidence-backed candidates and writes the ticked ones to this machine's overlay (POST /api/assistant/service-peers, stored at <configDir>/service-peers-local.json). The shipped list is never edited at runtime; the overlay wins on the same userid."
+    }
+  };
+  var service_peers_default = {
+    version: 1,
+    source: "static",
+    updated: "2026-09-24",
+    note: "Service providers and network nodes: peers that are infrastructure or agents, not people. The Assistant manages them with /nodes, never /friends. Later this list comes from a service (dora / ENS / bridge / directory) in this same shape; until then it ships inside the app.",
+    peers: [
+      {
+        userid: "7xmbDbouSYEA5mbAgWxV2BTwjc59XGcVPqXSZx6VibUd",
+        name: "lens",
+        kind: "node",
+        role: "bridge + web host"
+      },
+      {
+        userid: "4uNnLnAQHVJ7td657MDaz4UnEuhnTW9sRAPSVeAEEQe4",
+        name: "tokyo",
+        kind: "node",
+        role: "exit + relay + dora + meeting"
+      },
+      {
+        userid: "5Aj6uQMd1cNRb9cGT4AwHCN4RdVZjfaGLtgKGhdP1LzN",
+        name: "cn",
+        kind: "node",
+        role: "exit"
+      },
+      {
+        userid: "DZN2L9RV1YkHjqGHMTA6juZhskKA65AD2RyPt4umZVc7",
+        name: "callpass",
+        kind: "node",
+        role: "server"
+      },
+      {
+        userid: "BcGvk2h5XCxBZWJrYwzKpZ8GbxaZRoakEzt2pQpathyA",
+        name: "gojipower",
+        kind: "node",
+        role: "server"
+      },
+      {
+        userid: "BeMbuKf1poh3U4rjw3eeUAKZsbN2qBSjVZdPSvehmHsw",
+        name: "snoopy",
+        kind: "node",
+        role: "dora + meeting + openclaw host"
+      },
+      {
+        userid: "CzwUZv6LfiGM7EXd9vXr6DutG8ASkA3TnNbqQzjKRJN5",
+        name: "GFAX",
+        kind: "node",
+        role: "server"
+      },
+      {
+        userid: "5SxEBHAx49Hknq1VzrA1HDtZHjW31vetX3iMEi4P6pK3",
+        name: "gfax118",
+        kind: "node",
+        role: "server"
+      },
+      {
+        userid: "72a4A7awtn6BqZnBt3eNhZH9MdYXRkM6Ht5HG2sqoiKR",
+        name: "nv4090-wsl",
+        kind: "node",
+        role: "GPU node"
+      },
+      {
+        userid: "6riqxxw18vjwXZEEtFUxbgNBMMe1dcv2kVHqVRQdihjE",
+        name: "node-3145",
+        kind: "node",
+        role: "GPU node (4090w)"
+      },
+      {
+        userid: "6D1PLSVqbSpcxnDMAd8ZXLWycYveeP2hU4g3igDQEqA7",
+        name: "node-5123",
+        kind: "node",
+        role: "node"
+      },
+      {
+        userid: "5EU9Ee3Vai1XwTr4pGaJFt4wmNVPUoYnJsdBM9LwNhrJ",
+        name: "node-2998",
+        kind: "node",
+        role: "node"
+      },
+      {
+        userid: "GujioyKQRucQgw8mwMPNWtYTdNdrooCuFq3R1D4RqjCW",
+        name: "beagle-help",
+        kind: "agent",
+        role: "product support"
+      },
+      {
+        userid: "FhbohSLrj5UjdyFKCEYNeEWAPq3QD9hRg6hsso5ipag2",
+        name: "help.beagles.eth",
+        kind: "agent",
+        role: "bridge agent"
+      },
+      {
+        userid: "9EaFGWuXH2UfREzYMkPPitzjoH6E8tvey4JvqTKtHFJh",
+        name: "openclaw",
+        kind: "agent",
+        role: "OpenClaw agent"
+      },
+      {
+        userid: "6z2o8ojPVjFGRzcffUdd5btvDYAt4tLuwJ8j1jvMBU8p",
+        name: "ClawAlan",
+        kind: "agent",
+        role: "OpenClaw agent on snoopy"
+      },
+      {
+        userid: "G7s3YjVfNLTY5pKBd83qQLAdzDddS7ZstsfrUySwK2Cb",
+        name: "interview",
+        kind: "agent",
+        role: "interview"
+      },
+      {
+        userid: "6jbXjrUWJ4zYvG8BDLnu8KVpoL7rhsdHYSwWER6WTfdt",
+        name: "interview editor",
+        kind: "agent",
+        role: "interview"
+      },
+      {
+        userid: "8BGemh6uqmh4X7KpnPVMeMSU8hZwAc6ZDo4MBRMFrq2L",
+        name: "readyplayer",
+        kind: "agent",
+        role: "readyplayer"
+      },
+      {
+        userid: "Ev1XmWRwtjQf8n33wgTwEhzXnYEyfqTyanehuDE6nczF",
+        name: "ReadyPlayer membership manager",
+        kind: "agent",
+        role: "readyplayer"
+      },
+      {
+        userid: "7xLPH2kjk7Nn8GrsAt7TYwa6b1WMPLkC2XRx7BzhiXYT",
+        name: "ai-btc-trader",
+        kind: "agent",
+        role: "btc signals (245)"
+      }
+    ]
+  };
+  var ASSISTANT_ID = "__assistant__";
+  var DAY_MS = 864e5;
+  var RECENT_DAYS = 14;
+  var DEFAULT_SILENT_DAYS = 90;
+  var FILTER_NAMES = ["never-messaged", "never-replied", "silent", "pending"];
+  var GUARDED = /* @__PURE__ */ new Set(["never-messaged", "never-replied", "silent"]);
+  function parseCommand(line) {
+    const text = String(line != null ? line : "").trim();
+    if (!text.startsWith("/"))
+      return null;
+    const parts = text.slice(1).split(/\s+/).filter(Boolean);
+    if (!parts.length)
+      return null;
+    const head = parts[0].toLowerCase();
+    if (head === "friends" || head === "nodes") {
+      const sub = (parts[1] || "").toLowerCase();
+      if (sub === "list" || sub === "remove")
+        return { ok: true, name: `${head}-${sub}`, args: parts.slice(2) };
+      if (head === "nodes" && sub === "refresh")
+        return { ok: true, name: "nodes-refresh", args: parts.slice(2) };
+      return { ok: false, name: head, args: parts.slice(1), error: `${head}-subcommand` };
+    }
+    return { ok: true, name: head, args: parts.slice(1) };
+  }
+  function parseFilters(args) {
+    const filters = [];
+    const unknown = [];
+    let silentDays = DEFAULT_SILENT_DAYS;
+    const words = (args != null ? args : []).map((a) => String(a).toLowerCase());
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      if (!FILTER_NAMES.includes(w)) {
+        unknown.push(words[i]);
+        continue;
+      }
+      if (w === "silent") {
+        const n = Number(words[i + 1]);
+        if (Number.isInteger(n) && n > 0) {
+          silentDays = n;
+          i++;
+        }
+      }
+      if (!filters.includes(w))
+        filters.push(w);
+    }
+    return { filters, silentDays, unknown };
+  }
+  function servicePeerMap(list) {
+    const map = /* @__PURE__ */ new Map();
+    const peers = list && list.peers || [];
+    for (const p of peers) {
+      if (p && typeof p.userid === "string" && p.userid) {
+        map.set(p.userid, { kind: p.kind === "agent" ? "agent" : "node", role: p.role || "", name: p.name || "" });
+      }
+    }
+    return map;
+  }
+  function mergeServicePeers(bundled, local) {
+    const byId = /* @__PURE__ */ new Map();
+    for (const p of bundled && bundled.peers || [])
+      if (p && p.userid)
+        byId.set(p.userid, { ...p, source: "app" });
+    for (const p of local && local.peers || [])
+      if (p && p.userid)
+        byId.set(p.userid, { ...p, source: "local" });
+    return { version: 1, source: "merged", peers: [...byId.values()] };
+  }
+  function newCandidates(candidates, svcMap) {
+    return (candidates != null ? candidates : []).filter((c) => c && c.userid && !(svcMap && svcMap.has(c.userid)));
+  }
+  function partitionPeers(friends, svcMap) {
+    const people = [];
+    const nodes = [];
+    for (const f of friends != null ? friends : []) {
+      if (!f)
+        continue;
+      const svc = svcMap && svcMap.get(f.userid);
+      if (svc)
+        nodes.push(Object.assign({}, f, { kind: svc.kind, role: svc.role, service: true }));
+      else
+        people.push(f);
+    }
+    return { people, nodes };
+  }
+  var acceptedOrRequestedAt = (f) => f.acceptedAt || f.requestedAt || 0;
+  function isRecent(friend, now, recentDays = RECENT_DAYS) {
+    const at = acceptedOrRequestedAt(friend);
+    return at > 0 && now - at < recentDays * DAY_MS;
+  }
+  function matchesFilter(friend, filter, { now, silentDays = DEFAULT_SILENT_DAYS } = {}) {
+    const inCount = friend.inboundCount || 0;
+    const outCount = friend.outboundCount || 0;
+    switch (filter) {
+      case "never-messaged":
+        return inCount === 0 && outCount === 0;
+      case "never-replied":
+        return outCount > 0 && inCount === 0;
+      case "silent":
+        return !friend.lastInboundTs || now - friend.lastInboundTs > silentDays * DAY_MS;
+      case "pending":
+        return friend.pending === true;
+      default:
+        return false;
+    }
+  }
+  function selectFriends(friends, filters, { now = Date.now(), silentDays = DEFAULT_SILENT_DAYS, recentDays = RECENT_DAYS } = {}) {
+    const pool = (friends != null ? friends : []).filter((f) => f && f.userid !== ASSISTANT_ID && !f.pinned);
+    if (!filters || !filters.length)
+      return { matched: pool.slice(), skippedRecent: [] };
+    const matched = [];
+    const skippedRecent = [];
+    for (const f of pool) {
+      let hit = false;
+      let guardedOnly = false;
+      for (const filter of filters) {
+        if (!matchesFilter(f, filter, { now, silentDays }))
+          continue;
+        if (GUARDED.has(filter) && isRecent(f, now, recentDays)) {
+          guardedOnly = true;
+          continue;
+        }
+        hit = true;
+        break;
+      }
+      if (hit)
+        matched.push(f);
+      else if (guardedOnly)
+        skippedRecent.push(f);
+    }
+    return { matched, skippedRecent };
+  }
+  function findFriends(friends, text) {
+    const q = String(text != null ? text : "").trim().toLowerCase();
+    if (!q)
+      return [];
+    return (friends != null ? friends : []).filter((f) => f && f.userid !== ASSISTANT_ID).filter((f) => [f.name, f.alias, f.description, f.ens].some((v) => typeof v === "string" && v.toLowerCase().includes(q)));
+  }
+  function resolveFriend(friends, token) {
+    const q = String(token != null ? token : "").trim().toLowerCase();
+    if (!q)
+      return { match: null, candidates: [] };
+    const pool = (friends != null ? friends : []).filter((f) => f && f.userid !== ASSISTANT_ID);
+    const exact = pool.filter((f) => [f.name, f.alias].some((v) => typeof v === "string" && v.toLowerCase() === q));
+    if (exact.length === 1)
+      return { match: exact[0], candidates: exact };
+    if (exact.length > 1)
+      return { match: null, candidates: exact };
+    const partial = pool.filter((f) => [f.name, f.alias].some((v) => typeof v === "string" && v.toLowerCase().startsWith(q)) || typeof f.userid === "string" && f.userid.toLowerCase().startsWith(q));
+    if (partial.length === 1)
+      return { match: partial[0], candidates: partial };
+    return { match: null, candidates: partial };
+  }
+  async function loadServicePeers() {
+    try {
+      const local = await fetch("/api/assistant/service-peers").then((r) => r.json());
+      return mergeServicePeers(service_peers_default, local);
+    } catch (e) {
+      return service_peers_default;
+    }
+  }
+  var ASSISTANT_TS_KEY = "beagle.assistant.lastTs";
+  function loadAssistantTs() {
+    try {
+      return Number(localStorage.getItem(ASSISTANT_TS_KEY)) || 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+  function saveAssistantTs(ts) {
+    try {
+      localStorage.setItem(ASSISTANT_TS_KEY, String(ts));
+    } catch (e) {
+    }
+  }
+  var ASSISTANT_PEER = {
+    id: ASSISTANT_ID,
+    userId: ASSISTANT_ID,
+    alias: "Beagle Assistant",
+    address: "",
+    // Not a peer, so not "online": there is no session, nothing to be present
+    // on, and no dot is drawn for an `app` row anywhere in the UI.
+    online: false,
+    app: true,
+    agent: false,
+    pending: false,
+    via: null,
+    ping: null,
+    ip: "",
+    unread: 0,
+    lastMsg: "",
+    lastTime: "",
+    lastTs: 0,
+    lastDir: null,
+    acceptedAt: 0,
+    requestedAt: 0,
+    wire: "163",
+    avatarUrl: null,
+    punkId: null
+  };
+  var fmtDate = (ts, lang) => !ts ? lang === "zh" ? "\u4ECE\u672A" : "never" : new Date(ts).toLocaleDateString(lang === "zh" ? "zh-CN" : "en-GB", { year: "numeric", month: "short", day: "numeric" });
+  var fmtAgo = (ts, now, lang) => {
+    if (!ts)
+      return lang === "zh" ? "\u4ECE\u672A" : "never";
+    const days = Math.floor((now - ts) / 864e5);
+    if (days <= 0)
+      return lang === "zh" ? "\u4ECA\u5929" : "today";
+    if (days === 1)
+      return lang === "zh" ? "1 \u5929\u524D" : "1 day ago";
+    return lang === "zh" ? `${days} \u5929\u524D` : `${days} days ago`;
+  };
+  var nameOf = (f) => f.alias || f.name || f.userid;
+  function sinceLine(historySince, lang) {
+    if (!historySince)
+      return lang === "zh" ? "*\u57FA\u4E8E\u672C\u8BBE\u5907\u4E0A\u7684\u6D88\u606F\uFF08\u672C\u673A\u6682\u65E0\u5386\u53F2\u8BB0\u5F55\uFF09*" : "*based on messages on this device (no history here yet)*";
+    return lang === "zh" ? `*\u57FA\u4E8E\u672C\u8BBE\u5907\u81EA ${fmtDate(historySince, lang)} \u8D77\u7684\u6D88\u606F*` : `*based on messages on this device since ${fmtDate(historySince, lang)}*`;
+  }
+  function friendTable(rows, now, lang) {
+    return rows.map((f) => {
+      const what = f.service ? ` \`${f.kind}${f.role ? " \xB7 " + f.role : ""}\`` : "";
+      return lang === "zh" ? `- **${nameOf(f)}**${what} \u2014 \u6700\u540E\u6536\u5230 ${fmtAgo(f.lastInboundTs, now, lang)} \xB7 \u6536 ${f.inboundCount || 0} / \u53D1 ${f.outboundCount || 0}` : `- **${nameOf(f)}**${what} \u2014 last heard ${fmtAgo(f.lastInboundTs, now, lang)} \xB7 in ${f.inboundCount || 0} / out ${f.outboundCount || 0}`;
+    }).join("\n");
+  }
+  function helpText(lang) {
+    const intro = lang === "zh" ? "**Beagle \u52A9\u624B** \u2014 \u53EA\u5728\u672C\u673A\u8FD0\u884C\uFF0C\u4E0D\u4F1A\u628A\u4EFB\u4F55\u5185\u5BB9\u53D1\u5230\u7F51\u7EDC\u4E0A\u3002\n\n\u53EF\u7528\u547D\u4EE4\uFF1A" : "**Beagle Assistant** \u2014 runs on this machine only; nothing here is sent over the network.\n\nCommands:";
+    const cmds = actions_default.actions.map((a) => `- \`${a.usage}\` \u2014 ${a.summary}`).join("\n");
+    const filters = actions_default.filters.map((f) => `- \`${f.usage}\` \u2014 ${f.summary}`).join("\n");
+    const tail = lang === "zh" ? `\u7B5B\u9009\u6761\u4EF6\uFF08\u53EF\u7EC4\u5408\uFF0C\u53D6\u5E76\u96C6\uFF09\uFF1A
+${filters}
+
+\`/rename\`\u3001\`/mute\`\u3001\`/find\` \u5BF9\u597D\u53CB\u548C\u670D\u52A1\u8282\u70B9\u90FD\u9002\u7528\uFF1B\u53EA\u6709\u5217\u8868\u548C\u5220\u9664\u5206\u6210\u4E24\u8FB9\u3002
+\u6700\u8FD1 ${RECENT_DAYS} \u5929\u5185\u6DFB\u52A0\u7684\u597D\u53CB\u4E0D\u4F1A\u88AB"\u4ECE\u672A/\u6C89\u9ED8"\u7C7B\u7B5B\u9009\u9009\u4E2D\uFF0C\u5E76\u4F1A\u5217\u51FA\u88AB\u8DF3\u8FC7\u7684\u540D\u5B57\u3002\u5220\u9664\u6C38\u8FDC\u9700\u8981\u5148\u786E\u8BA4\uFF0C\u53D6\u6D88\u52FE\u9009\u5373\u53EF\u4FDD\u7559\u3002` : `Filters (combine them; a friend matching any one is listed):
+${filters}
+
+\`/rename\`, \`/mute\` and \`/find\` work on friends and service peers alike \u2014 only listing and removing are split in two.
+Friends added in the last ${RECENT_DAYS} days are never matched by the "never/silent" filters, and the ones held back are named. Removal always asks first: untick anyone you want to keep.`;
+    return `${intro}
+${cmds}
+
+${tail}`;
+  }
+  var SKIP_NAMES_MAX = 10;
+  var seq = 0;
+  var asMsg = (from, text, extra) => Object.assign({
+    id: `as-${Date.now()}-${seq++}`,
+    from,
+    time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    text
+  }, extra);
+  function AssistantPanel({ m, T, lang, onRemove, onAdopt }) {
+    const rows = m.assistant.rows || [];
+    const adopt = m.assistant.kind === "adopt";
+    const [sel, setSel] = React.useState(() => new Set(rows.map((r) => r.userid)));
+    const [busy, setBusy] = React.useState(false);
+    const [done, setDone] = React.useState(null);
+    if (!rows.length)
+      return null;
+    const toggle = (id) => setSel((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+    const label = adopt ? lang === "zh" ? `\u52A0\u5165 ${sel.size} \u4E2A` : `Add ${sel.size} as ${sel.size === 1 ? "a node" : "nodes"}` : lang === "zh" ? `\u5220\u9664 ${sel.size} \u4F4D` : `Remove ${sel.size}`;
+    return /* @__PURE__ */ React.createElement("div", { style: { marginTop: 8, border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" } }, rows.map((r) => /* @__PURE__ */ React.createElement("label", { key: r.userid, style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "7px 10px",
+      borderBottom: "1px solid var(--line)",
+      fontSize: 13,
+      cursor: done ? "default" : "pointer"
+    } }, /* @__PURE__ */ React.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: sel.has(r.userid),
+        disabled: !!done || busy,
+        onChange: () => toggle(r.userid)
+      }
+    ), /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, nameOf(r), r.why && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--faint)", fontSize: 11.5 } }, ` \u2014 ${r.why}`)), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, r.userid.slice(0, 8), "\u2026"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px" } }, done ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12.5, color: "var(--faint)" } }, done) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: adopt ? "solid" : "danger", disabled: busy || !sel.size, onClick: () => {
+      setBusy(true);
+      const picked = rows.filter((r) => sel.has(r.userid));
+      const run = adopt ? onAdopt(picked) : onRemove([...sel]);
+      run.then((r) => {
+        setDone(adopt ? lang === "zh" ? `\u5DF2\u52A0\u5165 ${r.added} \u4E2A\u670D\u52A1\u8282\u70B9` : `Added ${r.added} as service peers` : lang === "zh" ? `\u5DF2\u5220\u9664 ${r.removed} \u4F4D${r.failed ? `\uFF0C${r.failed} \u4F4D\u5931\u8D25` : ""}` : `Removed ${r.removed}${r.failed ? `, ${r.failed} failed` : ""}`);
+      }).finally(() => setBusy(false));
+    } }, busy ? T.working || "Working\u2026" : label), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, color: "var(--faint)" } }, adopt ? lang === "zh" ? "\u53D6\u6D88\u52FE\u9009\u5373\u4FDD\u6301\u4E3A\u597D\u53CB" : "Untick any you want to keep as a friend" : lang === "zh" ? "\u53D6\u6D88\u52FE\u9009\u53EF\u4FDD\u7559" : "Untick anyone you want to keep"))));
+  }
+  function useAssistant({ lang, T, muted, onToggleMute, sound, flash, setAlert, onReloadFriends, onActivity }) {
+    const [thread, setThread] = React.useState(() => [{ day: (/* @__PURE__ */ new Date()).toLocaleDateString() }, asMsg("them", helpText(lang))]);
+    const bump = React.useCallback(() => {
+      const ts = Date.now();
+      saveAssistantTs(ts);
+      if (onActivity)
+        onActivity(ts);
+    }, [onActivity]);
+    const append = React.useCallback((...ms) => {
+      bump();
+      setThread((t) => t.concat(ms));
+    }, [bump]);
+    React.useEffect(() => {
+      setThread((t) => t.length === 2 ? [t[0], asMsg("them", helpText(lang))] : t);
+    }, [lang]);
+    const fetchFriends = async () => {
+      const r = await fetch("/api/assistant/friends").then((x) => x.json());
+      const svcMap = servicePeerMap(await loadServicePeers());
+      const { people, nodes } = partitionPeers(r.friends || [], svcMap);
+      return {
+        friends: people,
+        nodes,
+        all: r.friends || [],
+        svcMap,
+        historySince: r.historySince || null,
+        now: r.now || Date.now(),
+        ver: r.beagleVer || ""
+      };
+    };
+    const skipLine = (skipped) => {
+      if (!skipped.length)
+        return "";
+      const shown = skipped.slice(0, SKIP_NAMES_MAX).map(nameOf);
+      const more = skipped.length - shown.length;
+      const names = shown.join(", ") + (more > 0 ? lang === "zh" ? ` \u7B49 ${more} \u4F4D` : `, and ${more} more` : "");
+      return lang === "zh" ? `
+
+*\u8DF3\u8FC7\u4E86 ${skipped.length} \u4F4D\u6700\u8FD1 ${RECENT_DAYS} \u5929\u5185\u6DFB\u52A0\u7684\u597D\u53CB\uFF1A${names}\u3002*` : `
+
+*Skipped ${skipped.length} added in the last ${RECENT_DAYS} days: ${names}.*`;
+    };
+    const listReply = (rows, skipped, data, title) => {
+      if (!rows.length) {
+        return `${title}
+
+${lang === "zh" ? "\u6CA1\u6709\u7B26\u5408\u7684\u597D\u53CB\u3002" : "No friends match."}${skipLine(skipped)}
+
+${sinceLine(data.historySince, lang)}`;
+      }
+      return `${title}
+
+${friendTable(rows, data.now, lang)}${skipLine(skipped)}
+
+${sinceLine(data.historySince, lang)}`;
+    };
+    const ambiguous = (cands) => lang === "zh" ? `\u6709 ${cands.length} \u4F4D\u597D\u53CB\u7B26\u5408\uFF0C\u8BF7\u8BF4\u5F97\u66F4\u5177\u4F53\u4E00\u4E9B\uFF1A
+${cands.map((c) => `- ${nameOf(c)}`).join("\n")}` : `That matches ${cands.length} friends \u2014 be more specific:
+${cands.map((c) => `- ${nameOf(c)}`).join("\n")}`;
+    const notFound = (tok) => lang === "zh" ? `\u6CA1\u6709\u627E\u5230\u597D\u53CB "${tok}"\u3002` : `No friend matches "${tok}".`;
+    const handle = React.useCallback(async (text) => {
+      append(asMsg("me", text, { status: "read" }));
+      const cmd = parseCommand(text);
+      if (!cmd) {
+        return append(asMsg("them", lang === "zh" ? "\u6211\u53EA\u8BA4\u8BC6\u4EE5 `/` \u5F00\u5934\u7684\u547D\u4EE4\u3002\u8F93\u5165 `/help` \u770B\u770B\u80FD\u505A\u4EC0\u4E48\u3002" : "I only understand commands starting with `/`. Type `/help` to see them."));
+      }
+      if (cmd.ok === false) {
+        return append(asMsg("them", lang === "zh" ? `\`/${cmd.name}\` \u9700\u8981 \`list\` \u6216 \`remove\`\uFF0C\u4F8B\u5982 \`/${cmd.name} list silent 90\`\u3002` : `\`/${cmd.name}\` needs \`list\` or \`remove\`, for example \`/${cmd.name} list silent 90\`.`));
+      }
+      try {
+        switch (cmd.name) {
+          case "help":
+            return append(asMsg("them", helpText(lang)));
+          case "status": {
+            const d = await fetchFriends();
+            const pending = d.all.filter((f) => f.pending).length;
+            const nodeCount = d.nodes.filter((n) => n.kind === "node").length;
+            const agentCount = d.nodes.length - nodeCount;
+            return append(asMsg("them", lang === "zh" ? `**\u72B6\u6001**
+
+- \u597D\u53CB\uFF1A${d.friends.length}
+- \u670D\u52A1\u8282\u70B9\uFF1A${d.nodes.length}\uFF08\u8282\u70B9 ${nodeCount} \xB7 \u667A\u80FD\u4F53 ${agentCount}\uFF09\uFF0C\u7528 \`/nodes list\` \u67E5\u770B
+- \u5F85\u5BF9\u65B9\u63A5\u53D7\uFF1A${pending}
+- \u672C\u673A\u5386\u53F2\u8D77\u81EA\uFF1A${fmtDate(d.historySince, lang)}
+- \u7248\u672C\uFF1A${d.ver}` : `**Status**
+
+- Friends: ${d.friends.length}
+- Service peers: ${d.nodes.length} (${nodeCount} node${nodeCount === 1 ? "" : "s"} \xB7 ${agentCount} agent${agentCount === 1 ? "" : "s"}) \u2014 see \`/nodes list\`
+- Waiting to be accepted: ${pending}
+- History on this device since: ${fmtDate(d.historySince, lang)}
+- Version: ${d.ver}`));
+          }
+          case "nodes-refresh": {
+            const d = await fetchFriends();
+            const r = await fetch("/api/assistant/service-candidates").then((x) => x.json());
+            const fresh = newCandidates(r.candidates || [], d.svcMap);
+            const src = r.sources || {};
+            const where = lang === "zh" ? `\u67E5\u8BE2\u6765\u6E90\uFF1A\u5185\u7F6E\u51FA\u53E3\u8868\uFF08${src.exits || 0} \u6761\uFF09${src.dora == null ? "\uFF0C\u672C\u673A\u4E0D\u662F dora" : `\uFF0C\u672C\u673A dora \u540D\u518C\uFF08${src.dora} \u6761\uFF09`}` : `Looked at: the shipped exit table (${src.exits || 0})${src.dora == null ? ", and this machine is not a dora" : `, and this machine's dora roster (${src.dora})`}`;
+            if (!fresh.length) {
+              return append(asMsg("them", lang === "zh" ? `**\u6CA1\u6709\u65B0\u7684\u670D\u52A1\u8282\u70B9**
+
+\u73B0\u6709 ${d.nodes.length} \u4E2A\u5DF2\u8BC6\u522B\u3002${where}\u3002
+
+*\u53EA\u91C7\u7528\u8BC1\u636E\uFF0C\u4E0D\u9760\u540D\u5B57\u731C\u6D4B\u3002*` : `**Nothing new**
+
+${d.nodes.length} service peers are already classified. ${where}.
+
+*Evidence only \u2014 names are never guessed from.*`));
+            }
+            const title = lang === "zh" ? `**\u53D1\u73B0 ${fresh.length} \u4E2A\u53EF\u4EE5\u6807\u4E3A\u670D\u52A1\u8282\u70B9\u7684\u597D\u53CB** \u2014 \u52FE\u9009\u540E\u624D\u4F1A\u751F\u6548
+
+${where}\u3002` : `**${fresh.length === 1 ? "1 friend looks" : `${fresh.length} friends look`} like service peers** \u2014 nothing changes until you tick and confirm
+
+${where}.`;
+            const lines = fresh.map((c) => `- **${c.name}** \`${c.kind}${c.role ? " \xB7 " + c.role : ""}\` \u2014 ${c.why}`).join("\n");
+            return append(asMsg("them", `${title}
+
+${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
+          }
+          case "nodes-list":
+          case "friends-list": {
+            const nodesMode = cmd.name === "nodes-list";
+            const { filters, silentDays, unknown } = parseFilters(cmd.args);
+            if (unknown.length) {
+              return append(asMsg("them", lang === "zh" ? `\u4E0D\u8BA4\u8BC6\u7684\u7B5B\u9009\u6761\u4EF6\uFF1A${unknown.join(", ")}\u3002\u53EF\u7528\uFF1A${actions_default.filters.map((f) => f.name).join(", ")}\u3002` : `I don't know the filter${unknown.length > 1 ? "s" : ""} ${unknown.join(", ")}. Try: ${actions_default.filters.map((f) => f.name).join(", ")}.`));
+            }
+            const d = await fetchFriends();
+            const pool = nodesMode ? d.nodes : d.friends;
+            const { matched, skippedRecent } = selectFriends(pool, filters, { now: d.now, silentDays });
+            const all = nodesMode ? lang === "zh" ? `**\u5168\u90E8\u670D\u52A1\u8282\u70B9** \u2014 ${matched.length}` : `**All service peers** \u2014 ${matched.length}` : lang === "zh" ? `**\u5168\u90E8\u597D\u53CB** \u2014 ${matched.length}` : `**All friends** \u2014 ${matched.length}`;
+            const title = filters.length ? `**${nodesMode ? (lang === "zh" ? "\u670D\u52A1\u8282\u70B9" : "service peers") + ": " : ""}${filters.join(" + ")}**${filters.includes("silent") ? ` (${silentDays}d)` : ""} \u2014 ${matched.length}` : all;
+            return append(asMsg("them", listReply(matched, skippedRecent, d, title)));
+          }
+          case "nodes-remove":
+          case "friends-remove": {
+            const nodesMode = cmd.name === "nodes-remove";
+            const { filters, silentDays, unknown } = parseFilters(cmd.args);
+            if (unknown.length || !filters.length) {
+              return append(asMsg("them", lang === "zh" ? `\u5220\u9664\u9700\u8981\u7B5B\u9009\u6761\u4EF6\uFF0C\u4F8B\u5982 \`/friends remove never-messaged\`\u3002\u53EF\u7528\uFF1A${actions_default.filters.map((f) => f.name).join(", ")}\u3002` : `Removing needs a filter, for example \`/friends remove never-messaged\`. Available: ${actions_default.filters.map((f) => f.name).join(", ")}.`));
+            }
+            const d = await fetchFriends();
+            const { matched, skippedRecent } = selectFriends(nodesMode ? d.nodes : d.friends, filters, { now: d.now, silentDays });
+            const what = nodesMode ? lang === "zh" ? "\u4E2A\u670D\u52A1\u8282\u70B9" : `service peer${matched.length === 1 ? "" : "s"}` : lang === "zh" ? "\u4F4D\u597D\u53CB" : `friend${matched.length === 1 ? "" : "s"}`;
+            const title = lang === "zh" ? `**\u5C06\u8981\u5220\u9664 ${matched.length} ${what}** \u2014 \u8BF7\u5148\u6838\u5BF9\u8FD9\u4EFD\u540D\u5355` : `**${matched.length} ${what} to remove** \u2014 check the list first`;
+            return append(asMsg(
+              "them",
+              listReply(matched, skippedRecent, d, title),
+              matched.length ? { assistant: { kind: "confirm", rows: matched } } : void 0
+            ));
+          }
+          case "find": {
+            const q = cmd.args.join(" ");
+            if (!q)
+              return append(asMsg("them", lang === "zh" ? "\u7528\u6CD5\uFF1A`/find <\u6587\u5B57>`" : "Usage: `/find <text>`"));
+            const d = await fetchFriends();
+            const rows = findFriends(d.friends.concat(d.nodes), q);
+            const title = lang === "zh" ? `**"${q}"** \u2014 ${rows.length} \u4F4D` : `**"${q}"** \u2014 ${rows.length} found`;
+            return append(asMsg("them", listReply(rows, [], d, title)));
+          }
+          case "rename": {
+            const [tok, ...rest] = cmd.args;
+            const alias = rest.join(" ").trim();
+            if (!tok || !alias)
+              return append(asMsg("them", lang === "zh" ? "\u7528\u6CD5\uFF1A`/rename <\u597D\u53CB> <\u65B0\u540D\u5B57>`" : "Usage: `/rename <friend> <new name>`"));
+            const d = await fetchFriends();
+            const { match, candidates } = resolveFriend(d.friends.concat(d.nodes), tok);
+            if (!match)
+              return append(asMsg("them", candidates.length ? ambiguous(candidates) : notFound(tok)));
+            const was = nameOf(match);
+            await dkApi.alias(match.userid, alias);
+            if (onReloadFriends)
+              onReloadFriends();
+            return append(asMsg("them", lang === "zh" ? `\u5DF2\u628A "${was}" \u6539\u540D\u4E3A "${alias}"\u3002` : `Renamed "${was}" to "${alias}".`));
+          }
+          case "mute":
+          case "unmute": {
+            const tok = cmd.args.join(" ").trim();
+            if (!tok)
+              return append(asMsg("them", `${lang === "zh" ? "\u7528\u6CD5" : "Usage"}: \`/${cmd.name} <friend>\``));
+            const d = await fetchFriends();
+            const { match, candidates } = resolveFriend(d.friends.concat(d.nodes), tok);
+            if (!match)
+              return append(asMsg("them", candidates.length ? ambiguous(candidates) : notFound(tok)));
+            const isMuted = (muted || []).includes(match.userid);
+            const want = cmd.name === "mute";
+            if (isMuted !== want)
+              onToggleMute(match.userid);
+            return append(asMsg("them", want ? lang === "zh" ? `\u5DF2\u9759\u97F3 "${nameOf(match)}"\u3002` : `Muted "${nameOf(match)}".` : lang === "zh" ? `\u5DF2\u53D6\u6D88\u9759\u97F3 "${nameOf(match)}"\u3002` : `Unmuted "${nameOf(match)}".`));
+          }
+          case "sound":
+          case "flash": {
+            const word = (cmd.args[0] || "").toLowerCase();
+            if (word !== "on" && word !== "off") {
+              return append(asMsg("them", `${lang === "zh" ? "\u7528\u6CD5" : "Usage"}: \`/${cmd.name} on|off\``));
+            }
+            const on = word === "on";
+            setAlert(cmd.name, on);
+            const what = cmd.name === "sound" ? lang === "zh" ? "\u63D0\u793A\u97F3" : "Sound" : lang === "zh" ? "\u7A97\u53E3\u95EA\u70C1" : "Window flash";
+            return append(asMsg("them", lang === "zh" ? `${what}\u5DF2${on ? "\u5F00\u542F" : "\u5173\u95ED"}\u3002` : `${what} ${on ? "on" : "off"}.`));
+          }
+          default:
+            return append(asMsg("them", lang === "zh" ? `\u4E0D\u8BA4\u8BC6\u7684\u547D\u4EE4 \`/${cmd.name}\`\u3002\u8F93\u5165 \`/help\` \u770B\u770B\u53EF\u7528\u547D\u4EE4\u3002` : `I don't know \`/${cmd.name}\`. Type \`/help\` for the list.`));
+        }
+      } catch (e) {
+        return append(asMsg("them", lang === "zh" ? `\u51FA\u9519\u4E86\uFF1A${e && e.message || e}` : `That failed: ${e && e.message || e}`));
+      }
+    }, [append, lang, muted, onToggleMute, setAlert, onReloadFriends]);
+    const adoptServicePeers = React.useCallback(async (rows) => {
+      const add = rows.map((r) => ({ userid: r.userid, name: r.name, kind: r.kind, role: r.role }));
+      let added = 0;
+      try {
+        const r = await fetch("/api/assistant/service-peers", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ add })
+        }).then((x) => x.json());
+        added = r && r.ok ? add.length : 0;
+      } catch (e) {
+        added = 0;
+      }
+      if (onReloadFriends)
+        onReloadFriends();
+      append(asMsg("them", added ? lang === "zh" ? `\u5DF2\u628A ${added} \u4F4D\u6807\u4E3A\u670D\u52A1\u8282\u70B9\uFF0C\u5B83\u4EEC\u4E0D\u518D\u51FA\u73B0\u5728 \`/friends\` \u4E2D\u3002` : `${added} now count as service peers \u2014 they no longer appear in \`/friends\`.` : lang === "zh" ? "\u5199\u5165\u5931\u8D25\uFF0C\u6CA1\u6709\u4EFB\u4F55\u6539\u52A8\u3002" : "That write failed; nothing changed."));
+      return { added };
+    }, [append, lang, onReloadFriends]);
+    const removeFriends = React.useCallback(async (ids) => {
+      let removed = 0;
+      const failed = [];
+      for (const id of ids) {
+        try {
+          const r = await dkApi.remove(id);
+          if (r && r.ok === false)
+            failed.push(id);
+          else
+            removed++;
+        } catch (e) {
+          failed.push(id);
+        }
+      }
+      if (onReloadFriends)
+        onReloadFriends();
+      append(asMsg("them", failed.length ? lang === "zh" ? `\u5DF2\u5220\u9664 ${removed} \u4F4D\uFF0C${failed.length} \u4F4D\u5931\u8D25\u3002` : `Removed ${removed}, ${failed.length} failed.` : lang === "zh" ? `\u5DF2\u5220\u9664 ${removed} \u4F4D\u597D\u53CB\u3002` : `Removed ${removed} friend${removed === 1 ? "" : "s"}.`));
+      return { removed, failed: failed.length };
+    }, [append, lang, onReloadFriends]);
+    return { thread, handle, removeFriends, adoptServicePeers };
+  }
+  var DK_CMD_HIST_KEY = "beagle.assistant.history";
+  var DK_CMD_HIST_MAX = 50;
   function RequestsBlock({ T, requests, onAct }) {
     const [acted, setActed] = React.useState({});
     const [failed, setFailed] = React.useState({});
@@ -557,8 +1755,9 @@
       paddingLeft: 8
     } }, r.descr), failed[r.id] && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11, color: "var(--danger)" } }, failed[r.id]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => act(r, "accept"), style: { flex: 1 } }, T.accept), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "x", size: "sm", onClick: () => act(r, "reject"), style: { flex: 1 } }, T.reject))))));
   }
-  function PeerRow({ peer, T, active, onClick, muted }) {
+  function PeerRow({ peer, T, active, onClick, muted, isProtocol, fix }) {
     const name = peer.alias || peer.userId;
+    const row = rosterRow(peer, isProtocol || (() => false), fix);
     return /* @__PURE__ */ React.createElement("button", { onClick, style: {
       display: "flex",
       alignItems: "center",
@@ -579,7 +1778,7 @@
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis"
-    } }, peer.alias || shortKey(peer.userId, 8, 5)), peer.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 13, color: "var(--faint)", stroke: 2 }), muted && /* @__PURE__ */ React.createElement(Icon, { name: "bellOff", size: 12, color: "var(--faint)", stroke: 2, title: T && T.mutedTag || "sound muted" }), peer.wire === "64" && /* @__PURE__ */ React.createElement(Tag, { tone: "off", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "w64")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, peer.ip ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, peer.ip), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)", fontSize: 11 } }, "\xB7")) : null, /* @__PURE__ */ React.createElement("span", { style: {
+    } }, peer.alias || shortKey(peer.userId, 8, 5)), peer.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 13, color: "var(--faint)", stroke: 2 }), peer.app && /* @__PURE__ */ React.createElement(Tag, { tone: "accent", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "APP"), muted && /* @__PURE__ */ React.createElement(Icon, { name: "bellOff", size: 12, color: "var(--faint)", stroke: 2, title: T && T.mutedTag || "sound muted" }), peer.wire === "64" && /* @__PURE__ */ React.createElement(Tag, { tone: "off", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "w64")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, peer.ip ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, peer.ip), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)", fontSize: 11 } }, "\xB7")) : null, /* @__PURE__ */ React.createElement("span", { style: {
       fontSize: 11,
       color: "var(--dim)",
       whiteSpace: "nowrap",
@@ -587,12 +1786,13 @@
       textOverflow: "ellipsis",
       flex: 1,
       minWidth: 0
-    } }, dkRowPreview(peer.lastMsg)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)" } }, peer.lastTime), peer.unread ? /* @__PURE__ */ React.createElement(Unread, { n: peer.unread }) : peer.pending ? /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 11, stroke: 2.2, color: "var(--warn, #d29922)", title: "friend request pending" }) : /* @__PURE__ */ React.createElement(StatusDot, { online: peer.online })));
+    } }, dkRowPreview(row.preview)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)" } }, row.lastTime), peer.app ? null : row.unread ? /* @__PURE__ */ React.createElement(Unread, { n: row.unread }) : peer.pending ? /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 11, stroke: 2.2, color: "var(--warn, #d29922)", title: "friend request pending" }) : /* @__PURE__ */ React.createElement(StatusDot, { online: peer.online })));
   }
-  function dkActivityTs(p) {
-    return Math.max(p.lastTs || 0, p.acceptedAt || 0, p.requestedAt || 0);
+  function dkActivityTs(p, isProtocol, fix) {
+    const row = rosterRow(p, isProtocol || (() => false), fix);
+    return Math.max(row.activityTs, p.acceptedAt || 0, p.requestedAt || 0);
   }
-  function PeerSidebar({ T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, wide }) {
+  function PeerSidebar({ T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, wide, isProtocol, protocolFix }) {
     const [q, setQ] = React.useState("");
     const [addr, setAddr] = React.useState("");
     const [addState, setAddState] = React.useState(null);
@@ -635,7 +1835,10 @@
       const s = (p.alias || "") + " " + p.userId + " " + p.ip;
       return s.toLowerCase().includes(q.toLowerCase());
     }).slice().sort((a, b) => {
-      const ta = dkActivityTs(a), tb = dkActivityTs(b);
+      if (!!a.pinned !== !!b.pinned)
+        return a.pinned ? -1 : 1;
+      const ta = dkActivityTs(a, isProtocol, protocolFix && protocolFix[a.id]);
+      const tb = dkActivityTs(b, isProtocol, protocolFix && protocolFix[b.id]);
       if (ta !== tb)
         return tb - ta;
       return String(a.alias || a.userId || "").localeCompare(String(b.alias || b.userId || ""));
@@ -674,7 +1877,7 @@
       fontSize: 11.5,
       lineHeight: 1.35,
       color: addState.kind === "err" ? "var(--bad, #e5484d)" : addState.kind === "ok" ? "var(--good, #46a758)" : "var(--faint)"
-    } }, addState.msg), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: "search", size: 15, color: "var(--faint)", stroke: 2, style: { position: "absolute", left: 9 } }), /* @__PURE__ */ React.createElement("input", { value: q, onChange: (e) => setQ(e.target.value), placeholder: T.search, style: { ...inputStyle, paddingLeft: 30 } }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", padding: "10px 8px 16px" } }, /* @__PURE__ */ React.createElement(RequestsBlock, { T, requests, onAct }), /* @__PURE__ */ React.createElement(Section, { label: T.peers, count: `${online}/${peers.length}`, style: { margin: "6px 4px 8px" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, filtered.map((p) => /* @__PURE__ */ React.createElement(PeerRow, { key: p.id, peer: p, T, active: p.id === activeId, onClick: () => onSelect(p.id), muted: !!muted && muted.includes(p.id) })), !filtered.length && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, textAlign: "center", fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "no matches"))));
+    } }, addState.msg), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: "search", size: 15, color: "var(--faint)", stroke: 2, style: { position: "absolute", left: 9 } }), /* @__PURE__ */ React.createElement("input", { value: q, onChange: (e) => setQ(e.target.value), placeholder: T.search, style: { ...inputStyle, paddingLeft: 30 } }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", padding: "10px 8px 16px" } }, /* @__PURE__ */ React.createElement(RequestsBlock, { T, requests, onAct }), /* @__PURE__ */ React.createElement(Section, { label: T.peers, count: `${online}/${peers.length}`, style: { margin: "6px 4px 8px" } }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, filtered.map((p) => /* @__PURE__ */ React.createElement(PeerRow, { key: p.id, peer: p, T, active: p.id === activeId, onClick: () => onSelect(p.id), muted: !!muted && muted.includes(p.id), isProtocol, fix: protocolFix && protocolFix[p.id] })), !filtered.length && /* @__PURE__ */ React.createElement("div", { style: { padding: 16, textAlign: "center", fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, "no matches"))));
   }
   var inputStyle = {
     flex: 1,
@@ -1300,7 +2503,7 @@
       return null;
     }), err && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--danger, #ff6b6b)", fontSize: 11.5, fontFamily: "var(--mono)" } }, err));
   }
-  function Msg({ m, peer, T, onTheater, onDelete, onCancel, onRetry, onRetryMsg, onReveal, onOpenFile, onCall, onFormSubmit, onNameCard, answered, selMode, selected, onToggleSel, busy, isGroup }) {
+  function Msg({ m, peer, T, lang, onTheater, onDelete, onCancel, onRetry, onRetryMsg, onReveal, onOpenFile, onCall, onFormSubmit, onNameCard, onAssistantRemove, onAssistantAdopt, answered, selMode, selected, onToggleSel, busy, isGroup }) {
     const mine = m.from === "me";
     const nativeMedia = !m.file ? dkNativeMediaFromText(m.text) : null;
     const grp = isGroup && m.dir !== "out" && !m.file && !nativeMedia ? dkGroupParse(m.text) : null;
@@ -1629,7 +2832,7 @@
           letterSpacing: -0.1,
           wordBreak: "break-word"
         } }, /* @__PURE__ */ React.createElement(MarkdownText, { text: read.text, onNameCard })));
-      })(), read.form && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement(DkChatForm, { form: read.form, submitted, peer, onSubmit: onFormSubmit })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, margin: "3px 3px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--faint)" } }, m.time), (() => {
+      })(), read.form && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 6 } }, /* @__PURE__ */ React.createElement(DkChatForm, { form: read.form, submitted, peer, onSubmit: onFormSubmit })), m.assistant && onAssistantRemove && /* @__PURE__ */ React.createElement(AssistantPanel, { m, T, lang, onRemove: onAssistantRemove, onAdopt: onAssistantAdopt }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 4, margin: "3px 3px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10, color: "var(--faint)" } }, m.time), (() => {
         const sentDone = mine && m.status && m.status !== "queued" && m.status !== "sending" && m.status !== "failed";
         const via = !mine ? m.via : sentDone ? m.via === "offline" ? "offline" : "online" : null;
         if (!via)
@@ -1674,7 +2877,7 @@
       ) : mine && m.via === "offline" && m.status !== "queued" && m.status !== "sending" ? /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, stroke: 2.2, color: "#f59e0b", title: T.viaOutOffline || "posted to the offline relay \u2014 they get it when they come online" }) : mine && m.status === "sent" && m.confirmed === false ? /* @__PURE__ */ React.createElement(Icon, { name: "check", size: 12, stroke: 2.2, color: "var(--faint)", title: T.sentUnconfirmed || "sent \u2014 not confirmed by the peer" }) : mine && m.status && /* @__PURE__ */ React.createElement(Icon, { name: "checkCheck", size: 12, stroke: 2.2, color: m.status === "read" ? "var(--accent)" : "var(--faint)" })))
     );
   }
-  function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, muted, onToggleMute, phone, onBack }) {
+  function Conversation({ T, peer, lang, peers, onOpenChat, thread: threadProp, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, onAssistantRemove, onAssistantAdopt, isProtocol, muted, onToggleMute, phone, onBack }) {
     const scrollRef = React.useRef(null);
     const prependRef = React.useRef(null);
     const [earlierBusy, setEarlierBusy] = React.useState(false);
@@ -1898,6 +3101,59 @@
       setSelMode(false);
     };
     const [draft, setDraft] = React.useState("");
+    const [hist, setHist] = React.useState([]);
+    const histIdx = React.useRef(null);
+    const histStash = React.useRef("");
+    React.useEffect(() => {
+      histIdx.current = null;
+      histStash.current = "";
+      if (!peer.app) {
+        setHist([]);
+        return;
+      }
+      try {
+        setHist(JSON.parse(localStorage.getItem(DK_CMD_HIST_KEY) || "[]"));
+      } catch (e) {
+        setHist([]);
+      }
+    }, [peer.id, peer.app]);
+    const rememberCommand = (text) => {
+      setHist((h) => {
+        const next = (h[h.length - 1] === text ? h : h.concat(text)).slice(-DK_CMD_HIST_MAX);
+        if (peer.app) {
+          try {
+            localStorage.setItem(DK_CMD_HIST_KEY, JSON.stringify(next));
+          } catch (e) {
+          }
+        }
+        return next;
+      });
+      histIdx.current = null;
+      histStash.current = "";
+    };
+    const walkHistory = (dir) => {
+      if (!hist.length)
+        return false;
+      let i = histIdx.current;
+      if (i === null) {
+        if (dir > 0)
+          return false;
+        histStash.current = draft;
+        i = hist.length - 1;
+      } else {
+        i += dir;
+        if (i >= hist.length) {
+          histIdx.current = null;
+          setDraft(histStash.current);
+          return true;
+        }
+        if (i < 0)
+          i = 0;
+      }
+      histIdx.current = i;
+      setDraft(hist[i]);
+      return true;
+    };
     const [dragOver, setDragOver] = React.useState(false);
     const [sending, setSending] = React.useState(null);
     const [theater, setTheater] = React.useState(null);
@@ -1920,6 +3176,7 @@
     const sendDraft = () => {
       if (draft.trim()) {
         followScrollRef.current = true;
+        rememberCommand(draft.trim());
         onSend(draft);
         setDraft("");
         requestAnimationFrame(scrollToBottom);
@@ -1979,7 +3236,11 @@
           style: { width: 40, height: 44, flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }
         },
         /* @__PURE__ */ React.createElement(Icon, { name: "chevronLeft", size: 26, stroke: 2.2, color: "var(--accent)" })
-      ), /* @__PURE__ */ React.createElement("div", { onClick: () => setPubProfile(true), title: T && T.pubOpen || "View public profile", style: { cursor: "pointer", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer, size: 34, radius: 8 })), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: phone ? 1 : void 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { onClick: () => setPubProfile(true), style: { fontFamily: peer.alias ? "var(--ui)" : "var(--mono)", fontSize: 15, fontWeight: 700, color: "var(--text)", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 } }, peer.alias || shortKey(peer.userId, phone ? 6 : 10, phone ? 4 : 6)), peer.agent && !phone && /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, "agent"), isGroup && !phone && /* @__PURE__ */ React.createElement(Tag, null, T && T.groupTag || "group"), !phone && /* @__PURE__ */ React.createElement(RouteTag, { peer })), phone ? /* @__PURE__ */ React.createElement("div", { style: { marginTop: 2, display: "flex" } }, /* @__PURE__ */ React.createElement(RouteTag, { peer })) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 } }, /* @__PURE__ */ React.createElement(Mono, { size: 11.5, dim: true, copy: peer.userId, title: peer.userId }, shortKey(peer.userId, 10, 6)), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)" } }, "\xB7"), /* @__PURE__ */ React.createElement("button", { onClick: () => onOpenNet(peer), title: T && T.openNet || "Network view", style: { background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--accent)", display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: "network", size: 12, stroke: 2 })), /* @__PURE__ */ React.createElement(Mono, { size: 11.5, dim: true, copy: peer.ip, title: peer.ip }, peer.ip), peer.address && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)" } }, "\xB7"), /* @__PURE__ */ React.createElement(
+      ), /* @__PURE__ */ React.createElement("div", { onClick: () => setPubProfile(true), title: T && T.pubOpen || "View public profile", style: { cursor: "pointer", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer, size: 34, radius: 8 })), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: phone ? 1 : void 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { onClick: () => setPubProfile(true), style: { fontFamily: peer.alias ? "var(--ui)" : "var(--mono)", fontSize: 15, fontWeight: 700, color: "var(--text)", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 } }, peer.alias || shortKey(peer.userId, phone ? 6 : 10, phone ? 4 : 6)), peer.app && !phone && /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, "APP"), peer.agent && !phone && /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, "agent"), isGroup && !phone && /* @__PURE__ */ React.createElement(Tag, null, T && T.groupTag || "group"), !phone && !peer.app && /* @__PURE__ */ React.createElement(RouteTag, { peer })), peer.app ? (
+        // The internal id is not an address anyone can use and not a name
+        // anyone chose; saying what this row IS is more use than showing it.
+        /* @__PURE__ */ React.createElement("div", { style: { marginTop: 2, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--faint)" } }, T && T.assistantSub || "Local \xB7 APP")
+      ) : phone ? /* @__PURE__ */ React.createElement("div", { style: { marginTop: 2, display: "flex" } }, /* @__PURE__ */ React.createElement(RouteTag, { peer })) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 2 } }, /* @__PURE__ */ React.createElement(Mono, { size: 11.5, dim: true, copy: peer.userId, title: peer.userId }, shortKey(peer.userId, 10, 6)), onOpenNet && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)" } }, "\xB7"), onOpenNet && /* @__PURE__ */ React.createElement("button", { onClick: () => onOpenNet(peer), title: T && T.openNet || "Network view", style: { background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--accent)", display: "inline-flex", alignItems: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: "network", size: 12, stroke: 2 })), /* @__PURE__ */ React.createElement(Mono, { size: 11.5, dim: true, copy: peer.ip, title: peer.ip }, peer.ip), peer.address && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)" } }, "\xB7"), /* @__PURE__ */ React.createElement(
         Mono,
         {
           size: 11.5,
@@ -1997,7 +3258,7 @@ ${peer.address}`
           title: muted ? T && T.unmuteSound || "Turn sound back on for this chat" : T && T.muteSound || "Mute sound for this chat",
           onClick: () => onToggleMute(peer.id)
         }
-      ), onCall && /* @__PURE__ */ React.createElement(Btn, { icon: "phone", title: T && T.audioCall || "Audio call", onClick: () => onCall(peer.userId, false) }), onCall && /* @__PURE__ */ React.createElement(Btn, { icon: "video", title: T && T.videoCall || "Video call", onClick: () => onCall(peer.userId, true) }), onSendRtcFile && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
+      ), onCall && !peer.app && /* @__PURE__ */ React.createElement(Btn, { icon: "phone", title: T && T.audioCall || "Audio call", onClick: () => onCall(peer.userId, false) }), onCall && !peer.app && /* @__PURE__ */ React.createElement(Btn, { icon: "video", title: T && T.videoCall || "Video call", onClick: () => onCall(peer.userId, true) }), onSendRtcFile && !peer.app && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(
         "input",
         {
           ref: rtcFileRef,
@@ -2011,19 +3272,19 @@ ${peer.address}`
       ), !phone && /* @__PURE__ */ React.createElement(Btn, { icon: "file", title: T && T.sendWebrtcFile || "Send file via WebRTC", onClick: () => rtcFileRef.current && rtcFileRef.current.click() })), /* @__PURE__ */ React.createElement("div", { style: { position: "relative" } }, /* @__PURE__ */ React.createElement(Btn, { icon: "more", onClick: () => setMenu((v) => !v) }), menu && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", { onClick: () => setMenu(false), style: { position: "fixed", inset: 0, zIndex: 40 } }), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", right: 0, top: 36, zIndex: 50, width: 180, background: "var(--panel-2)", border: "1px solid var(--line)", borderRadius: 9, padding: 6, boxShadow: "0 14px 40px rgba(0,0,0,0.4)" } }, phone && onToggleMute && /* @__PURE__ */ React.createElement(MenuItem, { icon: muted ? "bell" : "bellOff", label: muted ? T && T.unmuteSound || "Turn sound back on" : T && T.muteSound || "Mute sound", onClick: () => {
         setMenu(false);
         onToggleMute(peer.id);
-      } }), phone && onSendRtcFile && /* @__PURE__ */ React.createElement(MenuItem, { icon: "file", label: T && T.sendWebrtcFile || "Send file via WebRTC", onClick: () => {
+      } }), phone && onSendRtcFile && !peer.app && /* @__PURE__ */ React.createElement(MenuItem, { icon: "file", label: T && T.sendWebrtcFile || "Send file via WebRTC", onClick: () => {
         setMenu(false);
         rtcFileRef.current && rtcFileRef.current.click();
-      } }), phone && /* @__PURE__ */ React.createElement(MenuItem, { icon: "network", label: T && T.openNet || "Network view", onClick: () => {
+      } }), phone && !peer.app && onOpenNet && /* @__PURE__ */ React.createElement(MenuItem, { icon: "network", label: T && T.openNet || "Network view", onClick: () => {
         setMenu(false);
         onOpenNet(peer);
-      } }), /* @__PURE__ */ React.createElement(MenuItem, { icon: "hash", label: T.alias, onClick: () => {
+      } }), !peer.app && /* @__PURE__ */ React.createElement(MenuItem, { icon: "hash", label: T.alias, onClick: () => {
         setMenu(false);
         onAlias(peer);
       } }), /* @__PURE__ */ React.createElement(MenuItem, { icon: "check", label: T.selectDelete || "Select & delete", onClick: () => {
         setMenu(false);
         setSelMode(true);
-      } }), /* @__PURE__ */ React.createElement("div", { style: { height: 1, background: "var(--line)", margin: "5px 4px" } }), /* @__PURE__ */ React.createElement(MenuItem, { icon: "trash", label: T.remove, danger: true, onClick: () => {
+      } }), !peer.app && /* @__PURE__ */ React.createElement("div", { style: { height: 1, background: "var(--line)", margin: "5px 4px" } }), !peer.app && /* @__PURE__ */ React.createElement(MenuItem, { icon: "trash", label: T.remove, danger: true, onClick: () => {
         setMenu(false);
         onRemove(peer);
       } }))))),
@@ -2038,15 +3299,26 @@ ${peer.address}`
         fontSize: 12.5,
         color: "var(--text)"
       } }, /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 13, stroke: 2.2, color: "#d29922" }), /* @__PURE__ */ React.createElement("span", null, T.pendingFriend || "Waiting for them to accept your friend request \u2014 messages will queue and deliver once they do.")),
-      /* @__PURE__ */ React.createElement("div", { ref: scrollRef, onScroll: updateFollowScroll, style: { flex: 1, overflow: "auto", padding: phone ? "12px 10px" : "18px 22px", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1200, margin: "0 auto" } }, hasEarlier && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", margin: "4px 0 10px" } }, /* @__PURE__ */ React.createElement(Btn, { size: "sm", onClick: loadEarlier, disabled: earlierBusy }, earlierBusy ? T.loadingEarlier || "Loading\u2026" : T.loadEarlier || "Load earlier messages")), thread.filter((m) => m.day || !hidden.has(m.id)).map((m, i) => m.day ? /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", justifyContent: "center", margin: "14px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, fontWeight: 600, color: "var(--faint)", background: "var(--chip)", padding: "3px 10px", borderRadius: 999 } }, m.day)) : /* @__PURE__ */ React.createElement(
+      /* @__PURE__ */ React.createElement("div", { ref: scrollRef, onScroll: updateFollowScroll, style: { flex: 1, overflow: "auto", padding: phone ? "12px 10px" : "18px 22px", WebkitOverflowScrolling: "touch" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1200, margin: "0 auto" } }, hasEarlier && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "center", margin: "4px 0 10px" } }, /* @__PURE__ */ React.createElement(Btn, { size: "sm", onClick: loadEarlier, disabled: earlierBusy }, earlierBusy ? T.loadingEarlier || "Loading\u2026" : T.loadEarlier || "Load earlier messages")), collapseProtocol(thread, isProtocol || (() => false), lang).filter((m) => m.day || m.protocol || !hidden.has(m.id)).map((m, i) => m.day ? /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", justifyContent: "center", margin: "14px 0" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, fontWeight: 600, color: "var(--faint)", background: "var(--chip)", padding: "3px 10px", borderRadius: 999 } }, m.day)) : m.protocol ? /* @__PURE__ */ React.createElement("div", { key: m.id || i, style: { display: "flex", justifyContent: "center", margin: "4px 0" } }, /* @__PURE__ */ React.createElement("span", { title: m.text, style: {
+        fontFamily: "var(--mono)",
+        fontSize: 10.5,
+        color: "var(--faint)",
+        maxWidth: "86%",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis"
+      } }, m.line)) : /* @__PURE__ */ React.createElement(
         Msg,
         {
           key: m.id || i,
           m,
           peer,
           T,
+          lang,
           isGroup,
           onTheater: setTheater,
+          onAssistantRemove,
+          onAssistantAdopt,
           onDelete: (id) => doDelete([id]),
           onCancel: doCancel,
           onRetry: doRetry,
@@ -2095,15 +3367,23 @@ ${peer.address}`
             e.target.value = "";
           }
         }
-      ), /* @__PURE__ */ React.createElement(Btn, { icon: "paperclip", title: T.sendFile, onClick: () => fileRef.current && fileRef.current.click() }), /* @__PURE__ */ React.createElement(
+      ), !peer.app && /* @__PURE__ */ React.createElement(Btn, { icon: "paperclip", title: T.sendFile, onClick: () => fileRef.current && fileRef.current.click() }), /* @__PURE__ */ React.createElement(
         "input",
         {
           value: draft,
-          onChange: (e) => setDraft(e.target.value),
+          onChange: (e) => {
+            histIdx.current = null;
+            setDraft(e.target.value);
+          },
           onKeyDown: (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               sendDraft();
+              return;
+            }
+            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+              if (walkHistory(e.key === "ArrowUp" ? -1 : 1))
+                e.preventDefault();
             }
           },
           placeholder: phone ? `${T.message}\u2026` : `${T.message} ${peer.alias || shortKey(peer.userId, 6, 4)}\u2026`,
@@ -2198,14 +3478,73 @@ ${peer.address}`
   function ChatEmpty({ T }) {
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "var(--faint)", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "message", size: 40, stroke: 1.4, color: "var(--line)" }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13 } }, T.pickPeer));
   }
-  function ChatTab({ T, lang, peers, requests, activeId, thread, onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, prefillAddr, onPrefillConsumed, muted, onToggleMute, phone, onBack }) {
+  function ChatTab({ T, lang, peers, requests, activeId, thread, isProtocol, protocolFix, onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, onAssistantRemove, onAssistantAdopt, prefillAddr, onPrefillConsumed, muted, onToggleMute, phone, onBack }) {
     const peer = peers.find((p) => p.id === activeId);
     if (phone) {
-      return peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, muted: !!muted && muted.includes(peer.id), onToggleMute, phone: true, onBack }) : /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, wide: true });
+      return peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, isProtocol, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, onAssistantRemove, onAssistantAdopt, muted: !!muted && muted.includes(peer.id), onToggleMute, phone: true, onBack }) : /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, isProtocol, protocolFix, wide: true });
     }
-    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, muted: !!muted && muted.includes(peer.id), onToggleMute }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
+    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, isProtocol, protocolFix }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, isProtocol, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, onAssistantRemove, onAssistantAdopt, muted: !!muted && muted.includes(peer.id), onToggleMute }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
   }
   Object.assign(window, { ChatTab });
+  var PROOF_KEY = { eth: "proof.eth", sol: "proof.sol" };
+  var HEAD = "Beagle wallet binding";
+  var LINE = "I bind this wallet to my Beagle identity.";
+  var ADDRESS_RE = { eth: /^0x[0-9a-fA-F]{40}$/, sol: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/ };
+  var USERID_RE = /^[1-9A-HJ-NP-Za-km-z]{32,48}$/;
+  var ISSUED_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+  function isWalletAddress(chain, address) {
+    const re = ADDRESS_RE[chain];
+    return !!re && typeof address === "string" && re.test(address);
+  }
+  function proofTime(date = /* @__PURE__ */ new Date()) {
+    return new Date(Math.floor(date.getTime() / 1e3) * 1e3).toISOString().replace(".000Z", "Z");
+  }
+  function walletProofMessage({ userid, chain, address, issued }) {
+    if (!USERID_RE.test(String(userid || "")))
+      throw new Error("wallet proof: bad userid");
+    if (!isWalletAddress(chain, address))
+      throw new Error("wallet proof: bad chain or address");
+    if (!ISSUED_RE.test(String(issued || "")))
+      throw new Error("wallet proof: bad issued time");
+    return [HEAD, "", LINE, "", `userid: ${userid}`, `chain: ${chain}`, `address: ${address}`, `issued: ${issued}`].join("\n");
+  }
+  var B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  function base58Encode(bytes) {
+    const digits = [];
+    for (const b of bytes) {
+      let carry = b;
+      for (let j = 0; j < digits.length; j++) {
+        carry += digits[j] << 8;
+        digits[j] = carry % 58;
+        carry = carry / 58 | 0;
+      }
+      while (carry > 0) {
+        digits.push(carry % 58);
+        carry = carry / 58 | 0;
+      }
+    }
+    let out = "";
+    for (const b of bytes) {
+      if (b !== 0)
+        break;
+      out += "1";
+    }
+    for (let i = digits.length - 1; i >= 0; i--)
+      out += B58[digits[i]];
+    return out;
+  }
+  var utf8Hex = (s) => "0x" + Array.from(new TextEncoder().encode(s), (b) => b.toString(16).padStart(2, "0")).join("");
+  async function signEthProof(provider, { userid, address, issued = proofTime() }) {
+    const message = walletProofMessage({ userid, chain: "eth", address, issued });
+    const signature = await provider.request({ method: "personal_sign", params: [utf8Hex(message), address] });
+    return { message, signature: String(signature) };
+  }
+  async function signSolProof(wallet, { userid, address, issued = proofTime() }) {
+    const message = walletProofMessage({ userid, chain: "sol", address, issued });
+    const r = await wallet.signMessage(new TextEncoder().encode(message), "utf8");
+    const sig = r && r.signature ? r.signature : r;
+    return { message, signature: base58Encode(Uint8Array.from(sig)) };
+  }
   function CopyBtn({ value, copiedText = "Copied", copyFailedText = "Copy failed", copyTitle = "Copy" }) {
     const [status, setStatus] = React.useState(null);
     const timer = React.useRef(null);
@@ -2619,7 +3958,7 @@ ${peer.address}`
     const [msg, setMsg] = React.useState(null);
     const reload = () => {
       fetch("/api/ens-name").then((r) => r.json()).then((d) => {
-        setSt({ loading: false, registered: !!d.registered, record: d.record || null, mineOwned: !!d.mineOwned });
+        setSt({ loading: false, registered: !!d.registered, record: d.record || null, mineOwned: !!d.mineOwned, writeBlocked: d.writeBlocked || "" });
         if (d.registered && d.record && d.record.name)
           setLabel(d.record.name.replace(/\.beagles\.eth$/i, ""));
         if (onRecord)
@@ -2646,7 +3985,15 @@ ${peer.address}`
       if (l)
         post("/api/ens-register", { name: l, displayName: me.name, description: me.description || "" });
     };
-    const bind = (chain, address) => post("/api/ens-bind-wallet", { chain, address });
+    const bind = (chain, address, proof) => post("/api/ens-bind-wallet", proof ? { chain, address, proof } : { chain, address });
+    const signing = () => {
+      setBusy(true);
+      setMsg({ tone: "ok", text: T.ensSigning || "approve the signature in your wallet\u2026" });
+    };
+    const walletErr = (e) => {
+      setBusy(false);
+      setMsg({ tone: "err", text: String(e && e.message || e) });
+    };
     const bindEth = async () => {
       const eth = window.ethereum;
       if (!eth) {
@@ -2655,10 +4002,13 @@ ${peer.address}`
       }
       try {
         const a = await eth.request({ method: "eth_requestAccounts" });
-        if (a && a[0])
-          bind("eth", a[0]);
+        if (!a || !a[0])
+          return;
+        signing();
+        const proof = await signEthProof(eth, { userid: me.userId, address: a[0] });
+        bind("eth", a[0], proof);
       } catch (e) {
-        setMsg({ tone: "err", text: String(e && e.message || e) });
+        walletErr(e);
       }
     };
     const bindSol = async () => {
@@ -2670,10 +4020,13 @@ ${peer.address}`
       try {
         const r = await sol.connect();
         const a = r && r.publicKey && r.publicKey.toString();
-        if (a)
-          bind("sol", a);
+        if (!a)
+          return;
+        signing();
+        const proof = await signSolProof(sol, { userid: me.userId, address: a });
+        bind("sol", a, proof);
       } catch (e) {
-        setMsg({ tone: "err", text: String(e && e.message || e) });
+        walletErr(e);
       }
     };
     const field = { flex: 1, minWidth: 0, height: 34, borderRadius: 8, border: "1px solid var(--line)", background: "var(--panel-2)", color: "var(--text)", fontFamily: "var(--mono)", fontSize: 13, padding: "0 10px", outline: "none" };
@@ -2722,6 +4075,7 @@ ${peer.address}`
     const [picking, setPicking] = React.useState(false);
     const fileRef = React.useRef(null);
     const canWrite = hostEnsWrite && !!st.mineOwned;
+    const canBind = hostWalletBind && !!st.mineOwned && !st.writeBlocked;
     const rec = st.record;
     const boundEth = rec && rec.addresses && rec.addresses["60"];
     const boundSol = rec && rec.addresses && rec.addresses["501"];
@@ -2744,7 +4098,16 @@ ${peer.address}`
         setMsg({ tone: "err", text: m === "too-big" ? T.ensTooBig || "image too large even after scaling" : m === "bad-image" ? T.ensBadImage || "cannot read that image" : String(m || err) });
       });
     };
-    const walletRow = (lbl, chain, bound, onBind, last) => /* @__PURE__ */ React.createElement("div", { className: "dk-row", style: { ...row, borderBottom: last ? "none" : row.borderBottom } }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, lbl), bound ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, bound), /* @__PURE__ */ React.createElement(CopyBtn, { value: bound, copiedText: T.copied, copyFailedText: T.copyFailed, copyTitle: T.copy }), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => bind(chain, "") }, T.ensUnbind || "unbind")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotBound || "not bound"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: onBind }, T.ensBind || "bind")));
+    const proven = (chain, bound) => {
+      if (rec && rec.owner && String(rec.owner).toLowerCase() === String(bound).toLowerCase())
+        return true;
+      try {
+        return JSON.parse((rec && rec.texts || {})[PROOF_KEY[chain]]).msg.indexOf("address: " + bound + "\n") >= 0;
+      } catch {
+        return false;
+      }
+    };
+    const walletRow = (lbl, chain, bound, onBind, last) => /* @__PURE__ */ React.createElement("div", { className: "dk-row", style: { ...row, borderBottom: last ? "none" : row.borderBottom } }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, lbl), bound ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, bound), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 11, color: proven(chain, bound) ? "var(--online)" : "var(--faint)" } }, proven(chain, bound) ? T.ensProven || "signed by this wallet" : T.ensUnproven || "no wallet signature yet")), /* @__PURE__ */ React.createElement(CopyBtn, { value: bound, copiedText: T.copied, copyFailedText: T.copyFailed, copyTitle: T.copy }), !proven(chain, bound) && /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canBind, onClick: onBind }, T.ensProve || "sign"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canBind, onClick: () => bind(chain, "") }, T.ensUnbind || "unbind")) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotBound || "not bound"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canBind, onClick: onBind }, T.ensBind || "bind")));
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Card, { label: T.ensCard || "Name \xB7 beagles.eth" }, st.loading ? /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.dirLoading || "loading\u2026") : /* @__PURE__ */ React.createElement(React.Fragment, null, !hostEnsWrite ? /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensName || "name"), st.registered && rec && rec.name ? /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, rec.name) : /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12, lineHeight: 1.5, color: "var(--faint)" } }, T.ensWebOnly || "Registering a beagles.eth name needs the Beagle phone or desktop app. Your avatar can be set above without one.")) : /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensName || "name"), /* @__PURE__ */ React.createElement(
       "input",
       {
@@ -2758,7 +4121,7 @@ ${peer.address}`
         },
         style: { ...field, minWidth: 110 }
       }
-    ), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--dim)", flexShrink: 0 } }, ".beagles.eth"), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", disabled: busy || !label.trim(), onClick: register }, busy ? "\u2026" : st.registered && st.mineOwned ? T.ensUpdate || "update" : T.ensRegister || "register")), st.registered && !st.mineOwned && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", borderBottom: "1px solid var(--line)", fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, (T.ensWalletOwned || "registered via your mobile wallet as") + " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)" } }, rec && rec.name)), st.registered && /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensAvatar || "avatar"), upAvatar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("img", { src: upAvatar, alt: "", width: 34, height: 34, style: { width: 34, height: 34, borderRadius: 9, objectFit: "cover", flexShrink: 0, background: "var(--panel-2)" } }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)" } }, T.ensCustom || "custom image"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : punkId != null ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punkId, size: 34, radius: 9, fallbackSeed: me.userId }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, `CryptoPunk #${punkId}`), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotSet || "not set"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: () => fileRef.current && fileRef.current.click() }, T.ensUpload || "upload"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: () => setPicking(true) }, T.ensChoose || "choose"), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUploadFile, style: { display: "none" } })), walletRow(T.ensEth || "ethereum", "eth", boundEth, bindEth, false), walletRow(T.ensSol || "solana", "sol", boundSol, bindSol, !msg), msg && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", fontFamily: "var(--ui)", fontSize: 12, color: msg.tone === "ok" ? "var(--online)" : "var(--danger)" } }, msg.text)), picking && /* @__PURE__ */ React.createElement(DkPunkPicker, { T, onPick: pickPunk, onClose: () => setPicking(false) })), !st.loading && st.registered && /* @__PURE__ */ React.createElement(Card, { label: T.linksCard || "Links" }, SOCIALS.map((s, i) => socialRow(s, i === SOCIALS.length - 1))));
+    ), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--dim)", flexShrink: 0 } }, ".beagles.eth"), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", disabled: busy || !label.trim(), onClick: register }, busy ? "\u2026" : st.registered && st.mineOwned ? T.ensUpdate || "update" : T.ensRegister || "register")), st.registered && !st.mineOwned && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", borderBottom: "1px solid var(--line)", fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, (T.ensWalletOwned || "registered via your mobile wallet as") + " ", /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)" } }, rec && rec.name)), st.registered && /* @__PURE__ */ React.createElement("div", { className: "dk-row dk-wrap", style: row }, /* @__PURE__ */ React.createElement("span", { className: "dk-lbl", style: { width: 130, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11.5, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 } }, T.ensAvatar || "avatar"), upAvatar ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("img", { src: upAvatar, alt: "", width: 34, height: 34, style: { width: 34, height: 34, borderRadius: 9, objectFit: "cover", flexShrink: 0, background: "var(--panel-2)" } }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)" } }, T.ensCustom || "custom image"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : punkId != null ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: punkId, size: 34, radius: 9, fallbackSeed: me.userId }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, `CryptoPunk #${punkId}`), /* @__PURE__ */ React.createElement(Btn, { size: "sm", tone: "danger", disabled: busy || !canWrite, onClick: () => post("/api/ens-avatar", { nftid: null }) }, T.ensClear || "clear")) : /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)" } }, T.ensNotSet || "not set"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: () => fileRef.current && fileRef.current.click() }, T.ensUpload || "upload"), /* @__PURE__ */ React.createElement(Btn, { size: "sm", disabled: busy || !canWrite, onClick: () => setPicking(true) }, T.ensChoose || "choose"), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onUploadFile, style: { display: "none" } })), walletRow(T.ensEth || "ethereum", "eth", boundEth, bindEth, false), walletRow(T.ensSol || "solana", "sol", boundSol, bindSol, !msg && !st.writeBlocked), st.writeBlocked && hostWalletBind && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", borderBottom: msg ? "1px solid var(--line)" : "none", fontFamily: "var(--ui)", fontSize: 12, lineHeight: 1.5, color: "var(--faint)" } }, st.writeBlocked), msg && /* @__PURE__ */ React.createElement("div", { style: { padding: "10px 16px", fontFamily: "var(--ui)", fontSize: 12, color: msg.tone === "ok" ? "var(--online)" : "var(--danger)" } }, msg.text)), picking && /* @__PURE__ */ React.createElement(DkPunkPicker, { T, onPick: pickPunk, onClose: () => setPicking(false) })), !st.loading && st.registered && /* @__PURE__ */ React.createElement(Card, { label: T.linksCard || "Links" }, SOCIALS.map((s, i) => socialRow(s, i === SOCIALS.length - 1))));
   }
   function DkUpdateCheck({ T }) {
     const [st, setSt] = React.useState("idle");
@@ -2976,7 +4339,7 @@ ${peer.address}`
       return /* @__PURE__ */ React.createElement(DkPunkPicker, { T, onPick: pickPunk, onClose: () => setPicking(false) });
     return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: 360, maxWidth: "100%", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: 16, display: "flex", flexDirection: "column", gap: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 4 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 40, radius: 10, dot: false }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 700, color: "var(--text)" } }, zh ? "\u66F4\u6362\u5934\u50CF" : "Change avatar"), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), item("sparkles", zh ? "\u9009\u4E00\u4E2A CryptoPunk" : "Choose a CryptoPunk", () => setPicking(true)), canUpload && item("image", zh ? "\u4E0A\u4F20\u7167\u7247" : "Upload a photo", () => fileRef.current && fileRef.current.click()), has && item("trash", zh ? "\u79FB\u9664\u5934\u50CF" : "Remove avatar", () => save(canUpload ? { punkId: null, avatarDataUrl: null } : { punkId: null }), true), /* @__PURE__ */ React.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: onFile, style: { display: "none" } }), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)", lineHeight: 1.5, marginTop: 2 } }, zh ? "\u4E0D\u9700\u8981\u6CE8\u518C beagles.eth \u540D\u5B57\u3002\u597D\u53CB\u4F1A\u5728\u4E0B\u6B21\u6536\u5230\u4F60\u7684\u8D44\u6599\u65F6\u770B\u5230\u65B0\u5934\u50CF\u3002" : "No beagles.eth name needed. Friends see it the next time your profile reaches them."), err && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--danger)" } }, err)));
   }
-  function ProfileTab({ T, me, onEdit, t, setTweak, onSetAvatar }) {
+  function ProfileTab({ T, me, onEdit, t, setTweak, onSetAvatar, sections, sectionProps }) {
     var _a;
     const [avatarSheet, setAvatarSheet] = React.useState(false);
     const [qr, setQr] = React.useState(null);
@@ -3008,12 +4371,33 @@ ${peer.address}`
         },
         style: { width: 16, height: 16, accentColor: "var(--accent)" }
       }
-    ), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--text)" } }, T && T.autoAcceptLabel || "Auto-accept friend requests"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--dim)", marginTop: 2 } }, T && T.autoAcceptSub || "Off: requests wait in the sidebar for your approval.")))), hostHasKeyBackup && /* @__PURE__ */ React.createElement(DkKeyBackup, { t: t || {} }), t && setTweak && /* @__PURE__ */ React.createElement(DkAlertSettings, { t, setTweak }), t && setTweak && /* @__PURE__ */ React.createElement(DkDisplaySettings, { t, setTweak }), /* @__PURE__ */ React.createElement(Card, { label: T.network }, /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.virtualIp, value: me.ip, copy: true }), /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.wireLabel, value: `${me.wire} \xB7 lossless`, mono: false }), /* @__PURE__ */ React.createElement(DkVersionRow, { T, me }), /* @__PURE__ */ React.createElement(DkUpdateCheck, { T })), /* @__PURE__ */ React.createElement(Card, { label: T.dangerZone }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 13, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: "color-mix(in oklab, var(--danger), transparent 86%)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--danger)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "trash", size: 17, stroke: 2 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--danger)" } }, T.deleteNode), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)", marginTop: 1 } }, T.deleteSub)), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", size: "sm" }, T.delete)))), qr && /* @__PURE__ */ React.createElement(DkQrModal, { T, value: qr.value, label: qr.label, onClose: () => setQr(null) }), avatarSheet && /* @__PURE__ */ React.createElement(DkAvatarSheet, { T, me, zh: t && t.lang === "zh", onSet: onSetAvatar, onClose: () => setAvatarSheet(false) }), editing && /* @__PURE__ */ React.createElement(DkEditModal, { T, me, onClose: () => setEditing(false), onSave: (name, description) => {
+    ), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--text)" } }, T && T.autoAcceptLabel || "Auto-accept friend requests"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--dim)", marginTop: 2 } }, T && T.autoAcceptSub || "Off: requests wait in the sidebar for your approval.")))), hostHasKeyBackup && /* @__PURE__ */ React.createElement(DkKeyBackup, { t: t || {} }), t && setTweak && /* @__PURE__ */ React.createElement(DkAlertSettings, { t, setTweak }), t && setTweak && /* @__PURE__ */ React.createElement(DkDisplaySettings, { t, setTweak }), /* @__PURE__ */ React.createElement(Card, { label: T.network }, /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.virtualIp, value: me.ip, copy: true }), /* @__PURE__ */ React.createElement(FieldRow, { T, label: T.wireLabel, value: `${me.wire} \xB7 lossless`, mono: false }), /* @__PURE__ */ React.createElement(DkVersionRow, { T, me }), /* @__PURE__ */ React.createElement(DkUpdateCheck, { T })), /* @__PURE__ */ React.createElement(Card, { label: T.dangerZone }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 13, padding: "14px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 34, height: 34, borderRadius: 8, flexShrink: 0, background: "color-mix(in oklab, var(--danger), transparent 86%)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--danger)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "trash", size: 17, stroke: 2 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--danger)" } }, T.deleteNode), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--faint)", marginTop: 1 } }, T.deleteSub)), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", size: "sm" }, T.delete)))), Array.isArray(sections) && sections.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "0 20px 40px", display: "flex", flexDirection: "column", gap: 16 } }, sections.map((sec) => sec && typeof sec.render === "function" ? /* @__PURE__ */ React.createElement(DkHostSection, { key: sec.id, sec, props: sectionProps, lang: t && t.lang }) : null)), qr && /* @__PURE__ */ React.createElement(DkQrModal, { T, value: qr.value, label: qr.label, onClose: () => setQr(null) }), avatarSheet && /* @__PURE__ */ React.createElement(DkAvatarSheet, { T, me, zh: t && t.lang === "zh", onSet: onSetAvatar, onClose: () => setAvatarSheet(false) }), editing && /* @__PURE__ */ React.createElement(DkEditModal, { T, me, onClose: () => setEditing(false), onSave: (name, description) => {
       if (onEdit)
         onEdit(name, description);
       setEditing(false);
     } }));
   }
+  var DkHostSection = class extends React.Component {
+    constructor(props) {
+      super(props);
+      this.state = { err: null };
+    }
+    static getDerivedStateFromError(err) {
+      return { err };
+    }
+    render() {
+      var _a;
+      const { sec, props, lang } = this.props;
+      if (this.state.err) {
+        return /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)" } }, lang === "zh" ? "\u8FD9\u4E2A\u9644\u52A0\u677F\u5757\u51FA\u9519\u4E86\u3002" : "This host section failed to render.");
+      }
+      try {
+        return (_a = sec.render(props)) != null ? _a : null;
+      } catch (e) {
+        return null;
+      }
+    }
+  };
   Object.assign(window, { DkShareSheet, ProfileTab, DkPunkAvatar, DkEnsAvatar, DkPublicProfile });
   var DK_PHONE_MQ = "(max-width: 700px)";
   function useIsPhone() {
@@ -3090,6 +4474,8 @@ ${peer.address}`
   }
   function DkAvatar({ peer, size = 30, radius = 7, dot = true }) {
     const d = Math.max(8, size * 0.3);
+    if (peer && peer.app)
+      dot = false;
     return /* @__PURE__ */ React.createElement("div", { style: { position: "relative", width: size, height: size, flexShrink: 0 } }, peer.agent ? /* @__PURE__ */ React.createElement(DkBot, { seed: peer.id, size, radius }) : peer.avatarUrl ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: peer.avatarUrl, seed: peer.userId || peer.id, size, radius }) : peer.punkId != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: peer.punkId, size, radius, fallbackSeed: peer.userId || peer.id }) : /* @__PURE__ */ React.createElement(DkIdenticon, { seed: peer.userId || peer.id, size, radius }), dot && /* @__PURE__ */ React.createElement("span", { style: {
       position: "absolute",
       right: -2,
@@ -3227,6 +4613,82 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, padding: "0 2px", ...style } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "var(--faint)" } }, label), count != null && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, color: "var(--faint)" } }, count), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, height: 1, background: "var(--line)" } }), trailing);
   }
   Object.assign(window, { useIsPhone, DkPhoneStyles, DkIdenticon, DkBot, DkAvatar, DkImgAvatar, StatusDot, Mono, shortKey, RouteTag, Tag, Unread, Btn, Section });
+  var BUILTIN_TABS = ["chat", "people", "network", "apps", "profile"];
+  var warned = /* @__PURE__ */ new Set();
+  function warnOnce(what) {
+    if (warned.has(what))
+      return;
+    warned.add(what);
+    try {
+      console.warn(`[beagle-ui] ignoring unknown host tab or app: ${what}`);
+    } catch (e) {
+    }
+  }
+  function pickText(value, lang, fallback = "") {
+    if (typeof value === "string")
+      return value;
+    if (value && typeof value === "object")
+      return value[lang] || value.en || value.zh || fallback;
+    return fallback;
+  }
+  function resolveTabs(hostTabs2) {
+    if (!Array.isArray(hostTabs2) || !hostTabs2.length) {
+      return BUILTIN_TABS.map((id) => ({ id, kind: "builtin" }));
+    }
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const entry of hostTabs2) {
+      if (typeof entry === "string") {
+        if (!BUILTIN_TABS.includes(entry)) {
+          warnOnce(entry);
+          continue;
+        }
+        if (seen.has(entry))
+          continue;
+        seen.add(entry);
+        out.push({ id: entry, kind: "builtin" });
+        continue;
+      }
+      if (entry && typeof entry === "object" && typeof entry.id === "string" && entry.id) {
+        if (typeof entry.render !== "function") {
+          warnOnce(`${entry.id} (no render function)`);
+          continue;
+        }
+        if (BUILTIN_TABS.includes(entry.id)) {
+          warnOnce(`${entry.id} (a built-in id cannot be redefined)`);
+          continue;
+        }
+        if (seen.has(entry.id))
+          continue;
+        seen.add(entry.id);
+        out.push({
+          id: entry.id,
+          kind: "host",
+          label: entry.label,
+          icon: entry.icon,
+          render: entry.render,
+          badge: typeof entry.badge === "function" ? entry.badge : void 0
+        });
+        continue;
+      }
+      warnOnce(String(entry && entry.id ? entry.id : entry));
+    }
+    return out.length ? out : BUILTIN_TABS.map((id) => ({ id, kind: "builtin" }));
+  }
+  function hasTab(tabs, id) {
+    return (tabs != null ? tabs : []).some((t) => t.id === id);
+  }
+  function resolveApps(builtins, hideApps, hostApps2) {
+    const hidden = new Set(Array.isArray(hideApps) ? hideApps : []);
+    const host2 = (Array.isArray(hostApps2) ? hostApps2 : []).filter((a) => {
+      if (a && typeof a.id === "string" && a.id && typeof a.open === "function")
+        return true;
+      warnOnce(`app ${a && a.id ? a.id : String(a)}`);
+      return false;
+    }).map((a) => ({ ...a, host: true }));
+    const kept = (builtins != null ? builtins : []).filter((a) => !hidden.has(a.id));
+    return host2.concat(kept);
+  }
   var APPS = [
     {
       id: "meet",
@@ -3266,11 +4728,24 @@ ${peer.address}`
     const b64 = btoa(unescape(encodeURIComponent(json)));
     return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
-  function AppsTab({ T, t }) {
+  function AppsTab({ T, t, me, peers, phone, setTab }) {
     const zh = t && t.lang === "zh";
+    const apps = React.useMemo(
+      () => resolveApps(APPS, hostHideApps, hostApps),
+      []
+    );
     const [busy, setBusy] = React.useState(null);
     const [err, setErr] = React.useState(null);
     const open = async (app) => {
+      if (app.host) {
+        setErr(null);
+        try {
+          app.open({ T, t, me, peers, phone, setTab });
+        } catch (e) {
+          setErr(String(e && e.message || e));
+        }
+        return;
+      }
       setBusy(app.id);
       setErr(null);
       const win = window.open("", "_blank");
@@ -3292,7 +4767,7 @@ ${peer.address}`
         setBusy(null);
       }
     };
-    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)" } }, zh ? "\u5E94\u7528" : "Apps"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", marginTop: 6, lineHeight: 1.6 } }, zh ? "\u8FD9\u4E9B\u5E94\u7528\u63A5\u53D7 Beagle \u8EAB\u4EFD\u3002\u4ECE\u8FD9\u91CC\u6253\u5F00\u4E0D\u9700\u8981\u518D\u767B\u5F55\u4E00\u6B21 \u2014\u2014 \u4F1A\u5E26\u4E0A\u4E00\u4E2A\u4E24\u5206\u949F\u5185\u6709\u6548\u7684\u7B7E\u540D\u3002" : "These accept a Beagle identity. Opening one from here does not ask you to sign in again \u2014 it carries a signature that is good for two minutes.")), err && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: "#f85149" } }, err), APPS.map((app) => /* @__PURE__ */ React.createElement("div", { key: app.id, style: {
+    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 760, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 16 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: "var(--faint)" } }, zh ? "\u5E94\u7528" : "Apps"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", marginTop: 6, lineHeight: 1.6 } }, zh ? "\u8FD9\u4E9B\u5E94\u7528\u63A5\u53D7 Beagle \u8EAB\u4EFD\u3002\u4ECE\u8FD9\u91CC\u6253\u5F00\u4E0D\u9700\u8981\u518D\u767B\u5F55\u4E00\u6B21 \u2014\u2014 \u4F1A\u5E26\u4E0A\u4E00\u4E2A\u4E24\u5206\u949F\u5185\u6709\u6548\u7684\u7B7E\u540D\u3002" : "These accept a Beagle identity. Opening one from here does not ask you to sign in again \u2014 it carries a signature that is good for two minutes.")), err && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: "#f85149" } }, err), apps.map((app) => /* @__PURE__ */ React.createElement("div", { key: app.id, style: {
       display: "flex",
       alignItems: "center",
       gap: 14,
@@ -3309,7 +4784,7 @@ ${peer.address}`
       display: "flex",
       alignItems: "center",
       justifyContent: "center"
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: app.icon, size: 19, color: "var(--accent)", stroke: 1.8 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 14, fontWeight: 600, color: "var(--text)" } }, app.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", marginTop: 2 } }, zh ? app.blurb.zh : app.blurb.en), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", marginTop: 3 } }, app.origin.replace(/^https?:\/\//, ""))), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", onClick: busy ? void 0 : () => open(app) }, busy === app.id ? zh ? "\u6253\u5F00\u4E2D\u2026" : "opening\u2026" : zh ? "\u6253\u5F00" : "Open")))));
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: app.icon, size: 19, color: "var(--accent)", stroke: 1.8 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 14, fontWeight: 600, color: "var(--text)" } }, pickText(app.name, t && t.lang, app.id)), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", marginTop: 2 } }, pickText(app.blurb, t && t.lang, "")), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", marginTop: 3 } }, app.host ? zh ? "\u672C\u673A\u5E94\u7528" : "runs in this app" : String(app.origin || "").replace(/^https?:\/\//, ""))), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", onClick: busy ? void 0 : () => open(app) }, busy === app.id ? zh ? "\u6253\u5F00\u4E2D\u2026" : "opening\u2026" : zh ? "\u6253\u5F00" : "Open")))));
   }
   var DK_FALLBACK_ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
@@ -4717,7 +6192,7 @@ ${peer.address}`
   function dkLooking() {
     return document.visibilityState === "visible" && document.hasFocus();
   }
-  function useIncomingAlerts({ T, peers, requests, loaded, activeId, sound = true, flash = true, muted }) {
+  function useIncomingAlerts({ T, peers, requests, loaded, activeId, sound = true, flash = true, muted, isProtocol }) {
     const prev = React.useRef(null);
     const mutedRef = React.useRef(/* @__PURE__ */ new Set());
     mutedRef.current = new Set(muted || []);
@@ -4746,8 +6221,11 @@ ${peer.address}`
         return;
       const byId = /* @__PURE__ */ new Map();
       for (const p of peers || []) {
+        if (p && p.app)
+          continue;
         const dir = p.lastDir || (String(p.lastMsg || "").startsWith("you: ") ? "out" : "in");
-        byId.set(p.id, { ts: p.lastTs || 0, dir });
+        const quiet = typeof isProtocol === "function" && lastIsProtocol(p, isProtocol);
+        byId.set(p.id, { ts: p.lastTs || 0, dir, quiet });
       }
       const reqIds = new Set((requests || []).map((r) => r.id));
       const was = prev.current;
@@ -4757,6 +6235,8 @@ ${peer.address}`
       let msgs = 0, elsewhere = 0, reqs = 0, loud = 0, loudElsewhere = 0;
       for (const [id, cur] of byId) {
         if (cur.dir !== "in" || !cur.ts)
+          continue;
+        if (cur.quiet)
           continue;
         const old = was.byId.get(id);
         if (old ? cur.ts <= old.ts : Date.now() - cur.ts > 3e4)
@@ -4966,6 +6446,7 @@ ${peer.address}`
       autoAcceptLabel: "Auto-accept friend requests",
       autoAcceptSub: "Off: requests wait in the sidebar for your approval.",
       groupSenderUnknown: "The group relays only this display name. Register Beagle as a group agent (/agent add <beagle address> in the group) to receive full member identities you can add as friends.",
+      assistantSub: "Local \xB7 APP",
       loadEarlier: "Load earlier messages",
       loadingEarlier: "Loading\u2026",
       pendingFriend: "Waiting for them to accept your friend request \u2014 messages will queue and deliver once they do.",
@@ -5018,6 +6499,10 @@ ${peer.address}`
       ensUnbind: "unbind",
       ensNotBound: "not bound",
       ensWebOnly: "Registering a beagles.eth name needs the Beagle phone or desktop app. Your avatar can be set above without one.",
+      ensProven: "signed by this wallet",
+      ensUnproven: "no wallet signature yet",
+      ensProve: "sign",
+      ensSigning: "approve the signature in your wallet\u2026",
       ensAvatar: "avatar",
       ensChoose: "choose",
       ensClear: "clear",
@@ -5160,6 +6645,7 @@ ${peer.address}`
       autoAcceptLabel: "\u81EA\u52A8\u63A5\u53D7\u597D\u53CB\u8BF7\u6C42",
       autoAcceptSub: "\u5173\u95ED\u540E\uFF0C\u597D\u53CB\u8BF7\u6C42\u4F1A\u7B49\u5F85\u4F60\u5728\u4FA7\u8FB9\u680F\u624B\u52A8\u786E\u8BA4\u3002",
       groupSenderUnknown: "\u7FA4\u670D\u52A1\u53EA\u8F6C\u53D1\u4E86\u663E\u793A\u540D\uFF0C\u62FF\u4E0D\u5230\u8BE5\u6210\u5458\u7684\u5B8C\u6574\u8EAB\u4EFD\u3002\u5728\u7FA4\u91CC\u6267\u884C /agent add <beagle \u5730\u5740> \u628A Beagle \u6CE8\u518C\u4E3A\u7FA4 agent \u540E\uFF0C\u5373\u53EF\u6536\u5230\u5B8C\u6574\u8EAB\u4EFD\u5E76\u4E00\u952E\u52A0\u597D\u53CB\u3002",
+      assistantSub: "\u672C\u673A \xB7 APP",
       loadEarlier: "\u52A0\u8F7D\u66F4\u65E9\u7684\u6D88\u606F",
       loadingEarlier: "\u52A0\u8F7D\u4E2D\u2026",
       pendingFriend: "\u7B49\u5F85\u5BF9\u65B9\u63A5\u53D7\u597D\u53CB\u8BF7\u6C42 \u2014 \u6D88\u606F\u4F1A\u5148\u6392\u961F\uFF0C\u5BF9\u65B9\u63A5\u53D7\u540E\u81EA\u52A8\u9001\u8FBE\u3002",
@@ -5212,6 +6698,10 @@ ${peer.address}`
       ensUnbind: "\u89E3\u7ED1",
       ensNotBound: "\u672A\u7ED1\u5B9A",
       ensWebOnly: "\u6CE8\u518C beagles.eth \u540D\u5B57\u9700\u8981 Beagle \u624B\u673A\u6216\u684C\u9762\u5E94\u7528\u3002\u5934\u50CF\u4E0D\u9700\u8981\u540D\u5B57\uFF0C\u53EF\u5728\u4E0A\u65B9\u76F4\u63A5\u8BBE\u7F6E\u3002",
+      ensProven: "\u5DF2\u7531\u8BE5\u94B1\u5305\u7B7E\u540D",
+      ensUnproven: "\u5C1A\u65E0\u94B1\u5305\u7B7E\u540D",
+      ensProve: "\u7B7E\u540D",
+      ensSigning: "\u8BF7\u5728\u94B1\u5305\u4E2D\u786E\u8BA4\u7B7E\u540D\u2026",
       ensAvatar: "\u5934\u50CF",
       ensChoose: "\u9009\u62E9",
       ensClear: "\u6E05\u9664",
@@ -5296,7 +6786,7 @@ ${peer.address}`
       meetingDesc: "\u8DE8\u670D\u52A1\u5668\u521B\u5EFA\u97F3\u89C6\u9891\u623F\u95F4\uFF0C\u901A\u8FC7\u865A\u62DF IP \u9080\u8BF7\u597D\u53CB\u3002\u7FA4\u7EC4\u901A\u8BDD\u3001\u5C4F\u5E55\u5171\u4EAB\u4E0E\u5171\u4EAB\u51FA\u53E3\u8DEF\u7531\u5C06\u5728\u4E0B\u4E2A\u7248\u672C\u4E0A\u7EBF\u3002"
     }
   };
-  function RailBtn({ icon, label, active, soon, onClick }) {
+  function RailBtn({ icon, label, active, soon, onClick, svgPath }) {
     return /* @__PURE__ */ React.createElement("button", { onClick, title: label, style: {
       width: 52,
       height: 52,
@@ -5311,9 +6801,9 @@ ${peer.address}`
       alignItems: "center",
       justifyContent: "center",
       gap: 3
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: icon, size: 20, stroke: active ? 2.1 : 1.8, color: active ? "var(--accent)" : "var(--dim)" }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, fontWeight: 600, letterSpacing: 0.2, color: active ? "var(--accent)" : "var(--faint)" } }, label), soon && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 5, right: 6, width: 6, height: 6, borderRadius: 999, background: "var(--warn)" } }));
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: icon, svgPath, size: 20, stroke: active ? 2.1 : 1.8, color: active ? "var(--accent)" : "var(--dim)" }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, fontWeight: 600, letterSpacing: 0.2, color: active ? "var(--accent)" : "var(--faint)" } }, label), soon && /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 5, right: 6, width: 6, height: 6, borderRadius: 999, background: "var(--warn)" } }));
   }
-  function TabBarBtn({ icon, label, active, badge, onClick }) {
+  function TabBarBtn({ icon, label, active, badge, onClick, svgPath }) {
     return /* @__PURE__ */ React.createElement("button", { onClick, style: {
       flex: 1,
       minWidth: 0,
@@ -5328,9 +6818,36 @@ ${peer.address}`
       justifyContent: "center",
       gap: 3,
       fontFamily: "var(--mono)"
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: icon, size: 22, stroke: active ? 2.1 : 1.8, color: active ? "var(--accent)" : "var(--dim)" }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: active ? "var(--accent)" : "var(--faint)", whiteSpace: "nowrap" } }, label), badge ? /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 4, left: "50%", marginLeft: 6 } }, /* @__PURE__ */ React.createElement(Unread, { n: badge })) : null);
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: icon, svgPath, size: 22, stroke: active ? 2.1 : 1.8, color: active ? "var(--accent)" : "var(--dim)" }), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: active ? "var(--accent)" : "var(--faint)", whiteSpace: "nowrap" } }, label), badge ? /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", top: 4, left: "50%", marginLeft: 6 } }, /* @__PURE__ */ React.createElement(Unread, { n: badge })) : null);
   }
   var DK_PEOPLE_TABS = ["here", "recommended", "registered"];
+  var HostTabPane = class extends React.Component {
+    constructor(props) {
+      super(props);
+      this.state = { err: null };
+    }
+    static getDerivedStateFromError(err) {
+      return { err };
+    }
+    componentDidCatch(err) {
+      try {
+        console.error("[beagle-ui] host tab failed", err);
+      } catch (e) {
+      }
+    }
+    render() {
+      var _a;
+      const { tab, props, lang } = this.props;
+      if (this.state.err) {
+        return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--faint)", maxWidth: 420 } }, lang === "zh" ? `"${pickText(tab.label, lang, tab.id)}" \u8FD9\u4E2A\u6807\u7B7E\u9875\u51FA\u9519\u4E86\u3002\u5176\u5B83\u6807\u7B7E\u9875\u4E0D\u53D7\u5F71\u54CD\u3002` : `The "${pickText(tab.label, lang, tab.id)}" tab failed to render. The rest of the app is unaffected.`));
+      }
+      try {
+        return (_a = tab.render(props)) != null ? _a : null;
+      } catch (e) {
+        return null;
+      }
+    }
+  };
   function Brand({ T, children, style }) {
     if (!hostBrandHref)
       return /* @__PURE__ */ React.createElement("span", { style }, children);
@@ -5447,7 +6964,17 @@ ${peer.address}`
   }
   function DkApp() {
     const [t, setTweak] = useTweaks({ ...DK_DEFAULTS, lang: dkDetectLang() });
-    const [tab, setTab] = React.useState(t.startTab || "chat");
+    const tabs = React.useMemo(() => resolveTabs(hostTabs), []);
+    const showPeople = hasTab(tabs, "people");
+    const showNetwork = hasTab(tabs, "network");
+    const showProfile = hasTab(tabs, "profile");
+    const firstTab = tabs[0] ? tabs[0].id === "people" ? "here" : tabs[0].id : "chat";
+    const [tab, setTab] = React.useState(() => {
+      const want = t.startTab || "chat";
+      if (want === "chat" && hasTab(tabs, "chat"))
+        return "chat";
+      return hasTab(tabs, want) || DK_PEOPLE_TABS.includes(want) && showPeople ? want : firstTab;
+    });
     const [activeId, setActiveId] = React.useState(null);
     const data = useDaemonData();
     const me = data.me;
@@ -5482,11 +7009,13 @@ ${peer.address}`
       });
     }, []);
     React.useEffect(() => {
+      if (!showNetwork)
+        return void 0;
       refreshBackend();
       const ms = backend && backend.state === "releasing" ? 1500 : 8e3;
       const t2 = setInterval(refreshBackend, ms);
       return () => clearInterval(t2);
-    }, [refreshBackend, backend && backend.state]);
+    }, [refreshBackend, backend && backend.state, showNetwork]);
     const armLan = React.useCallback(async () => {
       await dkPost("/api/lan-arm", {});
       refreshBackend();
@@ -5506,7 +7035,11 @@ ${peer.address}`
       sessionStorage.setItem(key, "1");
       window.location.reload();
     }, [me && me.beagleVer]);
-    const peers = data.peers;
+    const [assistantTs, setAssistantTs] = React.useState(loadAssistantTs);
+    const peers = React.useMemo(() => (data.peers || []).concat(hostAssistant ? [Object.assign({}, ASSISTANT_PEER, {
+      lastTs: assistantTs,
+      lastTime: assistantTs ? dkClock(assistantTs) : ""
+    })] : []), [data.peers, assistantTs]);
     const [pendingAddr, setPendingAddr] = React.useState(() => dkParseDeepLinkAddress());
     React.useEffect(() => {
       const onHash = () => {
@@ -5560,6 +7093,8 @@ ${peer.address}`
     const rowPad = t.density === "comfortable" ? "11px 12px" : "7px 10px";
     const mutedIds = Array.isArray(t.alertMuted) ? t.alertMuted : [];
     const onToggleMute = (id) => setTweak("alertMuted", mutedIds.includes(id) ? mutedIds.filter((x) => x !== id) : mutedIds.concat(id));
+    const isProtocol = React.useMemo(() => protocolTest(hostIsProtocolMessage), []);
+    const protocolFix = useProtocolTails(peers, isProtocol, !!hostIsProtocolMessage);
     useIncomingAlerts({
       T,
       peers,
@@ -5568,7 +7103,19 @@ ${peer.address}`
       activeId,
       sound: t.alertSound !== false,
       flash: t.alertFlash !== false,
-      muted: mutedIds
+      muted: mutedIds,
+      isProtocol
+    });
+    const assistant = useAssistant({
+      lang: t.lang,
+      T,
+      muted: mutedIds,
+      onToggleMute,
+      onActivity: setAssistantTs,
+      sound: t.alertSound !== false,
+      flash: t.alertFlash !== false,
+      setAlert: (which, on) => setTweak(which === "sound" ? "alertSound" : "alertFlash", on),
+      onReloadFriends: () => data.refresh()
     });
     const callCtl = useCallController(me.userId, (peerId, video, direction) => {
       const text = `WebRTC ${video ? "video" : "audio"} call: ${direction}`;
@@ -5592,6 +7139,54 @@ ${peer.address}`
     });
     const phone = useIsPhone();
     const [sharing, setSharing] = React.useState(false);
+    const headerActions = (hostHeaderActions || []).filter((a) => a && a.id && typeof a.onClick === "function");
+    const headerActionBtns = headerActions.map((a) => {
+      let on = false;
+      try {
+        on = typeof a.active === "function" ? !!a.active() : false;
+      } catch (e) {
+        on = false;
+      }
+      const label = pickText(a.label, t.lang, a.id);
+      return /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: a.id,
+          title: label,
+          "aria-label": label,
+          "aria-pressed": on,
+          onClick: () => {
+            try {
+              a.onClick({ T, t, me, activeId, phone });
+            } catch (e) {
+            }
+          },
+          style: {
+            width: 32,
+            height: 32,
+            flexShrink: 0,
+            borderRadius: 8,
+            cursor: "pointer",
+            padding: 0,
+            border: "1px solid " + (on ? "var(--accent)" : "var(--line)"),
+            background: on ? "color-mix(in oklab, var(--accent), transparent 86%)" : "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }
+        },
+        /* @__PURE__ */ React.createElement(
+          Icon,
+          {
+            name: typeof a.icon === "string" ? a.icon : void 0,
+            svgPath: a.icon && typeof a.icon === "object" ? a.icon.svgPath : void 0,
+            size: 16,
+            stroke: 2,
+            color: on ? "var(--accent)" : "var(--dim)"
+          }
+        )
+      );
+    });
     const shareBtn = /* @__PURE__ */ React.createElement(
       "button",
       {
@@ -5603,8 +7198,11 @@ ${peer.address}`
       /* @__PURE__ */ React.createElement(Icon, { name: "share", size: 16, stroke: 2, color: "var(--accent)" })
     );
     React.useEffect(() => {
-      if (!phone && !activeId && peers.length)
-        setActiveId(peers[0].id);
+      if (phone || activeId)
+        return;
+      const first = (peers || []).find((p) => !p.app);
+      if (first)
+        setActiveId(first.id);
     }, [peers, activeId, phone]);
     React.useEffect(() => {
       if (!phone)
@@ -5631,6 +7229,8 @@ ${peer.address}`
     };
     React.useEffect(() => {
       if (!activeId)
+        return;
+      if (activeId === ASSISTANT_ID)
         return;
       data.loadThread(activeId, { reset: true });
       dkApi.markRead(activeId).then(data.refresh);
@@ -5675,6 +7275,10 @@ ${peer.address}`
     const onSend = (text) => {
       if (!activeId || !text || !text.trim())
         return;
+      if (activeId === ASSISTANT_ID) {
+        assistant.handle(text.trim());
+        return;
+      }
       dkApi.send(activeId, text.trim()).then(() => data.loadThread(activeId)).then(data.refresh);
     };
     const peerTakesRtcFile = (id) => {
@@ -5739,36 +7343,68 @@ ${peer.address}`
       setTab("chat");
       openConversation(id);
     };
-    const onOpenNet = () => setTab("network");
-    const nav = [
-      { id: "chat", icon: "message", label: T.chat },
-      { id: "here", icon: "users", label: T.here },
-      { id: "recommended", icon: "sparkles", label: T.recommended },
-      { id: "registered", icon: "at", label: T.registered },
-      { id: "network", icon: "network", label: T.network },
-      { id: "apps", icon: "grid", label: T.apps }
-    ];
+    const onOpenNet = showNetwork ? () => setTab("network") : null;
+    const RAIL_FOR = {
+      chat: [{ id: "chat", icon: "message", label: T.chat }],
+      people: [
+        { id: "here", icon: "users", label: T.here },
+        { id: "recommended", icon: "sparkles", label: T.recommended },
+        { id: "registered", icon: "at", label: T.registered }
+      ],
+      network: [{ id: "network", icon: "network", label: T.network }],
+      apps: [{ id: "apps", icon: "grid", label: T.apps }],
+      profile: []
+    };
+    const nav = tabs.flatMap((x) => x.kind === "builtin" ? RAIL_FOR[x.id] || [] : [{ id: x.id, icon: x.icon, label: pickText(x.label, t.lang, x.id) }]);
     const peopleTab = DK_PEOPLE_TABS.includes(tab);
     const lastPeople = React.useRef("here");
     if (peopleTab)
       lastPeople.current = tab;
-    const unreadTotal = (peers || []).reduce((n, p) => n + (Number(p.unread) || 0), 0) + (requests || []).length;
-    const phoneNav = [
-      { id: "chat", icon: "message", label: T.chat, active: tab === "chat", badge: unreadTotal, go: () => setTab("chat") },
-      { id: "people", icon: "users", label: T.people, active: peopleTab, go: () => setTab(lastPeople.current) },
-      { id: "network", icon: "network", label: T.network, active: tab === "network", go: () => setTab("network") },
-      { id: "apps", icon: "grid", label: T.apps, active: tab === "apps", go: () => setTab("apps") },
-      { id: "profile", icon: "userRound", label: T.profile, active: tab === "profile", go: () => setTab("profile") }
-    ];
+    const unreadTotal = rosterUnreadTotal(peers, isProtocol, protocolFix) + (requests || []).length;
+    const NAV_FOR = {
+      chat: { icon: "message", label: T.chat, active: tab === "chat", badge: unreadTotal, go: () => setTab("chat") },
+      people: { icon: "users", label: T.people, active: peopleTab, go: () => setTab(lastPeople.current) },
+      network: { icon: "network", label: T.network, active: tab === "network", go: () => setTab("network") },
+      apps: { icon: "grid", label: T.apps, active: tab === "apps", go: () => setTab("apps") },
+      profile: { icon: "userRound", label: T.profile, active: tab === "profile", go: () => setTab("profile") }
+    };
+    const phoneNav = tabs.map((x) => x.kind === "builtin" ? { id: x.id, ...NAV_FOR[x.id] } : {
+      id: x.id,
+      icon: typeof x.icon === "string" ? x.icon : void 0,
+      svgPath: x.icon && typeof x.icon === "object" ? x.icon.svgPath : void 0,
+      label: pickText(x.label, t.lang, x.id),
+      active: tab === x.id,
+      // A host badge is called on every render, like the unread count beside
+      // it; a throwing one must not take the tab bar down with it.
+      badge: (() => {
+        try {
+          return x.badge ? x.badge() : 0;
+        } catch (e) {
+          return 0;
+        }
+      })(),
+      go: () => setTab(x.id)
+    });
     const inConversation = phone && tab === "chat" && !!activeId && (peers || []).some((p) => p.id === activeId);
-    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", flexDirection: phone ? "column" : "row", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement(DkPhoneStyles, null), !phone && /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement(Brand, { T, style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(RailBtn, { key: n.id, icon: n.icon, label: n.label, active: tab === n.id, soon: n.soon, onClick: () => setTab(n.id) })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: {
+    return /* @__PURE__ */ React.createElement("div", { style: { ...vars, "--row-pad": rowPad, position: "fixed", inset: 0, display: "flex", flexDirection: phone ? "column" : "row", background: "var(--bg)", color: "var(--text)", fontFamily: "var(--ui)" } }, /* @__PURE__ */ React.createElement(DkPhoneStyles, null), !phone && /* @__PURE__ */ React.createElement("div", { style: { width: 68, flexShrink: 0, borderRight: "1px solid var(--line)", background: "var(--rail)", display: "flex", flexDirection: "column", alignItems: "center", padding: "14px 0", gap: 8 } }, /* @__PURE__ */ React.createElement(Brand, { T, style: { width: 38, height: 38, borderRadius: 10, background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8, flexShrink: 0 } }, /* @__PURE__ */ React.createElement(Icon, { name: "terminal", size: 20, color: "#fff", stroke: 2.2 })), nav.map((n) => /* @__PURE__ */ React.createElement(
+      RailBtn,
+      {
+        key: n.id,
+        icon: typeof n.icon === "string" ? n.icon : void 0,
+        svgPath: n.icon && typeof n.icon === "object" ? n.icon.svgPath : void 0,
+        label: n.label,
+        active: tab === n.id,
+        soon: n.soon,
+        onClick: () => setTab(n.id)
+      }
+    )), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), showProfile && /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: {
       padding: 4,
       borderRadius: 12,
       cursor: "pointer",
       display: "flex",
       border: "1px solid " + (tab === "profile" ? "var(--line)" : "transparent"),
       background: tab === "profile" ? "var(--panel-2)" : "transparent"
-    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, !inConversation && /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), !inConversation && /* @__PURE__ */ React.createElement("div", { style: { height: 46, boxSizing: "content-box", paddingTop: phone ? "env(safe-area-inset-top, 0px)" : 0, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: phone ? 8 : 12, paddingLeft: phone ? 12 : 16, paddingRight: phone ? 12 : 16 } }, /* @__PURE__ */ React.createElement(Brand, { T, style: { gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle")), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), phone ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), shareBtn, /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: { padding: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 28, radius: 7, dot: false }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), shareBtn, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name)))), phone && peopleTab && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", overflowX: "auto" } }, nav.filter((n) => DK_PEOPLE_TABS.includes(n.id)).map((n) => /* @__PURE__ */ React.createElement("button", { key: n.id, onClick: () => setTab(n.id), style: {
+    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 36, radius: 9 }))), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" } }, !inConversation && /* @__PURE__ */ React.createElement(DkBrowserNotice, { lang: t.lang }), !inConversation && /* @__PURE__ */ React.createElement("div", { style: { height: 46, boxSizing: "content-box", paddingTop: phone ? "env(safe-area-inset-top, 0px)" : 0, flexShrink: 0, borderBottom: "1px solid var(--line)", background: "var(--panel)", display: "flex", alignItems: "center", gap: phone ? 8 : 12, paddingLeft: phone ? 12 : 16, paddingRight: phone ? 12 : 16 } }, /* @__PURE__ */ React.createElement(Brand, { T, style: { gap: 12, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "var(--accent)", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", style: { display: "block", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 17 6-6-6-6" }), /* @__PURE__ */ React.createElement("path", { d: "M12 18.5h7.5" })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, letterSpacing: -0.3, color: "var(--text)" } }, "beagle")), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap" } }, "\xB7 ", (nav.find((n) => n.id === tab) || { label: T.profile }).label.toLowerCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), phone ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), headerActionBtns, shareBtn, /* @__PURE__ */ React.createElement("button", { onClick: () => setTab("profile"), title: T.profile, style: { padding: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 28, radius: 7, dot: false }))) : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, me.channel, " \xB7 lan ", me.lanVer), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, padding: "0 4px" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: me.online }), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, copy: me.ip }, me.ip)), /* @__PURE__ */ React.createElement("span", { style: { width: 1, height: 22, background: "var(--line)" } }), headerActionBtns, shareBtn, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: { ...me, id: me.userId, agent: false }, size: 26, radius: 7 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 600, color: "var(--text)" } }, me.name)))), phone && peopleTab && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid var(--line)", background: "var(--panel)", overflowX: "auto" } }, nav.filter((n) => DK_PEOPLE_TABS.includes(n.id)).map((n) => /* @__PURE__ */ React.createElement("button", { key: n.id, onClick: () => setTab(n.id), style: {
       display: "inline-flex",
       alignItems: "center",
       gap: 6,
@@ -5782,10 +7418,22 @@ ${peer.address}`
       fontWeight: 600,
       background: tab === n.id ? "var(--accent)" : "transparent",
       color: tab === n.id ? "#fff" : "var(--dim)"
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: n.icon, size: 14, stroke: 2, color: tab === n.id ? "#fff" : "var(--dim)" }), n.label))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, phone, onBack: closeConversation, peers, requests, activeId, thread: data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), hasEarlier: !!(activeId && data.earlier[activeId]), onLoadEarlier: () => activeId && data.loadEarlier(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr(""), muted: mutedIds, onToggleMute }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t }), tab === "profile" && /* @__PURE__ */ React.createElement(ProfileTab, { T, me, onEdit, t, setTweak, onSetAvatar: (p) => dkApi.setProfileFull(p).then((r) => {
-      data.refresh();
-      return r;
-    }) })), phone && !inConversation && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", borderTop: "1px solid var(--line)", background: "var(--rail)", paddingBottom: "env(safe-area-inset-bottom, 0px)" } }, phoneNav.map((n) => /* @__PURE__ */ React.createElement(TabBarBtn, { key: n.id, icon: n.icon, label: n.label, active: n.active, badge: n.badge, onClick: n.go }))), data.locked && /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: n.icon, size: 14, stroke: 2, color: tab === n.id ? "#fff" : "var(--dim)" }), n.label))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, phone, isProtocol, protocolFix, onBack: closeConversation, peers, requests, activeId, thread: activeId === ASSISTANT_ID ? assistant.thread : data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), hasEarlier: !!(activeId && activeId !== ASSISTANT_ID && data.earlier[activeId]), onAssistantRemove: activeId === ASSISTANT_ID ? assistant.removeFriends : null, onAssistantAdopt: activeId === ASSISTANT_ID ? assistant.adoptServicePeers : null, onLoadEarlier: () => activeId && data.loadEarlier(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr(""), muted: mutedIds, onToggleMute }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t, me, peers, phone, setTab }), tabs.map((x) => x.kind === "host" && tab === x.id ? /* @__PURE__ */ React.createElement(HostTabPane, { key: x.id, tab: x, props: { T, t, me, peers, phone, setTab }, lang: t.lang }) : null), tab === "profile" && /* @__PURE__ */ React.createElement(
+      ProfileTab,
+      {
+        T,
+        me,
+        onEdit,
+        t,
+        setTweak,
+        onSetAvatar: (p) => dkApi.setProfileFull(p).then((r) => {
+          data.refresh();
+          return r;
+        }),
+        sections: hostProfileSections,
+        sectionProps: { T, t, me, peers, phone, setTab }
+      }
+    )), phone && !inConversation && /* @__PURE__ */ React.createElement("div", { style: { flexShrink: 0, display: "flex", borderTop: "1px solid var(--line)", background: "var(--rail)", paddingBottom: "env(safe-area-inset-bottom, 0px)" } }, phoneNav.map((n) => /* @__PURE__ */ React.createElement(TabBarBtn, { key: n.id, icon: n.icon, svgPath: n.svgPath, label: n.label, active: n.active, badge: n.badge, onClick: n.go }))), data.locked && /* @__PURE__ */ React.createElement(
       DkLockedOut,
       {
         compact: true,
@@ -6862,7 +8510,13 @@ ${peer.address}`
     // The marks the app draws — the rail square, the header glyph and
     // wordmark — lead to the product's own site. Someone who arrives here from
     // a friend's link otherwise has no way to read what Beagle is.
-    hostBrandHref: "https://beagle.chat"
+    hostBrandHref: "https://beagle.chat",
+    // Registration still needs the phone or desktop app, but binding a wallet
+    // into a name this key already owns is signed here (api-router.js).
+    hostWalletBind: true,
+    // The Assistant answers from the desktop server's /api/assistant/* routes,
+    // which this client does not have.
+    hostAssistant: false
   };
 
   // src/ui/entry.jsx
