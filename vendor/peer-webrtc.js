@@ -39,7 +39,7 @@ var PeerWebRTC = (() => {
     return method;
   };
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/index.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/index.js
   var dist_exports = {};
   __export(dist_exports, {
     BeaglePushClient: () => BeaglePushClient,
@@ -57,11 +57,13 @@ var PeerWebRTC = (() => {
     fitSignalForInvite: () => fitSignalForInvite,
     looksLikeSignal: () => looksLikeSignal,
     mediaDirection: () => mediaDirection,
+    orphanPayloadTypeLines: () => orphanPayloadTypeLines,
+    sanitizeSdp: () => sanitizeSdp,
     shrinkSdpForInvite: () => shrinkSdpForInvite,
     videoIsSending: () => videoIsSending
   });
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/emitter.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/emitter.js
   var _handlers;
   var Emitter = class {
     constructor() {
@@ -97,7 +99,7 @@ var PeerWebRTC = (() => {
   };
   _handlers = new WeakMap();
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/sdp.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/sdp.js
   var CARRIER_MAX_INVITE_DATA_LEN = 8192;
   function mediaSection(sdp, kind) {
     const norm = sdp.replace(/\r\n/g, "\n");
@@ -198,8 +200,31 @@ var PeerWebRTC = (() => {
     }
     return join(lines);
   }
+  function orphanPayloadTypeLines(sdp) {
+    const out = [];
+    let pts;
+    for (const line of sdp.replace(/\r\n/g, "\n").split("\n")) {
+      if (line.startsWith("m=")) {
+        pts = new Set(line.split(" ").slice(3));
+        continue;
+      }
+      const m = pts && /^a=(?:rtpmap|rtcp-fb|fmtp):(\d+)\b/.exec(line);
+      if (m && !pts.has(m[1]))
+        out.push(line);
+    }
+    return out;
+  }
+  function sanitizeSdp(sdp) {
+    const orphans = orphanPayloadTypeLines(sdp);
+    if (orphans.length === 0)
+      return sdp;
+    const drop = new Set(orphans);
+    const crlf = sdp.includes("\r\n");
+    const kept = sdp.replace(/\r\n/g, "\n").split("\n").filter((l) => !drop.has(l));
+    return kept.join(crlf ? "\r\n" : "\n");
+  }
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/signal.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signal.js
   var SDP_TYPES = /* @__PURE__ */ new Set([
     "offer",
     "answer",
@@ -289,7 +314,7 @@ var PeerWebRTC = (() => {
     return text.startsWith("{") && text.includes('"callId"') && text.includes('"type"');
   }
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/call-engine.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/call-engine.js
   var DEFAULT_ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" }
   ];
@@ -297,7 +322,7 @@ var PeerWebRTC = (() => {
   var ICE_RESTART_MAX = 3;
   var ICE_DISCONNECT_GRACE_MS = 4e3;
   var ICE_FAILED_GRACE_MS = 12e4;
-  var _opts, _iceServers, _sessions, _restartOffersEnabled, _setOutgoingVideoTrack, setOutgoingVideoTrack_fn, _renegotiate, renegotiate_fn, _createOffer, createOffer_fn, _createAnswer, createAnswer_fn, _preferLeanVideoCodecs, preferLeanVideoCodecs_fn, _restartIce, restartIce_fn, _handleSignal, handleSignal_fn, _onOffer, onOffer_fn, _answerRenegotiation, answerRenegotiation_fn, _onAnswer, onAnswer_fn, _onCandidate, onCandidate_fn, _onBye, onBye_fn, _onAuxiliary, onAuxiliary_fn, _createSession, createSession_fn, _wirePeerConnection, wirePeerConnection_fn, _ensureRemoteStream, ensureRemoteStream_fn, _attachLocalMedia, attachLocalMedia_fn, _flushLocalCandidates, flushLocalCandidates_fn, _drainRemoteCandidates, drainRemoteCandidates_fn, _send, send_fn, _sendByeSafe, sendByeSafe_fn, _cleanup, cleanup_fn, _setState, setState_fn, _normId, normId_fn, _toInfo, _newCallId, newCallId_fn, _log, log_fn;
+  var _opts, _iceServers, _sessions, _restartOffersEnabled, _setOutgoingVideoTrack, setOutgoingVideoTrack_fn, _renegotiate, renegotiate_fn, _createOffer, createOffer_fn, _createAnswer, createAnswer_fn, _cleanOutbound, cleanOutbound_fn, _cleanInbound, cleanInbound_fn, _preferLeanVideoCodecs, preferLeanVideoCodecs_fn, _restartIce, restartIce_fn, _handleSignal, handleSignal_fn, _onOffer, onOffer_fn, _answerRenegotiation, answerRenegotiation_fn, _negotiationFailed, negotiationFailed_fn, _onAnswer, onAnswer_fn, _onCandidate, onCandidate_fn, _onBye, onBye_fn, _onAuxiliary, onAuxiliary_fn, _createSession, createSession_fn, _wirePeerConnection, wirePeerConnection_fn, _ensureRemoteStream, ensureRemoteStream_fn, _attachLocalMedia, attachLocalMedia_fn, _flushLocalCandidates, flushLocalCandidates_fn, _drainRemoteCandidates, drainRemoteCandidates_fn, _send, send_fn, _sendByeSafe, sendByeSafe_fn, _cleanup, cleanup_fn, _setState, setState_fn, _normId, normId_fn, _toInfo, _newCallId, newCallId_fn, _log, log_fn;
   var CallEngine = class extends Emitter {
     constructor(opts) {
       var _a, _b;
@@ -309,10 +334,31 @@ var PeerWebRTC = (() => {
       /** Create + send a fresh offer to renegotiate media (e.g. after adding a
        *  screen-share track). The peer applies it via #onOffer's renegotiation path. */
       __privateAdd(this, _renegotiate);
-      /** createOffer with the lean codec set applied (see #preferLeanVideoCodecs). */
+      /** createOffer with the lean codec set applied (see #preferLeanVideoCodecs)
+       *  and the result sanitized (see #cleanOutbound). Every offer — initial,
+       *  screen-share re-offer, ICE restart — goes through here. */
       __privateAdd(this, _createOffer);
-      /** createAnswer with the lean codec set applied. */
+      /** createAnswer with the lean codec set applied and the result sanitized. */
       __privateAdd(this, _createAnswer);
+      /**
+       * Strip orphan codec lines from a description WE produced, before it is
+       * applied locally and before it is sent.
+       *
+       * Firefox's setCodecPreferences drops VP9/AV1 from the m=video line but
+       * leaves their `a=fmtp:` / `a=rtcp-fb:` lines in place; Chrome's parser then
+       * rejects the whole re-offer ("Failed to parse codecs correctly") and the
+       * Firefox peer's screen share never shows up. Measured 2026-10-31 between
+       * the Firefox extension and a Chrome desktop, both on 0.2.16. The sanitizer
+       * is a no-op on a clean description (Chrome, Safari), so the same object
+       * comes back untouched there.
+       */
+      __privateAdd(this, _cleanOutbound);
+      /**
+       * The same cleanup for a description the PEER sent, before setRemoteDescription:
+       * Firefox extensions already in the field (AMO 1.4.14 ships 0.2.16) still
+       * produce the orphan lines, and a receiver on this engine must accept them.
+       */
+      __privateAdd(this, _cleanInbound);
       /**
        * Restrict video to the codecs the peers actually negotiate, so the SDP fits
        * the 8192-byte Carrier invite channel. Chrome otherwise advertises VP9 and
@@ -335,6 +381,7 @@ var PeerWebRTC = (() => {
       __privateAdd(this, _onOffer);
       /** Apply a mid-call re-offer (renegotiation) and send the answer. */
       __privateAdd(this, _answerRenegotiation);
+      __privateAdd(this, _negotiationFailed);
       __privateAdd(this, _onAnswer);
       __privateAdd(this, _onCandidate);
       __privateAdd(this, _onBye);
@@ -450,7 +497,7 @@ var PeerWebRTC = (() => {
         throw new Error(`accept: no pending incoming call ${callId}`);
       }
       await __privateMethod(this, _attachLocalMedia, attachLocalMedia_fn).call(this, session);
-      await session.pc.setRemoteDescription({ type: "offer", sdp: session.pendingOffer });
+      await session.pc.setRemoteDescription({ type: "offer", sdp: __privateMethod(this, _cleanInbound, cleanInbound_fn).call(this, session.pendingOffer, "offer") });
       session.hasReceivedSdp = true;
       session.pendingOffer = void 0;
       await __privateMethod(this, _drainRemoteCandidates, drainRemoteCandidates_fn).call(this, session);
@@ -638,12 +685,30 @@ var PeerWebRTC = (() => {
   _createOffer = new WeakSet();
   createOffer_fn = async function(session, opts) {
     __privateMethod(this, _preferLeanVideoCodecs, preferLeanVideoCodecs_fn).call(this, session.pc);
-    return session.pc.createOffer(opts);
+    return __privateMethod(this, _cleanOutbound, cleanOutbound_fn).call(this, await session.pc.createOffer(opts));
   };
   _createAnswer = new WeakSet();
   createAnswer_fn = async function(session) {
     __privateMethod(this, _preferLeanVideoCodecs, preferLeanVideoCodecs_fn).call(this, session.pc);
-    return session.pc.createAnswer();
+    return __privateMethod(this, _cleanOutbound, cleanOutbound_fn).call(this, await session.pc.createAnswer());
+  };
+  _cleanOutbound = new WeakSet();
+  cleanOutbound_fn = function(desc) {
+    var _a, _b;
+    const raw = (_a = desc.sdp) != null ? _a : "";
+    const sdp = sanitizeSdp(raw);
+    if (sdp === raw)
+      return desc;
+    __privateMethod(this, _log, log_fn).call(this, `${(_b = desc.type) != null ? _b : "sdp"}: removed ${orphanPayloadTypeLines(raw).length} orphan codec line(s) from our own description`);
+    return { type: desc.type, sdp };
+  };
+  _cleanInbound = new WeakSet();
+  cleanInbound_fn = function(raw, what) {
+    const sdp = sanitizeSdp(raw);
+    if (sdp !== raw) {
+      __privateMethod(this, _log, log_fn).call(this, `${what}: removed ${orphanPayloadTypeLines(raw).length} orphan codec line(s) from the peer's description`);
+    }
+    return sdp;
   };
   _preferLeanVideoCodecs = new WeakSet();
   preferLeanVideoCodecs_fn = function(pc) {
@@ -733,13 +798,20 @@ var PeerWebRTC = (() => {
   _answerRenegotiation = new WeakSet();
   answerRenegotiation_fn = async function(session, sdp) {
     try {
-      await session.pc.setRemoteDescription({ type: "offer", sdp });
+      await session.pc.setRemoteDescription({ type: "offer", sdp: __privateMethod(this, _cleanInbound, cleanInbound_fn).call(this, sdp, "offer") });
       const answer = await __privateMethod(this, _createAnswer, createAnswer_fn).call(this, session);
       await session.pc.setLocalDescription(answer);
       await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "answer", sdp: answer.sdp, callId: session.callId });
     } catch (err) {
-      __privateMethod(this, _log, log_fn).call(this, `renegotiation answer failed: ${err.message}`);
+      __privateMethod(this, _negotiationFailed, negotiationFailed_fn).call(this, session, "re-offer", err);
     }
+  };
+  _negotiationFailed = new WeakSet();
+  negotiationFailed_fn = function(session, what, err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    __privateMethod(this, _log, log_fn).call(this, `renegotiation failed (${what}) callId=${session.callId}: ${error.message}`);
+    console.warn(`[peer-webrtc] could not apply the peer's ${what} for call ${session.callId}: ${error.message}`);
+    this.emit("negotiationFailed", session.callId, error);
   };
   _onAnswer = new WeakSet();
   onAnswer_fn = function(peerId, signal) {
@@ -749,14 +821,14 @@ var PeerWebRTC = (() => {
     session.peerId = peerId;
     void (async () => {
       try {
-        await session.pc.setRemoteDescription({ type: "answer", sdp: signal.sdp });
+        await session.pc.setRemoteDescription({ type: "answer", sdp: __privateMethod(this, _cleanInbound, cleanInbound_fn).call(this, signal.sdp, "answer") });
         session.hasReceivedSdp = true;
         if (session.state !== "connected")
           __privateMethod(this, _setState, setState_fn).call(this, session, "connecting");
         await __privateMethod(this, _drainRemoteCandidates, drainRemoteCandidates_fn).call(this, session);
         await __privateMethod(this, _flushLocalCandidates, flushLocalCandidates_fn).call(this, session);
       } catch (err) {
-        __privateMethod(this, _log, log_fn).call(this, `setRemoteDescription(answer) failed: ${err.message}`);
+        __privateMethod(this, _negotiationFailed, negotiationFailed_fn).call(this, session, "answer", err);
       }
     })();
   };
@@ -1046,7 +1118,7 @@ var PeerWebRTC = (() => {
     (_b = (_a = __privateGet(this, _opts)).logger) == null ? void 0 : _b.call(_a, `[peer-webrtc] ${msg}`);
   };
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/broadcast.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/broadcast.js
   var _selfId, _channel, _handler;
   var BroadcastChannelSignaling = class {
     constructor(selfId, channelName = "peer-webrtc-demo") {
@@ -1078,7 +1150,7 @@ var PeerWebRTC = (() => {
   _channel = new WeakMap();
   _handler = new WeakMap();
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/guard.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/guard.js
   function decodeSignalBytesGuard(input) {
     try {
       return decodeSignal(input);
@@ -1087,7 +1159,7 @@ var PeerWebRTC = (() => {
     }
   }
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/carrier.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/carrier.js
   var DEFAULT_EXT = "carrier";
   var _peer, _ext;
   var CarrierSignaling = class {
@@ -1116,7 +1188,7 @@ var PeerWebRTC = (() => {
   _peer = new WeakMap();
   _ext = new WeakMap();
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/socketio.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/socketio.js
   var _socket, _userId, _handler2, _rooms, _pending, _lastOffer, _wired, _roomKey, roomKey_fn, _ensureRoom, ensureRoom_fn, _emitMessage, emitMessage_fn, _wire, wire_fn;
   var SocketIoSignaling = class {
     constructor(socket, opts) {
@@ -1273,7 +1345,7 @@ var PeerWebRTC = (() => {
     return first && typeof first === "object" ? first : void 0;
   }
 
-  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/push.js
+  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/push.js
   var DEFAULT_ENDPOINTS = [
     "https://pushapi.beagle.chat/push-api/push-message",
     "https://www.callpass.cn/push-api/push-message",
