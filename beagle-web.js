@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.166","ui":"0.2.33","builtAt":"2026-11-01T03:21:29.771Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.170","ui":"0.2.35","builtAt":"2026-11-02T20:16:11.800Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -3122,59 +3122,78 @@ onmessage = (e) => {
     if (!value) {
       throw new Error("base58 value is required");
     }
-    let num = 0n;
-    for (const char of value) {
-      const digit = indexes.get(char);
-      if (digit === void 0) {
-        throw new Error(`invalid base58 character: ${char}`);
+    const size = value.length;
+    let zeros = 0;
+    while (zeros < size && value[zeros] === "1") {
+      zeros++;
+    }
+    const b256 = new Uint8Array(((size - zeros) * 733 / 1e3 | 0) + 1);
+    let length = 0;
+    for (let i = zeros; i < size; i++) {
+      const code = value.charCodeAt(i);
+      const digit = code < 128 ? INDEX[code] : -1;
+      if (digit < 0) {
+        throw new Error(`invalid base58 character: ${value[i]}`);
       }
-      num = num * BASE + digit;
-    }
-    const bytes = [];
-    while (num > 0n) {
-      bytes.push(Number(num & 0xffn));
-      num >>= 8n;
-    }
-    bytes.reverse();
-    for (const char of value) {
-      if (char !== "1") {
-        break;
+      let carry = digit;
+      let j = 0;
+      for (let k = b256.length - 1; (carry !== 0 || j < length) && k >= 0; k--, j++) {
+        carry += BASE * b256[k];
+        b256[k] = carry & 255;
+        carry = carry / 256 | 0;
       }
-      bytes.unshift(0);
+      length = j;
     }
-    return Uint8Array.from(bytes);
+    const it = b256.length - length;
+    const out = new Uint8Array(zeros + (b256.length - it));
+    let oi = zeros;
+    for (let k = it; k < b256.length; k++) {
+      out[oi++] = b256[k];
+    }
+    return out;
   }
   function bytesToBase58(bytes) {
     if (!bytes.length) {
       return "";
     }
-    let num = 0n;
-    for (const byte of bytes) {
-      num = (num << 8n) + BigInt(byte);
+    let zeros = 0;
+    while (zeros < bytes.length && bytes[zeros] === 0) {
+      zeros++;
     }
-    let encoded = "";
-    while (num > 0n) {
-      const rem = Number(num % BASE);
-      encoded = ALPHABET[rem] + encoded;
-      num /= BASE;
-    }
-    for (const byte of bytes) {
-      if (byte !== 0) {
-        break;
+    const b58 = new Uint8Array(((bytes.length - zeros) * 138 / 100 | 0) + 1);
+    let length = 0;
+    for (let i = zeros; i < bytes.length; i++) {
+      let carry = bytes[i];
+      let j = 0;
+      for (let k = b58.length - 1; (carry !== 0 || j < length) && k >= 0; k--, j++) {
+        carry += 256 * b58[k];
+        b58[k] = carry % BASE;
+        carry = carry / BASE | 0;
       }
-      encoded = "1" + encoded;
+      length = j;
+    }
+    const it = b58.length - length;
+    let encoded = "";
+    for (let z = 0; z < zeros; z++) {
+      encoded += "1";
+    }
+    for (let k = it; k < b58.length; k++) {
+      encoded += ALPHABET[b58[k]];
     }
     return encoded || "1";
   }
-  var ALPHABET, BASE, indexes;
+  var ALPHABET, BASE, INDEX;
   var init_base58 = __esm({
     "node_modules/@decentnetwork/peer/dist/utils/base58.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
       ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-      BASE = BigInt(58);
-      indexes = new Map([...ALPHABET].map((char, index) => [char, BigInt(index)]));
+      BASE = 58;
+      INDEX = new Int8Array(128).fill(-1);
+      for (let i = 0; i < ALPHABET.length; i++) {
+        INDEX[ALPHABET.charCodeAt(i)] = i;
+      }
     }
   });
 
@@ -6282,7 +6301,19 @@ onmessage = (e) => {
     const platform2 = opts.platform ? builder.createString(opts.platform) : 0;
     const osVersion = opts.osVersion ? builder.createString(opts.osVersion) : 0;
     const appVersion = opts.appVersion ? builder.createString(opts.appVersion) : 0;
-    builder.startObject(11);
+    const avatarUrl = opts.avatarUrl ? builder.createString(opts.avatarUrl) : 0;
+    const url = opts.url ? builder.createString(opts.url) : 0;
+    const ens = opts.ens ? builder.createString(opts.ens) : 0;
+    const extra = opts.extra ? builder.createString(opts.extra) : 0;
+    builder.startObject(15);
+    if (extra)
+      builder.addFieldOffset(14, extra, 0);
+    if (ens)
+      builder.addFieldOffset(13, ens, 0);
+    if (url)
+      builder.addFieldOffset(12, url, 0);
+    if (avatarUrl)
+      builder.addFieldOffset(11, avatarUrl, 0);
     if (appVersion)
       builder.addFieldOffset(10, appVersion, 0);
     if (osVersion)
@@ -6304,11 +6335,30 @@ onmessage = (e) => {
     return finishCarrierPacket(builder, PACKET_TYPE_USERINFO, ANYBODY_USERINFO, userinfo);
   }
   function encodeFriendRequestPacket(opts) {
+    let avatarUrl = opts.avatarUrl ?? "";
+    if (utf8Length(avatarUrl) > FRIENDREQ_MAX_AVATAR_URL_LEN)
+      avatarUrl = "";
+    const packet = buildFriendRequestPacket({ ...opts, avatarUrl });
+    if (avatarUrl && packet.length > TOX_MAX_FRIEND_REQUEST_LENGTH) {
+      return buildFriendRequestPacket({ ...opts, avatarUrl: "" });
+    }
+    return packet;
+  }
+  function utf8Length(value) {
+    return new TextEncoder().encode(value).length;
+  }
+  function buildFriendRequestPacket(opts) {
     const builder = new Builder(256);
     const name = builder.createString(opts.name ?? "");
     const descr = builder.createString(opts.descr ?? "");
     const hello = builder.createString(opts.hello ?? "");
-    builder.startObject(3);
+    const gender = opts.gender ? builder.createString(opts.gender) : 0;
+    const avatarUrl = opts.avatarUrl ? builder.createString(opts.avatarUrl) : 0;
+    builder.startObject(5);
+    if (avatarUrl)
+      builder.addFieldOffset(4, avatarUrl, 0);
+    if (gender)
+      builder.addFieldOffset(3, gender, 0);
     builder.addFieldOffset(2, hello, 0);
     builder.addFieldOffset(1, descr, 0);
     builder.addFieldOffset(0, name, 0);
@@ -6392,7 +6442,12 @@ onmessage = (e) => {
         protoVersion: readUint32Field(body2, 7),
         platform: readStringField(body2, 8) ?? "",
         osVersion: readStringField(body2, 9) ?? "",
-        appVersion: readStringField(body2, 10) ?? ""
+        appVersion: readStringField(body2, 10) ?? "",
+        // Profile extension (fields 11-14) — absent from peers before proto v2.
+        avatarUrl: readStringField(body2, 11) ?? "",
+        url: readStringField(body2, 12) ?? "",
+        ens: readStringField(body2, 13) ?? "",
+        extra: readStringField(body2, 14) ?? ""
       };
     }
     if (type2 === PACKET_TYPE_FRIEND_REQUEST && bodyType === ANYBODY_FRIENDREQ) {
@@ -6400,7 +6455,10 @@ onmessage = (e) => {
         type: type2,
         name: readStringField(body2, 0) ?? "",
         descr: readStringField(body2, 1) ?? "",
-        hello: readStringField(body2, 2) ?? ""
+        hello: readStringField(body2, 2) ?? "",
+        // Appended fields 3-4 — absent from old 3-field senders.
+        gender: readStringField(body2, 3) ?? "",
+        avatarUrl: readStringField(body2, 4) ?? ""
       };
     }
     if (type2 === PACKET_TYPE_MESSAGE && bodyType === ANYBODY_FRIENDMSG) {
@@ -6517,7 +6575,7 @@ onmessage = (e) => {
     }
     return Uint8Array.from(out);
   }
-  var PACKET_TYPE_USERINFO, PACKET_TYPE_FRIEND_REQUEST, PACKET_TYPE_MESSAGE, PACKET_TYPE_INVITE_REQUEST, PACKET_TYPE_INVITE_RESPONSE, PACKET_TYPE_BULKMSG, CARRIER_MAX_APP_MESSAGE_LEN, CARRIER_MAX_APP_BULKMSG_LEN, INVITE_DATA_UNIT, CARRIER_MAX_INVITE_DATA_LEN, CARRIER_EXTENSION_NAME, ANYBODY_USERINFO, ANYBODY_FRIENDREQ, ANYBODY_FRIENDMSG, ANYBODY_INVITEREQ, ANYBODY_INVITERSP, ANYBODY_BULKMSG;
+  var PACKET_TYPE_USERINFO, PACKET_TYPE_FRIEND_REQUEST, PACKET_TYPE_MESSAGE, PACKET_TYPE_INVITE_REQUEST, PACKET_TYPE_INVITE_RESPONSE, PACKET_TYPE_BULKMSG, CARRIER_MAX_APP_MESSAGE_LEN, CARRIER_MAX_APP_BULKMSG_LEN, INVITE_DATA_UNIT, CARRIER_MAX_INVITE_DATA_LEN, CARRIER_EXTENSION_NAME, ANYBODY_USERINFO, ANYBODY_FRIENDREQ, ANYBODY_FRIENDMSG, ANYBODY_INVITEREQ, ANYBODY_INVITERSP, ANYBODY_BULKMSG, FRIENDREQ_MAX_AVATAR_URL_LEN, TOX_MAX_FRIEND_REQUEST_LENGTH;
   var init_packet = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/packet.js"() {
       init_buffer_global();
@@ -6541,6 +6599,8 @@ onmessage = (e) => {
       ANYBODY_INVITEREQ = 4;
       ANYBODY_INVITERSP = 5;
       ANYBODY_BULKMSG = 6;
+      FRIENDREQ_MAX_AVATAR_URL_LEN = 128;
+      TOX_MAX_FRIEND_REQUEST_LENGTH = 1016;
     }
   });
 
@@ -11467,7 +11527,7 @@ onmessage = (e) => {
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
-  var import_tweetnacl14, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, ONION_HOP_KEY_TTL_MS, ONION_HOP_KEY_CACHE_MAX, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_TRANSPORT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _onionHopKeyCache, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _persistInFlight, _persistPending, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _onExpressFriendMessage, onExpressFriendMessage_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _onionHopKeys, onionHopKeys_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
+  var import_tweetnacl14, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, ONION_HOP_KEY_TTL_MS, ONION_HOP_KEY_CACHE_MAX, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_TRANSPORT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, PENDING_REQUESTER_PROFILE_MAX, PENDING_REQUESTER_PROFILE_TTL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _onionHopKeyCache, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _pendingRequesterProfiles, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _persistInFlight, _persistPending, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _requesterAvatar, requesterAvatar_fn, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _onExpressFriendMessage, onExpressFriendMessage_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _encodeOwnNickname, encodeOwnNickname_fn, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn, _encodeOwnUserInfo, encodeOwnUserInfo_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _onionHopKeys, onionHopKeys_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
   var init_peer = __esm({
     "node_modules/@decentnetwork/peer/dist/peer.js"() {
       init_buffer_global();
@@ -11590,6 +11650,8 @@ onmessage = (e) => {
       PACKET_ID_ACTION = 65;
       PACKET_ID_UDP_ENDPOINT = 160;
       RECV_REQUEST_MIN_INTERVAL_MS = 200;
+      PENDING_REQUESTER_PROFILE_MAX = 64;
+      PENDING_REQUESTER_PROFILE_TTL_MS = 24 * 60 * 60 * 1e3;
       _Peer = class _Peer {
         constructor(opts) {
           /** Lazy session shell used when we want to attach state before any handshake. */
@@ -11604,6 +11666,14 @@ onmessage = (e) => {
           __privateAdd(this, _cancelTextAckWait);
           __privateAdd(this, _waitForFriendConnected);
           __privateAdd(this, _dispatchTextMessage);
+          /** The requester's avatar for a friend-request event / pending entry: what
+           *  the packet carried (fields 3-4), else what the requester already pushed
+           *  over a live session (#pendingRequesterProfiles). Only set keys. */
+          __privateAdd(this, _requesterAvatar);
+          /** Remember what a not-yet-accepted peer told us about itself (see
+           *  PendingRequesterProfile). Newest entry last; oldest evicted past the cap;
+           *  stale entries aged out on every write. */
+          __privateAdd(this, _rememberPendingRequesterProfile);
           __privateAdd(this, _sendTextAck);
           __privateAdd(this, _rememberDeliveredTextId);
           /** Where the delivered-id set lives between runs. Next to the friend store,
@@ -11762,6 +11832,16 @@ onmessage = (e) => {
            */
           __privateAdd(this, _sendToFriend);
           __privateAdd(this, _scheduleProfileRetry);
+          /** Our toxcore PACKET_ID_NICKNAME payload: the raw UTF-8 nickname. */
+          __privateAdd(this, _encodeOwnNickname);
+          /** Our Carrier friendreq payload. An explicit "" introduction goes out
+           *  empty — it used to be replaced with "decent peer". The punk (field 3, in
+           *  `gender` like userinfo) and avatar URL (field 4) let the recipient draw
+           *  our picture before accepting; both are omitted when unset, and the
+           *  encoder drops the URL (never the punk) if the request would not fit. */
+          __privateAdd(this, _encodeOwnFriendRequest);
+          /** Our Carrier PACKET_TYPE_USERINFO payload (sent as PACKET_ID_STATUSMESSAGE). */
+          __privateAdd(this, _encodeOwnUserInfo);
           __privateAdd(this, _sendProfileAndGreeting);
           __privateAdd(this, _cacheFriendRemote);
           /** Single choke point for setting session.remote (the direct-UDP send
@@ -12171,6 +12251,8 @@ onmessage = (e) => {
           // Per-friend tracking sets so we send our nickname/status/greeting once
           // per session rather than on every PACKET_ID_ONLINE arrival.
           __privateAdd(this, _profileSentTo, /* @__PURE__ */ new Set());
+          // Profiles pushed by peers we have not accepted yet; see PendingRequesterProfile.
+          __privateAdd(this, _pendingRequesterProfiles, /* @__PURE__ */ new Map());
           __privateAdd(this, _profileRetryAttempts, /* @__PURE__ */ new Map());
           __privateAdd(this, _profileRetryTimers, /* @__PURE__ */ new Map());
           __privateAdd(this, _greetingSentTo, /* @__PURE__ */ new Set());
@@ -13103,11 +13185,7 @@ onmessage = (e) => {
               await sleep(500);
             }
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend-request: announce stored on ${__privateGet(this, _lastSelfAnnounceStoredCount)} node(s) before send`);
-            const appPayload = encodeFriendRequestPacket({
-              name: __privateGet(this, _opts3).nickname ?? PEER_NICKNAME,
-              descr: (__privateGet(this, _opts3).statusMessage ?? PEER_STATUS_MESSAGE) || "decent peer",
-              hello: hello ?? ""
-            });
+            const appPayload = __privateMethod(this, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn).call(this, hello);
             const friendReqPayload = concatBytes([
               uint32ToLe(friendAddress.nospam),
               appPayload
@@ -13219,22 +13297,46 @@ onmessage = (e) => {
           }
           const nospam = request?.nospam ?? opts?.nospam ?? 0;
           __privateGet(this, _pendingFriendRequests).delete(pubkey);
-          __privateGet(this, _friends).set(pubkey, {
+          const pushed = __privateGet(this, _pendingRequesterProfiles).get(pubkey);
+          __privateGet(this, _pendingRequesterProfiles).delete(pubkey);
+          const record = {
             pubkey,
             userid: request?.userid ?? pubkey,
             address: request?.address ?? opts?.address ?? carrierAddressFromPublicKey(key2, nospam),
             nospam,
-            name: request?.name ?? opts?.name ?? "",
-            description: request?.description ?? opts?.description ?? "",
+            name: pushed?.name || request?.name || opts?.name || "",
+            description: pushed?.description ?? request?.description ?? opts?.description ?? "",
             hello: request?.hello ?? opts?.hello ?? "",
+            ...request?.avatarUrl ? { avatarUrl: request.avatarUrl } : {},
+            ...(pushed?.punkId ?? request?.punkId) != null ? { punkId: pushed?.punkId ?? request?.punkId } : {},
+            ...pushed?.clientMeta ?? {},
+            ...pushed?.profileExt ?? {},
             status: "offline",
             acceptedAt: Date.now()
-          });
-          __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
-          __privateGet(this, _events).emit("friendConnection", {
-            pubkey,
-            status: "disconnected"
-          });
+          };
+          __privateGet(this, _friends).set(pubkey, record);
+          const session = __privateGet(this, _friendSessions).get(pubkey);
+          if (session?.established) {
+            __privateMethod(this, _setFriendOnline, setFriendOnline_fn).call(this, pubkey, session.remote?.host ?? "tcp:", session.remote?.port ?? 0);
+          } else {
+            __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
+            __privateGet(this, _events).emit("friendConnection", {
+              pubkey,
+              status: "disconnected"
+            });
+          }
+          if (pushed) {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `accept friend ${pubkey}: applied profile pushed before accept (name="${record.name ?? ""}", punk=${record.punkId ?? "none"}, platform=${record.platform ?? ""}, app=${record.appVersion ?? ""})`);
+            __privateGet(this, _events).emit("friendInfo", {
+              pubkey,
+              userid: record.userid ?? pubkey,
+              name: record.name,
+              description: record.description,
+              punkId: record.punkId,
+              ...pushed.clientMeta ?? {},
+              ...pushed.profileExt ?? {}
+            });
+          }
           if (__privateGet(this, _tcpRelays)) {
             try {
               const pk = base58ToBytes(pubkey);
@@ -13256,6 +13358,7 @@ onmessage = (e) => {
          *  and neither side could see why. */
         rejectFriendRequest(pubkey) {
           __privateGet(this, _pendingFriendRequests).delete(pubkey);
+          __privateGet(this, _pendingRequesterProfiles).delete(pubkey);
           if (__privateGet(this, _friends).has(pubkey))
             this.removeFriend(pubkey);
         }
@@ -13280,6 +13383,7 @@ onmessage = (e) => {
           __privateGet(this, _fileRelayNegotiationUntil).delete(friendId);
           __privateGet(this, _dnft12).forget(friendId);
           __privateGet(this, _pendingFriendRequests).delete(friendId);
+          __privateGet(this, _pendingRequesterProfiles).delete(friendId);
           __privateGet(this, _cookieRetryCount).delete(friendId);
           __privateGet(this, _lastCookieSentKey).delete(friendId);
           __privateGet(this, _lastEndpointSelectedKey).delete(friendId);
@@ -13417,6 +13521,52 @@ onmessage = (e) => {
         }
         _testDispatchTextMessage(msg) {
           return __privateMethod(this, _dispatchTextMessage, dispatchTextMessage_fn).call(this, msg);
+        }
+        /** Test seam: an offline friend request as the express client hands it over. */
+        _testExpressFriendRequest(fromUserId, packet) {
+          __privateMethod(this, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn).call(this, fromUserId, packet);
+        }
+        /** Test seam: an online (onion / net_crypto) friend request payload as it
+         *  arrives — nospam prefix + Carrier friendreq packet. */
+        _testOnlineFriendRequest(senderPublicKey, payload) {
+          const split2 = splitFriendRequestPayload(payload);
+          if (split2)
+            __privateMethod(this, _emitFriendRequest, emitFriendRequest_fn).call(this, senderPublicKey, split2.carrierPacket, split2.nospam);
+        }
+        /** Test seam: the nickname + userinfo bytes #sendProfileAndGreeting puts on
+         *  the wire — the same encoder, so a test receives what a real peer sends. */
+        _testOwnProfilePackets() {
+          return { nickname: __privateMethod(this, _encodeOwnNickname, encodeOwnNickname_fn).call(this), userinfo: __privateMethod(this, _encodeOwnUserInfo, encodeOwnUserInfo_fn).call(this) };
+        }
+        /** Test seam: one decrypted lossless payload from `fromPubkey`, exactly as
+         *  the datagram handler delivers it, over a session marked established (the
+         *  state after a completed handshake, friend record or not). */
+        _testDispatchMessengerPacket(fromPubkey, kind, inner) {
+          let session = __privateGet(this, _friendSessions).get(fromPubkey);
+          if (!session) {
+            session = {
+              ourSessionKeyPair: import_tweetnacl14.default.box.keyPair(),
+              ourBaseNonce: randomBytes2(24),
+              sessionSharedKey: randomBytes2(32),
+              established: true,
+              remote: { host: "127.0.0.1", port: 33445 }
+            };
+            __privateGet(this, _friendSessions).set(fromPubkey, session);
+          }
+          const remote = session.remote ?? { host: "127.0.0.1", port: 0 };
+          __privateMethod(this, _deliverLosslessPayload, deliverLosslessPayload_fn).call(this, fromPubkey, session, kind, inner, { address: remote.host, port: remote.port });
+        }
+        /** Inbound friend requests not yet accepted or rejected (this process's
+         *  memory only — a host that must survive restarts keeps its own copy).
+         *  Each entry carries the same fields as the friendRequest event, with
+         *  punkId / avatarUrl filled in later if the requester pushed a profile
+         *  after its request arrived. Copies; mutating them changes nothing. */
+        pendingFriendRequests() {
+          return [...__privateGet(this, _pendingFriendRequests).values()].map((r) => ({ ...r }));
+        }
+        /** Test seam: how many not-yet-accepted peers' profiles are being held. */
+        _testPendingRequesterProfileCount() {
+          return __privateGet(this, _pendingRequesterProfiles).size;
         }
         /** Files received inline over (bulk)messages — the iOS/C Carrier apps'
          *  native way of sending images/audio online (FileModel JSON envelope). */
@@ -13742,6 +13892,10 @@ onmessage = (e) => {
             punkId: opts.punkId
           };
         }
+        /** Test seam: the friendreq packet sendFriendRequest would send. */
+        _testEncodeOwnFriendRequest(hello) {
+          return __privateMethod(this, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn).call(this, hello);
+        }
         /**
          * Tell a friend our public UDP endpoint over the (already-working,
          * possibly tcp-relay) messenger channel, so they can hole-punch to us.
@@ -13836,6 +13990,7 @@ onmessage = (e) => {
       _lastDesyncDeleteMs = new WeakMap();
       _srflxCache = new WeakMap();
       _profileSentTo = new WeakMap();
+      _pendingRequesterProfiles = new WeakMap();
       _profileRetryAttempts = new WeakMap();
       _profileRetryTimers = new WeakMap();
       _greetingSentTo = new WeakMap();
@@ -14037,6 +14192,40 @@ onmessage = (e) => {
           }
         } catch (error) {
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `text handler failed for ${msg.pubkey}: ${error.message}`);
+        }
+      };
+      _requesterAvatar = new WeakSet();
+      requesterAvatar_fn = function(userid, packetPunk, packetUrl) {
+        const held = __privateGet(this, _pendingRequesterProfiles).get(userid);
+        const punkId = packetPunk ?? held?.punkId;
+        const avatarUrl = packetUrl || held?.profileExt?.avatarUrl || "";
+        return {
+          ...punkId != null ? { punkId } : {},
+          ...avatarUrl ? { avatarUrl } : {}
+        };
+      };
+      _rememberPendingRequesterProfile = new WeakSet();
+      rememberPendingRequesterProfile_fn = function(friendId, patch) {
+        const now = Date.now();
+        for (const [id, p] of __privateGet(this, _pendingRequesterProfiles)) {
+          if (now - p.updatedAt > PENDING_REQUESTER_PROFILE_TTL_MS)
+            __privateGet(this, _pendingRequesterProfiles).delete(id);
+        }
+        const prev = __privateGet(this, _pendingRequesterProfiles).get(friendId);
+        __privateGet(this, _pendingRequesterProfiles).delete(friendId);
+        __privateGet(this, _pendingRequesterProfiles).set(friendId, { ...prev, ...patch, updatedAt: now });
+        const request = __privateGet(this, _pendingFriendRequests).get(friendId);
+        if (request) {
+          const fill = __privateMethod(this, _requesterAvatar, requesterAvatar_fn).call(this, friendId, request.punkId, request.avatarUrl ?? "");
+          if (fill.punkId !== request.punkId || fill.avatarUrl !== request.avatarUrl) {
+            __privateGet(this, _pendingFriendRequests).set(friendId, { ...request, ...fill });
+          }
+        }
+        while (__privateGet(this, _pendingRequesterProfiles).size > PENDING_REQUESTER_PROFILE_MAX) {
+          const oldest = __privateGet(this, _pendingRequesterProfiles).keys().next().value;
+          if (oldest === void 0)
+            break;
+          __privateGet(this, _pendingRequesterProfiles).delete(oldest);
         }
       };
       _sendTextAck = new WeakSet();
@@ -14300,6 +14489,8 @@ onmessage = (e) => {
         let hello = "";
         let name = "";
         let description = "";
+        let punkId;
+        let avatarUrl = "";
         try {
           const decoded = decodeCarrierPacket(carrierPacket);
           if (decoded.type !== PACKET_TYPE_FRIEND_REQUEST) {
@@ -14309,6 +14500,8 @@ onmessage = (e) => {
           hello = decoded.hello;
           name = decoded.name;
           description = decoded.descr;
+          punkId = parsePunkField(decoded.gender);
+          avatarUrl = decoded.avatarUrl;
         } catch (error) {
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend-request from ${carrierIdFromPublicKey(senderPublicKey)} DROPPED: undecodable (${carrierPacket.length} bytes): ${error.message}`);
           return;
@@ -14331,7 +14524,8 @@ onmessage = (e) => {
           address: carrierAddressFromPublicKey(senderPublicKey, nospam),
           name,
           description,
-          hello
+          hello,
+          ...__privateMethod(this, _requesterAvatar, requesterAvatar_fn).call(this, userid, punkId, avatarUrl)
         };
         __privateGet(this, _pendingFriendRequests).set(userid, request);
         __privateGet(this, _events).emit("friendInfo", {
@@ -14347,6 +14541,8 @@ onmessage = (e) => {
         let helloText = "";
         let name = "";
         let description = "";
+        let punkId;
+        let avatarUrl = "";
         try {
           const decoded = decodeCarrierPacket(packet);
           if (decoded.type !== PACKET_TYPE_FRIEND_REQUEST) {
@@ -14356,6 +14552,8 @@ onmessage = (e) => {
           helloText = decoded.hello;
           name = decoded.name;
           description = decoded.descr;
+          punkId = parsePunkField(decoded.gender);
+          avatarUrl = decoded.avatarUrl;
         } catch (error) {
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `offline friend-request from ${fromUserId} DROPPED: undecodable (${packet.length} bytes): ${error.message}`);
           return;
@@ -14373,7 +14571,8 @@ onmessage = (e) => {
           userid: fromUserId,
           name,
           description,
-          hello: helloText
+          hello: helloText,
+          ...__privateMethod(this, _requesterAvatar, requesterAvatar_fn).call(this, fromUserId, punkId, avatarUrl)
         };
         __privateGet(this, _pendingFriendRequests).set(fromUserId, request);
         __privateGet(this, _events).emit("friendInfo", {
@@ -15146,6 +15345,8 @@ onmessage = (e) => {
               name,
               description: friend.description
             });
+          } else if (!friend && name) {
+            __privateMethod(this, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn).call(this, friendId, { name });
           }
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto nickname received from ${friendId}: "${name}"`);
           return;
@@ -15155,6 +15356,7 @@ onmessage = (e) => {
           let userInfoDescr;
           let userInfoPunk;
           let clientMeta;
+          let profileExt;
           try {
             const decoded = decodeCarrierPacket(inner);
             if (decoded.type === PACKET_TYPE_USERINFO) {
@@ -15169,6 +15371,9 @@ onmessage = (e) => {
                   appVersion: decoded.appVersion
                 };
               }
+              if (decoded.avatarUrl || decoded.url || decoded.ens || decoded.extra) {
+                profileExt = { avatarUrl: decoded.avatarUrl, url: decoded.url, ens: decoded.ens, extra: decoded.extra };
+              }
             }
           } catch {
           }
@@ -15178,8 +15383,9 @@ onmessage = (e) => {
             const newDescr = userInfoDescr ?? friend?.description;
             const newPunk = userInfoPunk ?? friend?.punkId;
             const metaChanged = friend != null && clientMeta != null && (friend.protoVersion !== clientMeta.protoVersion || friend.platform !== clientMeta.platform || friend.osVersion !== clientMeta.osVersion || friend.appVersion !== clientMeta.appVersion);
-            if (friend && (friend.name !== newName || friend.description !== newDescr || friend.punkId !== newPunk || metaChanged)) {
-              __privateGet(this, _friends).set(friendId, { ...friend, name: newName, description: newDescr, punkId: newPunk, ...clientMeta ?? {} });
+            const profileChanged = friend != null && profileExt != null && (friend.avatarUrl !== profileExt.avatarUrl || friend.url !== profileExt.url || friend.ens !== profileExt.ens || friend.extra !== profileExt.extra);
+            if (friend && (friend.name !== newName || friend.description !== newDescr || friend.punkId !== newPunk || metaChanged || profileChanged)) {
+              __privateGet(this, _friends).set(friendId, { ...friend, name: newName, description: newDescr, punkId: newPunk, ...clientMeta ?? {}, ...profileExt ?? {} });
               __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
               __privateGet(this, _events).emit("friendInfo", {
                 pubkey: friendId,
@@ -15187,7 +15393,16 @@ onmessage = (e) => {
                 name: newName,
                 description: newDescr,
                 punkId: newPunk,
-                ...clientMeta ?? {}
+                ...clientMeta ?? {},
+                ...profileExt ?? {}
+              });
+            } else if (!friend) {
+              __privateMethod(this, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn).call(this, friendId, {
+                ...newName ? { name: newName } : {},
+                ...userInfoDescr !== void 0 ? { description: userInfoDescr } : {},
+                ...userInfoPunk !== void 0 ? { punkId: userInfoPunk } : {},
+                ...clientMeta ? { clientMeta } : {},
+                ...profileExt ? { profileExt } : {}
               });
             }
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto userinfo received from ${friendId}: name="${userInfoName ?? ""}" descr="${userInfoDescr ?? ""}"${clientMeta ? ` proto=${clientMeta.protoVersion} platform=${clientMeta.platform} app=${clientMeta.appVersion}` : ""}`);
@@ -15197,6 +15412,8 @@ onmessage = (e) => {
             if (friend && status && friend.description !== status) {
               __privateGet(this, _friends).set(friendId, { ...friend, description: status });
               __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
+            } else if (!friend && status) {
+              __privateMethod(this, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn).call(this, friendId, { description: status });
             }
             __privateMethod(this, _debugVerboseLog, debugVerboseLog_fn).call(this, `crypto status message (raw) received from ${friendId}: "${status}"`);
           }
@@ -15653,6 +15870,44 @@ onmessage = (e) => {
         __privateGet(this, _profileRetryTimers).set(friendId, timer);
         __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `profile retry ${attempt} for ${friendId} scheduled in ${delayMs}ms`);
       };
+      _encodeOwnNickname = new WeakSet();
+      encodeOwnNickname_fn = function() {
+        return new TextEncoder().encode(__privateGet(this, _opts3).nickname ?? PEER_NICKNAME);
+      };
+      _encodeOwnFriendRequest = new WeakSet();
+      encodeOwnFriendRequest_fn = function(hello) {
+        return encodeFriendRequestPacket({
+          name: __privateGet(this, _opts3).nickname ?? PEER_NICKNAME,
+          descr: __privateGet(this, _opts3).statusMessage ?? PEER_STATUS_MESSAGE,
+          hello: hello ?? "",
+          gender: __privateGet(this, _opts3).punkId != null ? String(__privateGet(this, _opts3).punkId) : "",
+          avatarUrl: __privateGet(this, _opts3).profile?.avatarUrl ?? ""
+        });
+      };
+      _encodeOwnUserInfo = new WeakSet();
+      encodeOwnUserInfo_fn = function() {
+        return encodeUserInfoPacket({
+          name: __privateGet(this, _opts3).nickname ?? PEER_NICKNAME,
+          descr: __privateGet(this, _opts3).statusMessage ?? PEER_STATUS_MESSAGE,
+          // AgentNet client metadata (appended userinfo fields 7-10). Old
+          // peers ignore them; updated peers negotiate capabilities + display
+          // the friend's platform/build.
+          protoVersion: AGENTNET_PROTO_VERSION,
+          platform: __privateGet(this, _opts3).platform ?? process.platform,
+          osVersion: __privateGet(this, _opts3).osVersion ?? `node-${process.versions?.node ?? ""}`,
+          appVersion: __privateGet(this, _opts3).appVersion ?? `peer-${PEER_PKG_VERSION}`,
+          // Profile extension (fields 11-14), omitted when unset.
+          avatarUrl: __privateGet(this, _opts3).profile?.avatarUrl,
+          url: __privateGet(this, _opts3).profile?.url,
+          ens: __privateGet(this, _opts3).profile?.ens,
+          extra: __privateGet(this, _opts3).profile?.extra,
+          // The avatar, in the field Beagle uses for it (see punkId on
+          // FriendInfoEvent). OMITTED when we have none, never sent as "":
+          // an empty string would clear an avatar the friend already
+          // resolved. Without this, iOS shows us no picture at all.
+          ...__privateGet(this, _opts3).punkId != null ? { gender: String(__privateGet(this, _opts3).punkId) } : {}
+        });
+      };
       _sendProfileAndGreeting = new WeakSet();
       sendProfileAndGreeting_fn = function(friendId) {
         if (!__privateGet(this, _profileSentTo).has(friendId)) {
@@ -15661,27 +15916,10 @@ onmessage = (e) => {
             try {
               const nick = __privateGet(this, _opts3).nickname ?? PEER_NICKNAME;
               const descr = __privateGet(this, _opts3).statusMessage ?? PEER_STATUS_MESSAGE;
-              const nameBytes = new TextEncoder().encode(nick);
-              await __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_NICKNAME, nameBytes);
+              await __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_NICKNAME, __privateMethod(this, _encodeOwnNickname, encodeOwnNickname_fn).call(this));
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `nickname "${nick}" sent to ${friendId}`);
               await sleep(250);
-              const userInfo = encodeUserInfoPacket({
-                name: nick,
-                descr,
-                // AgentNet client metadata (appended userinfo fields 7-10). Old
-                // peers ignore them; updated peers negotiate capabilities + display
-                // the friend's platform/build.
-                protoVersion: AGENTNET_PROTO_VERSION,
-                platform: __privateGet(this, _opts3).platform ?? process.platform,
-                osVersion: __privateGet(this, _opts3).osVersion ?? `node-${process.versions?.node ?? ""}`,
-                appVersion: __privateGet(this, _opts3).appVersion ?? `peer-${PEER_PKG_VERSION}`,
-                // The avatar, in the field Beagle uses for it (see punkId on
-                // FriendInfoEvent). OMITTED when we have none, never sent as "":
-                // an empty string would clear an avatar the friend already
-                // resolved. Without this, iOS shows us no picture at all.
-                ...__privateGet(this, _opts3).punkId != null ? { gender: String(__privateGet(this, _opts3).punkId) } : {}
-              });
-              await __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_STATUSMESSAGE, userInfo);
+              await __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_STATUSMESSAGE, __privateMethod(this, _encodeOwnUserInfo, encodeOwnUserInfo_fn).call(this));
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `userinfo sent to ${friendId} (name="${nick}", descr="${descr}", proto=${AGENTNET_PROTO_VERSION}, platform=${__privateGet(this, _opts3).platform ?? process.platform})`);
               __privateGet(this, _profileRetryAttempts).delete(friendId);
             } catch (error) {
@@ -18642,6 +18880,40 @@ ${ts}`);
     return normalizeExpressNodes(cfg.expressNodes);
   }
 
+  // src/request-picture.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  var REQUEST_AVATAR_HOST = "ens-gateway.beaglechat.workers.dev";
+  function requestAvatarUrl(url) {
+    if (typeof url !== "string")
+      return null;
+    try {
+      const u = new URL(url);
+      return u.protocol === "https:" && u.hostname === REQUEST_AVATAR_HOST && !u.username && !u.password && !u.port ? url : null;
+    } catch {
+      return null;
+    }
+  }
+  var requestPicture = (r) => ({
+    punkId: Number.isInteger(r?.punkId) && r.punkId >= 0 && r.punkId <= 9999 ? r.punkId : null,
+    avatarUrl: requestAvatarUrl(r?.avatarUrl)
+  });
+  function refreshPendingPictures(pending2, sdkPending) {
+    let changed = false;
+    for (const r of sdkPending || []) {
+      const p = pending2.find((x) => x.userid === (r.userid || r.pubkey));
+      if (!p)
+        continue;
+      const pic = requestPicture(r);
+      if ((pic.punkId != null || pic.avatarUrl) && (pic.punkId !== p.punkId || pic.avatarUrl !== p.avatarUrl)) {
+        Object.assign(p, pic);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   // src/backend-c.js
   var PENDING_KEY = "pending-requests";
   var PROFILE_KEY = "profile";
@@ -18724,10 +18996,17 @@ ${ts}`);
       expressNodes,
       tcpOnlyBootstrap: true,
       nickname: profile.name || void 0,
-      statusMessage: profile.description || void 0,
+      // An empty introduction goes out empty (peer 0.1.170); undefined meant the SDK's "decent peer".
+      statusMessage: profile.description ?? "",
       // Advertised at startup, not only when the profile is edited — otherwise
       // a returning user's friends never see the avatar they picked last time.
+      // Since peer 0.1.170 it also rides every friend request we send (friendreq
+      // field 3), so the recipient sees our punk before accepting.
       punkId: profile.punkId ?? void 0,
+      // friendreq field 4 / userinfo field 11. Only a beagles.eth gateway URL: the
+      // recipient draws nothing else before accept, and an uploaded picture here is
+      // a data: URL that does not fit the 128-byte field.
+      ...requestAvatarUrl(profile.avatarUrl) ? { profile: { avatarUrl: profile.avatarUrl } } : {},
       platform: "js",
       appVersion: "beagle-web",
       debugLabel: "browser",
@@ -18761,10 +19040,11 @@ ${ts}`);
             hello: req.hello || "",
             address: req.address || "",
             nospam: req.nospam,
-            ts: Date.now()
+            ts: Date.now(),
+            ...requestPicture(req)
           });
           await savePending();
-          onEvent?.({ type: "friend-request", req: { userid, name: req.name, descr: req.description, hello: req.hello } });
+          onEvent?.({ type: "friend-request", req: { userid, name: req.name, descr: req.description, hello: req.hello, ...requestPicture(req) } });
         }
       })();
     });
@@ -19226,8 +19506,16 @@ ${ts}`);
           }));
           return ok({ userid, via: "onion", queued: true });
         }
-        case "friends-pending":
+        case "friends-pending": {
+          let sdk = [];
+          try {
+            sdk = peer.pendingFriendRequests();
+          } catch {
+          }
+          if (refreshPendingPictures(pending2, sdk))
+            void savePending();
           return ok({ pending: pending2 });
+        }
         case "friends-accept": {
           const idx = pending2.findIndex((p) => p.userid === req.userid);
           if (idx < 0)
@@ -23885,8 +24173,11 @@ ${body2.length}`);
               name: who,
               descr: r.descr || "",
               ens: dir?.ens || "",
-              punkId: dir?.punkId ?? null,
-              avatarUrl: dir?.avatarUrl ?? null,
+              // The picture the requester sent (peer 0.1.170) wins; else their
+              // beagles.eth record. beagle-ui's DkRequestAvatar draws URL → punk →
+              // beagles.eth → identicon.
+              punkId: r.punkId ?? dir?.punkId ?? null,
+              avatarUrl: requestAvatarUrl(r.avatarUrl) || dir?.avatarUrl || null,
               hello: r.hello || "",
               via: who || (r.hello ? `"${r.hello}"` : "carrier"),
               time: shortClock(r.ts),

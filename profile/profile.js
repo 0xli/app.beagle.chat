@@ -1,53 +1,72 @@
 (() => {
   // node_modules/@decentnetwork/peer/dist/utils/base58.js
   var ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  var BASE = BigInt(58);
-  var indexes = new Map([...ALPHABET].map((char, index) => [char, BigInt(index)]));
+  var BASE = 58;
+  var INDEX = new Int8Array(128).fill(-1);
+  for (let i = 0; i < ALPHABET.length; i++) {
+    INDEX[ALPHABET.charCodeAt(i)] = i;
+  }
   function base58ToBytes(value) {
     if (!value) {
       throw new Error("base58 value is required");
     }
-    let num = 0n;
-    for (const char of value) {
-      const digit = indexes.get(char);
-      if (digit === void 0) {
-        throw new Error(`invalid base58 character: ${char}`);
+    const size = value.length;
+    let zeros = 0;
+    while (zeros < size && value[zeros] === "1") {
+      zeros++;
+    }
+    const b256 = new Uint8Array(((size - zeros) * 733 / 1e3 | 0) + 1);
+    let length = 0;
+    for (let i = zeros; i < size; i++) {
+      const code = value.charCodeAt(i);
+      const digit = code < 128 ? INDEX[code] : -1;
+      if (digit < 0) {
+        throw new Error(`invalid base58 character: ${value[i]}`);
       }
-      num = num * BASE + digit;
-    }
-    const bytes = [];
-    while (num > 0n) {
-      bytes.push(Number(num & 0xffn));
-      num >>= 8n;
-    }
-    bytes.reverse();
-    for (const char of value) {
-      if (char !== "1") {
-        break;
+      let carry = digit;
+      let j = 0;
+      for (let k = b256.length - 1; (carry !== 0 || j < length) && k >= 0; k--, j++) {
+        carry += BASE * b256[k];
+        b256[k] = carry & 255;
+        carry = carry / 256 | 0;
       }
-      bytes.unshift(0);
+      length = j;
     }
-    return Uint8Array.from(bytes);
+    const it = b256.length - length;
+    const out = new Uint8Array(zeros + (b256.length - it));
+    let oi = zeros;
+    for (let k = it; k < b256.length; k++) {
+      out[oi++] = b256[k];
+    }
+    return out;
   }
   function bytesToBase58(bytes) {
     if (!bytes.length) {
       return "";
     }
-    let num = 0n;
-    for (const byte of bytes) {
-      num = (num << 8n) + BigInt(byte);
+    let zeros = 0;
+    while (zeros < bytes.length && bytes[zeros] === 0) {
+      zeros++;
     }
-    let encoded = "";
-    while (num > 0n) {
-      const rem = Number(num % BASE);
-      encoded = ALPHABET[rem] + encoded;
-      num /= BASE;
-    }
-    for (const byte of bytes) {
-      if (byte !== 0) {
-        break;
+    const b58 = new Uint8Array(((bytes.length - zeros) * 138 / 100 | 0) + 1);
+    let length = 0;
+    for (let i = zeros; i < bytes.length; i++) {
+      let carry = bytes[i];
+      let j = 0;
+      for (let k = b58.length - 1; (carry !== 0 || j < length) && k >= 0; k--, j++) {
+        carry += 256 * b58[k];
+        b58[k] = carry % BASE;
+        carry = carry / BASE | 0;
       }
-      encoded = "1" + encoded;
+      length = j;
+    }
+    const it = b58.length - length;
+    let encoded = "";
+    for (let z = 0; z < zeros; z++) {
+      encoded += "1";
+    }
+    for (let k = it; k < b58.length; k++) {
+      encoded += ALPHABET[b58[k]];
     }
     return encoded || "1";
   }

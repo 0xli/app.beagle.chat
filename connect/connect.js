@@ -4424,27 +4424,38 @@
 
   // node_modules/@decentnetwork/peer/dist/utils/base58.js
   var ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  var BASE = BigInt(58);
-  var indexes = new Map([...ALPHABET].map((char, index) => [char, BigInt(index)]));
+  var BASE = 58;
+  var INDEX = new Int8Array(128).fill(-1);
+  for (let i = 0; i < ALPHABET.length; i++) {
+    INDEX[ALPHABET.charCodeAt(i)] = i;
+  }
   function bytesToBase58(bytes) {
     if (!bytes.length) {
       return "";
     }
-    let num = 0n;
-    for (const byte of bytes) {
-      num = (num << 8n) + BigInt(byte);
+    let zeros = 0;
+    while (zeros < bytes.length && bytes[zeros] === 0) {
+      zeros++;
     }
-    let encoded = "";
-    while (num > 0n) {
-      const rem = Number(num % BASE);
-      encoded = ALPHABET[rem] + encoded;
-      num /= BASE;
-    }
-    for (const byte of bytes) {
-      if (byte !== 0) {
-        break;
+    const b58 = new Uint8Array(((bytes.length - zeros) * 138 / 100 | 0) + 1);
+    let length = 0;
+    for (let i = zeros; i < bytes.length; i++) {
+      let carry = bytes[i];
+      let j = 0;
+      for (let k = b58.length - 1; (carry !== 0 || j < length) && k >= 0; k--, j++) {
+        carry += 256 * b58[k];
+        b58[k] = carry % BASE;
+        carry = carry / BASE | 0;
       }
-      encoded = "1" + encoded;
+      length = j;
+    }
+    const it = b58.length - length;
+    let encoded = "";
+    for (let z = 0; z < zeros; z++) {
+      encoded += "1";
+    }
+    for (let k = it; k < b58.length; k++) {
+      encoded += ALPHABET[b58[k]];
     }
     return encoded || "1";
   }

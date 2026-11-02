@@ -1695,6 +1695,37 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     }, [append, lang, onReloadFriends]);
     return { thread, handle, removeFriends, adoptServicePeers };
   }
+  var REQUEST_AVATAR_HOST = "ens-gateway.beaglechat.workers.dev";
+  var MAX_URL = 2048;
+  function requestAvatarUrl(r) {
+    const u = r && r.avatarUrl;
+    if (typeof u !== "string" || !u || u.length > MAX_URL)
+      return null;
+    let parsed;
+    try {
+      parsed = new URL(u);
+    } catch {
+      return null;
+    }
+    if (parsed.protocol !== "https:" || parsed.host !== REQUEST_AVATAR_HOST)
+      return null;
+    if (parsed.username || parsed.password)
+      return null;
+    return parsed.href;
+  }
+  function requestPunkId(r) {
+    const p = r && r.punkId;
+    return typeof p === "number" && Number.isInteger(p) && p >= 0 ? p : null;
+  }
+  function requestAvatarSource(r, skipUrl = false) {
+    const url = skipUrl ? null : requestAvatarUrl(r);
+    if (url)
+      return { kind: "url", url };
+    const id = requestPunkId(r);
+    if (id != null)
+      return { kind: "punk", id };
+    return { kind: "ens" };
+  }
   var DK_CMD_HIST_KEY = "beagle.assistant.history";
   var DK_CMD_HIST_MAX = 50;
   function RequestsBlock({ T, requests, onAct }) {
@@ -1738,7 +1769,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       display: "flex",
       flexDirection: "column",
       gap: 8
-    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: r.userid || r.id, name: r.name, fallbackSeed: r.carrier, size: 30, radius: 7 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, r.name ? /* @__PURE__ */ React.createElement("div", { style: {
+    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkRequestAvatar, { r, size: 30, radius: 7 }), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, r.name ? /* @__PURE__ */ React.createElement("div", { style: {
       fontFamily: "var(--ui)",
       fontSize: 13,
       fontWeight: 600,
@@ -1754,6 +1785,32 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       borderLeft: "2px solid var(--line)",
       paddingLeft: 8
     } }, r.descr), failed[r.id] && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11, color: "var(--danger)" } }, failed[r.id]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => act(r, "accept"), style: { flex: 1 } }, T.accept), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "x", size: "sm", onClick: () => act(r, "reject"), style: { flex: 1 } }, T.reject))))));
+  }
+  function DkRequestAvatar({ r, size, radius }) {
+    const [urlBroken, setUrlBroken] = React.useState(false);
+    const url = requestAvatarUrl(r);
+    React.useEffect(() => {
+      setUrlBroken(false);
+    }, [url]);
+    const src = requestAvatarSource(r, urlBroken);
+    const seed = r.carrier || r.userid || r.id;
+    if (src.kind === "url") {
+      return /* @__PURE__ */ React.createElement(
+        "img",
+        {
+          src: src.url,
+          alt: "",
+          width: size,
+          height: size,
+          referrerPolicy: "no-referrer",
+          onError: () => setUrlBroken(true),
+          style: { width: size, height: size, borderRadius: radius, objectFit: "cover", flexShrink: 0, background: "var(--panel-2)" }
+        }
+      );
+    }
+    if (src.kind === "punk")
+      return /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: src.id, size, radius, fallbackSeed: seed });
+    return /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: r.userid || r.id, name: r.name, fallbackSeed: r.carrier, size, radius });
   }
   function PeerRow({ peer, T, active, onClick, muted, isProtocol, fix }) {
     const name = peer.alias || peer.userId;
