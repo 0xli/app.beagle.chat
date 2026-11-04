@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.170","ui":"0.2.35","builtAt":"2026-11-02T20:16:11.800Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.170","ui":"0.2.36","builtAt":"2026-11-04T09:02:37.603Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -19862,6 +19862,109 @@ ${ts}`);
     return out;
   }
 
+  // src/friend-greetings.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  var GREETING_KIND = "friend-request";
+  var GREETINGS_KEY = "friend-greetings";
+  function arrivalMs(v) {
+    if (typeof v === "number" && Number.isFinite(v) && v > 0)
+      return v;
+    if (typeof v === "string" && v) {
+      const n = Date.parse(v);
+      if (Number.isFinite(n) && n > 0)
+        return n;
+    }
+    return void 0;
+  }
+  function normalizeGreetings(raw) {
+    const byPeer = {};
+    const src = raw && typeof raw === "object" ? raw.byPeer : null;
+    if (!src || typeof src !== "object")
+      return byPeer;
+    for (const [peer, list] of Object.entries(src)) {
+      if (!Array.isArray(list))
+        continue;
+      const ok = list.filter((g) => g && typeof g.text === "string" && typeof g.ts === "number");
+      if (ok.length)
+        byPeer[peer] = ok;
+    }
+    return byPeer;
+  }
+  function addGreeting(byPeer, peer, hello, arrivedAt, now = Date.now()) {
+    if (!peer || typeof hello !== "string")
+      return false;
+    const text = hello.trim();
+    if (!text)
+      return false;
+    const list = byPeer[peer] ?? [];
+    if (list.some((g) => g.text.trim() === text))
+      return false;
+    list.push({ text, ts: arrivalMs(arrivedAt) ?? now });
+    list.sort((a, b) => a.ts - b.ts);
+    byPeer[peer] = list;
+    return true;
+  }
+  function greetingItems(byPeer, peer) {
+    return (byPeer?.[peer] ?? []).map((g) => ({
+      id: `${GREETING_KIND}:${g.ts}`,
+      dir: "in",
+      text: g.text,
+      ts: g.ts,
+      kind: GREETING_KIND,
+      read: true
+    }));
+  }
+  function mergeGreetings(page, greetings2, { before, limit } = {}) {
+    if (!greetings2?.length)
+      return page.slice();
+    const full = limit !== void 0 && page.length >= limit;
+    const oldest = page.length ? Math.min(...page.map((m) => typeof m.ts === "number" ? m.ts : Infinity)) : Infinity;
+    const have = new Set(page.map((m) => m.id).filter(Boolean));
+    const add2 = greetings2.filter((g) => !have.has(g.id) && (before === void 0 || g.ts < before) && (!full || g.ts >= oldest));
+    if (!add2.length)
+      return page.slice();
+    return [...add2, ...page].sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+  }
+  function createGreetingStore(kv) {
+    let chain = Promise.resolve();
+    const read = async () => {
+      try {
+        return normalizeGreetings(await kv.kvGet(GREETINGS_KEY));
+      } catch {
+        return {};
+      }
+    };
+    const update = (fn) => {
+      const job = chain.then(async () => {
+        const byPeer = await read();
+        if (!fn(byPeer))
+          return false;
+        await kv.kvPut(GREETINGS_KEY, { version: 1, byPeer });
+        return true;
+      });
+      chain = job.catch(() => {
+      });
+      return job;
+    };
+    return {
+      record: (peer, hello, arrivedAt) => update((b) => addGreeting(b, peer, hello, arrivedAt)),
+      remove: (peer) => update((b) => {
+        if (!b[peer])
+          return false;
+        delete b[peer];
+        return true;
+      }),
+      // Waits for writes already queued: the chat opened right after an accept
+      // must see that accept's greeting.
+      items: async (peer) => {
+        await chain;
+        return greetingItems(await read(), peer);
+      }
+    };
+  }
+
   // node_modules/@decentnetwork/beagle-ui/dist/wallet-proof.js
   init_buffer_global();
   init_process_global();
@@ -23863,6 +23966,14 @@ ${body2.length}`);
     const d = new Date(ts);
     return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   }
+  var greetings = createGreetingStore({ kvGet: kvGet2, kvPut: kvPut2 });
+  async function withGreetings(peer, messages, page) {
+    try {
+      return mergeGreetings(messages, await greetings.items(peer), page);
+    } catch {
+      return messages;
+    }
+  }
   function historyPage(url, fallbackLimit) {
     const n = Number(url.searchParams.get("limit"));
     const b = Number(url.searchParams.get("before"));
@@ -24083,7 +24194,8 @@ ${body2.length}`);
           if (!peer)
             return json({ chats: {} });
           const { limit, before } = historyPage(url, 500);
-          return json({ chats: { [peer]: await historyFor2(peer, limit, before) } });
+          const messages = await historyFor2(peer, limit, before);
+          return json({ chats: { [peer]: await withGreetings(peer, messages, { limit, before }) } });
         }
         case "GET /api/punk-list": {
           const type2 = (url.searchParams.get("type") || "any").toLowerCase().replace(/[^a-z]/g, "") || "any";
@@ -24304,7 +24416,9 @@ ${body2.length}`);
           const { limit, before } = historyPage(url, 200);
           const r = await call2("chat-history", { userid: peer, limit, before });
           const messages = r.data?.messages ?? [];
-          return json({ chats: peer ? { [peer]: messages } : {} });
+          if (!peer)
+            return json({ chats: {} });
+          return json({ chats: { [peer]: await withGreetings(peer, messages, { limit, before }) } });
         }
         case "POST /api/chat-send":
           return json(await call2("chat-send", { userid: body2.userid, text: body2.text }));
@@ -24327,14 +24441,30 @@ ${body2.length}`);
           const r = await call2("launch-token", { origin: body2.origin });
           return r.ok ? json({ ok: true, ...r.data ?? {} }) : json({ ok: false, error: r.error });
         }
-        case "POST /api/accept":
-          return json(await call2("friends-accept", { userid: body2.userid }));
+        case "POST /api/accept": {
+          let entry = null;
+          try {
+            const pend = await call2("friends-pending");
+            entry = (pend.data?.pending ?? []).find((r2) => r2.userid === body2.userid) ?? null;
+          } catch {
+          }
+          const r = await call2("friends-accept", { userid: body2.userid });
+          if (r?.ok && entry)
+            void greetings.record(body2.userid, entry.hello, entry.ts).catch(() => {
+            });
+          return json(r);
+        }
         case "POST /api/reject":
           return json(await call2("friends-reject", { userid: body2.userid }));
         case "POST /api/autoaccept":
           return json(await call2("friends-autoaccept", { enabled: body2.enabled }));
-        case "POST /api/friend-remove":
-          return json(await call2("friend-remove", { userid: body2.userid }));
+        case "POST /api/friend-remove": {
+          const r = await call2("friend-remove", { userid: body2.userid });
+          if (r?.ok)
+            void greetings.remove(body2.userid).catch(() => {
+            });
+          return json(r);
+        }
         case "POST /api/friend-alias":
           return json(await call2("friend-set-alias", { userid: body2.userid, alias: body2.alias }));
         case "GET /api/identity-export": {

@@ -270,7 +270,7 @@
     };
     (thread || []).forEach((m, i) => {
       const hit = m && !m.day ? isProto({ text: m.text, dir: m && m.from === "me" ? "out" : "in", ts: m && m.ts }) : false;
-      if (!hit || m && m.file) {
+      if (!hit || m && (m.file || m.kind === "friend-request")) {
         flush();
         out.push(m);
         return;
@@ -527,7 +527,10 @@
       // Brief 30: a validated component form, already whitelisted host-side.
       // Passed through untouched — the renderer treats every string as text,
       // never markup.
-      components: m.components
+      components: m.components,
+      // 'friend-request': the accepted request's greeting, merged in by the
+      // host (beagle's friend-greetings.ts); chat.jsx draws its own bubble.
+      kind: m.kind
     };
   }
   var DK_TAIL_MIN = 30;
@@ -624,8 +627,16 @@
       if (!c)
         return;
       const arr = [...c.byId.values()].sort((a, b) => a.ts - b.ts);
-      const msgs = arr.map(dkThreadMsg);
-      const withDay = msgs.length ? [{ day: dkDayLabel(arr[0].ts) }].concat(msgs) : [];
+      const withDay = [];
+      let lastDay = null;
+      for (const m of arr) {
+        const day = dkDayLabel(m.ts);
+        if (day !== lastDay) {
+          withDay.push({ day });
+          lastDay = day;
+        }
+        withDay.push(dkThreadMsg(m));
+      }
       setThreads((t) => Object.assign({}, t, { [peerId]: withDay }));
       setEarlier((e) => e[peerId] === c.more ? e : Object.assign({}, e, { [peerId]: c.more }));
     }, []);
@@ -1726,6 +1737,25 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       return { kind: "punk", id };
     return { kind: "ens" };
   }
+  var REQUEST_TRANSPORTS = ["lan", "carrier", "direct", "relay", "express", "webrtc", "online", "offline", "tcp", "udp", "p2p"];
+  function unquote(s) {
+    const m = /^"([\s\S]*)"$/.exec(s);
+    return m ? m[1] : s;
+  }
+  function requestGreeting(r) {
+    const hello = r && typeof r.hello === "string" ? r.hello.trim() : "";
+    const via = r && typeof r.via === "string" ? r.via.trim() : "";
+    const isTransport = !!via && REQUEST_TRANSPORTS.includes(via.toLowerCase());
+    const isName = !!via && !!r && typeof r.name === "string" && r.name.trim() === via;
+    return {
+      greeting: hello || (via && !isTransport && !isName ? unquote(via).trim() : ""),
+      transport: isTransport ? via : ""
+    };
+  }
+  var GREETING_KIND = "friend-request";
+  function isGreetingItem(m) {
+    return !!m && m.kind === GREETING_KIND;
+  }
   var DK_CMD_HIST_KEY = "beagle.assistant.history";
   var DK_CMD_HIST_MAX = 50;
   function RequestsBlock({ T, requests, onAct }) {
@@ -1777,7 +1807,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
-    } }, r.name) : /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", fontStyle: "italic" } }, T.noName || "no name given"), /* @__PURE__ */ React.createElement(Mono, { size: 11, copy: r.carrier, title: r.carrier }, shortKey(r.carrier, 8, 6)), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)", marginTop: 2 } }, "via ", r.via, " \xB7 ", r.time))), r.descr && /* @__PURE__ */ React.createElement("div", { style: {
+    } }, r.name) : /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", fontStyle: "italic" } }, T.noName || "no name given"), /* @__PURE__ */ React.createElement(Mono, { size: 11, copy: r.carrier, title: r.carrier }, shortKey(r.carrier, 8, 6)), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)", marginTop: 2 } }, requestGreeting(r).transport ? "via " + requestGreeting(r).transport + " \xB7 " : "", r.time))), /* @__PURE__ */ React.createElement(DkRequestGreeting, { T, text: requestGreeting(r).greeting }), r.descr && /* @__PURE__ */ React.createElement("div", { style: {
       fontFamily: "var(--ui)",
       fontSize: 12,
       color: "var(--dim, var(--faint))",
@@ -1785,6 +1815,76 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       borderLeft: "2px solid var(--line)",
       paddingLeft: 8
     } }, r.descr), failed[r.id] && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11, color: "var(--danger)" } }, failed[r.id]), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => act(r, "accept"), style: { flex: 1 } }, T.accept), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "x", size: "sm", onClick: () => act(r, "reject"), style: { flex: 1 } }, T.reject))))));
+  }
+  function DkRequestGreeting({ T, text }) {
+    const [open, setOpen] = React.useState(false);
+    const [clipped, setClipped] = React.useState(false);
+    const ref = React.useRef(null);
+    React.useLayoutEffect(() => {
+      const el = ref.current;
+      if (el && !open)
+        setClipped(el.scrollHeight > el.clientHeight + 1);
+    }, [text, open]);
+    if (!text)
+      return null;
+    const toggle = () => {
+      try {
+        const sel = window.getSelection && window.getSelection();
+        if (sel && String(sel).length)
+          return;
+      } catch (e) {
+      }
+      if (clipped || open)
+        setOpen((o) => !o);
+    };
+    return /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: toggle,
+        title: !open && clipped ? T.showAll || "show all" : void 0,
+        style: { cursor: clipped || open ? "pointer" : "text" }
+      },
+      /* @__PURE__ */ React.createElement("div", { style: { background: "var(--bub-them)", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 9px" } }, /* @__PURE__ */ React.createElement("div", { ref, style: {
+        fontFamily: "var(--ui)",
+        fontSize: 12.5,
+        color: "var(--text)",
+        lineHeight: 1.45,
+        whiteSpace: "pre-wrap",
+        overflowWrap: "anywhere",
+        userSelect: "text",
+        WebkitUserSelect: "text",
+        ...open ? { maxHeight: 240, overflowY: "auto" } : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }
+      } }, text)),
+      (clipped || open) && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 11, color: "var(--accent)", marginTop: 3 } }, open ? T.showLess || "show less" : T.showAll || "show all")
+    );
+  }
+  function DkGreetingMsg({ m, peer, T }) {
+    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-start", alignItems: "flex-end", gap: 8, margin: "3px 0 10px" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer, size: 24, radius: 6, dot: false }), /* @__PURE__ */ React.createElement("div", { style: {
+      maxWidth: "75%",
+      padding: "8px 12px",
+      borderRadius: 12,
+      borderBottomLeftRadius: 4,
+      background: "var(--panel-2)",
+      border: "1px dashed var(--accent)",
+      color: "var(--text)"
+    } }, /* @__PURE__ */ React.createElement("div", { style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 4,
+      fontFamily: "var(--mono)",
+      fontSize: 10.5,
+      color: "var(--accent)",
+      fontWeight: 600
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: "userPlus", size: 12, stroke: 2.2, color: "var(--accent)" }), /* @__PURE__ */ React.createElement("span", null, T.friendRequestItem || "Friend request"), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--faint)", fontWeight: 400 } }, "\xB7 ", m.time)), /* @__PURE__ */ React.createElement("div", { style: {
+      fontFamily: "var(--ui)",
+      fontSize: 13.5,
+      lineHeight: 1.5,
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+      userSelect: "text",
+      WebkitUserSelect: "text"
+    } }, m.text)));
   }
   function DkRequestAvatar({ r, size, radius }) {
     const [urlBroken, setUrlBroken] = React.useState(false);
@@ -2560,7 +2660,12 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       return null;
     }), err && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--danger, #ff6b6b)", fontSize: 11.5, fontFamily: "var(--mono)" } }, err));
   }
-  function Msg({ m, peer, T, lang, onTheater, onDelete, onCancel, onRetry, onRetryMsg, onReveal, onOpenFile, onCall, onFormSubmit, onNameCard, onAssistantRemove, onAssistantAdopt, answered, selMode, selected, onToggleSel, busy, isGroup }) {
+  function Msg(props) {
+    if (isGreetingItem(props.m))
+      return /* @__PURE__ */ React.createElement(DkGreetingMsg, { m: props.m, peer: props.peer, T: props.T });
+    return /* @__PURE__ */ React.createElement(DkMsgBody, { ...props });
+  }
+  function DkMsgBody({ m, peer, T, lang, onTheater, onDelete, onCancel, onRetry, onRetryMsg, onReveal, onOpenFile, onCall, onFormSubmit, onNameCard, onAssistantRemove, onAssistantAdopt, answered, selMode, selected, onToggleSel, busy, isGroup }) {
     const mine = m.from === "me";
     const nativeMedia = !m.file ? dkNativeMediaFromText(m.text) : null;
     const grp = isGroup && m.dir !== "out" && !m.file && !nativeMedia ? dkGroupParse(m.text) : null;
@@ -6466,6 +6571,9 @@ ${peer.address}`
       dirSearch: "search name / userid\u2026",
       dirLoading: "loading directory\u2026",
       noName: "no name given",
+      friendRequestItem: "Friend request",
+      showAll: "show all",
+      showLess: "show less",
       dirEmpty: "nobody matches",
       dirError: "Could not load the directory:",
       bridgeEmpty: "Nobody else is listed on this bridge yet. You are the first.",
@@ -6665,6 +6773,9 @@ ${peer.address}`
       dirSearch: "\u641C\u7D22\u540D\u5B57 / userid\u2026",
       dirLoading: "\u6B63\u5728\u52A0\u8F7D\u540D\u5355\u2026",
       noName: "\u5BF9\u65B9\u6CA1\u6709\u586B\u540D\u5B57",
+      friendRequestItem: "\u597D\u53CB\u8BF7\u6C42",
+      showAll: "\u5C55\u5F00\u5168\u6587",
+      showLess: "\u6536\u8D77",
       dirEmpty: "\u6CA1\u6709\u5339\u914D\u7684\u4EBA",
       dirError: "\u540D\u5355\u52A0\u8F7D\u5931\u8D25\uFF1A",
       bridgeEmpty: "\u8FD9\u4E2A bridge \u4E0A\u8FD8\u6CA1\u6709\u522B\u4EBA\uFF0C\u4F60\u662F\u7B2C\u4E00\u4E2A\u3002",
