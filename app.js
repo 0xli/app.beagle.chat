@@ -299,6 +299,31 @@
     const s = String(text == null ? "" : text).replace(/\s+/g, " ").trim();
     return s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
   }
+  function hostHasExits(d) {
+    if (!d || typeof d !== "object")
+      return false;
+    if (d.exitsSupported === false)
+      return false;
+    return !!d.exitFeature && typeof d.exitFeature === "object";
+  }
+  function desktopPollPath({ wantExits, opened, supported }) {
+    if (!wantExits || supported !== true)
+      return "/api/desktop";
+    return opened ? "/api/desktop?exits=1&open=1" : "/api/desktop?exits=1";
+  }
+  function exitControls({ exitFeature, routeFallback, exits }) {
+    const has = hostHasExits({ exitFeature });
+    const list = Array.isArray(exits) ? exits : [];
+    const anyFailed = list.some((r) => (r.nodes || []).some((n) => n.status === "failed"));
+    return {
+      refresh: has && list.length > 0,
+      reconnect: has,
+      reconnectAll: has && anyFailed,
+      noExitNotice: has && exitFeature.available === false,
+      fallbackNotice: has && !!(routeFallback && routeFallback.from),
+      anyFailed: has && anyFailed
+    };
+  }
   function dkHash(s) {
     let h = 2166136261;
     for (let i = 0; i < s.length; i++) {
@@ -440,6 +465,12 @@
     cancelSend: (userid, ids) => dkPost("/api/file-cancel", { userid, ids }),
     retrySend: (userid, ids) => dkPost("/api/file-retry", { userid, ids }),
     setProfile: (name, description) => dkPost("/api/set-profile", { name, description }),
+    // Probe a failed exit once, now (or every failed exit with all=true). Exits
+    // that failed three times in a row are never probed again on their own.
+    reconnectExit: (ip) => dkPost("/api/exits/reconnect", { ip }),
+    reconnectAllExits: () => dkPost("/api/exits/reconnect", { all: true }),
+    // Every exit once, now, failed ones included.
+    refreshExits: () => dkPost("/api/exits/refresh", {}),
     // Used by the browser's welcome flow, which also picks an avatar and marks
     // first run done. Harmless where there is no welcome flow: nothing calls it.
     setProfileFull: (p) => dkPost("/api/set-profile", p),
@@ -575,22 +606,36 @@
     }, [peers, isProtocol, enabled]);
     return fixes;
   }
-  function useDaemonData() {
+  function useDaemonData(opts) {
+    const wantExits = !!(opts && opts.exits);
+    const wantExitsRef = React.useRef(wantExits);
+    wantExitsRef.current = wantExits;
+    const exitsOpenedRef = React.useRef(false);
+    const exitsSupportedRef = React.useRef(null);
     const [snap, setSnap] = React.useState({
       me: DK_ME_FALLBACK,
       peers: [],
       requests: [],
       exits: [],
       activeExit: null,
+      exitFeature: null,
+      routeFallback: null,
       loaded: false,
       locked: false
     });
     const [threads, setThreads] = React.useState({});
     const refreshRef = React.useRef(null);
     const refresh = React.useCallback(async () => {
-      var _a;
+      var _a, _b, _c;
       try {
-        const d = await dkGet("/api/desktop");
+        const path = desktopPollPath({
+          wantExits: wantExitsRef.current,
+          opened: exitsOpenedRef.current,
+          supported: exitsSupportedRef.current
+        });
+        if (path.includes("open=1"))
+          exitsOpenedRef.current = false;
+        const d = await dkGet(path);
         if (d && d.locked) {
           setSnap((s) => ({ ...s, locked: true, loaded: true }));
           return;
@@ -601,6 +646,13 @@
           }, 300);
           return;
         }
+        const had = exitsSupportedRef.current;
+        exitsSupportedRef.current = hostHasExits(d);
+        if (had !== true && exitsSupportedRef.current && wantExitsRef.current && exitsOpenedRef.current) {
+          setTimeout(() => {
+            refreshRef.current && refreshRef.current();
+          }, 0);
+        }
         setSnap({
           locked: false,
           me: d.me || DK_ME_FALLBACK,
@@ -608,6 +660,8 @@
           requests: d.requests || [],
           exits: d.exits || [],
           activeExit: (_a = d.activeExit) != null ? _a : null,
+          exitFeature: (_b = d.exitFeature) != null ? _b : null,
+          routeFallback: (_c = d.routeFallback) != null ? _c : null,
           loaded: true
         });
       } catch (e) {
@@ -619,6 +673,12 @@
       const t = setInterval(refresh, 2500);
       return () => clearInterval(t);
     }, [refresh]);
+    React.useEffect(() => {
+      if (wantExits) {
+        exitsOpenedRef.current = true;
+        refresh();
+      }
+    }, [wantExits, refresh]);
     const inFlight = React.useRef(/* @__PURE__ */ new Set());
     const cache = React.useRef({});
     const [earlier, setEarlier] = React.useState({});
@@ -640,10 +700,10 @@
       setThreads((t) => Object.assign({}, t, { [peerId]: withDay }));
       setEarlier((e) => e[peerId] === c.more ? e : Object.assign({}, e, { [peerId]: c.more }));
     }, []);
-    const loadThread = React.useCallback(async (peerId, opts) => {
+    const loadThread = React.useCallback(async (peerId, opts2) => {
       if (!peerId)
         return;
-      if (opts && opts.reset)
+      if (opts2 && opts2.reset)
         delete cache.current[peerId];
       if (inFlight.current.has(peerId))
         return;
@@ -6119,15 +6179,40 @@ ${peer.address}`
       borderBottom: i < peers.length - 1 ? "1px solid var(--line)" : "none"
     } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: p, size: 26, radius: 6 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: p.alias ? "var(--ui)" : "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, p.alias || shortKey(p.userId, 8, 5)), p.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 12, color: "var(--faint)", stroke: 2 })), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, dim: true, copy: p.ip }, p.ip), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(RouteTag, { peer: p })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: p.wire === "64" ? "var(--warn)" : "var(--dim)" } }, p.wire === "64" ? "old\xB764" : "new\xB7163"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { icon: "message", size: "sm", title: T.openChat, onClick: () => onOpenChat(p.id) }), /* @__PURE__ */ React.createElement(Btn, { icon: "signal", size: "sm", title: T.ping })))));
   }
-  function ExitCard({ T, region, activeExit, onSetExit }) {
+  function ReconnectBtn({ T, ip, onReconnect, label, icon = "refresh" }) {
+    const [busy, setBusy] = React.useState(false);
+    return /* @__PURE__ */ React.createElement(
+      Btn,
+      {
+        size: "sm",
+        icon,
+        disabled: busy,
+        onClick: async () => {
+          if (busy || !onReconnect)
+            return;
+          setBusy(true);
+          try {
+            await onReconnect(ip);
+          } finally {
+            setBusy(false);
+          }
+        }
+      },
+      busy ? T.exitChecking || "checking\u2026" : label || T.exitReconnect || "Reconnect"
+    );
+  }
+  function ExitCard({ T, region, activeExit, onSetExit, onReconnect, featureOn }) {
     return /* @__PURE__ */ React.createElement("div", { style: { borderRadius: 11, border: "1px solid var(--line)", overflow: "hidden", background: "var(--panel)" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderBottom: "1px solid var(--line)", background: "var(--panel-2)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, padding: "2px 7px", borderRadius: 5, background: "var(--chip)", color: "var(--dim)" } }, region.flag), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 13.5, fontWeight: 600, color: "var(--text)" } }, region.label), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), (() => {
       const reach = region.nodes.filter((n) => n.reachable).length;
-      const down = region.nodes.length - reach;
-      return /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: down > 0 ? "var(--warn)" : "var(--faint)" } }, reach, "/", region.nodes.length, " ", T.up, down > 0 ? ` \xB7 ${down} down` : "");
+      const failed = region.nodes.filter((n) => n.status === "failed").length;
+      const down = region.nodes.length - reach - failed;
+      return /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: down + failed > 0 ? "var(--warn)" : "var(--faint)" } }, reach, "/", region.nodes.length, " ", T.up, failed > 0 ? ` \xB7 ${failed} ${T.exitFailed || "failed"}` : "", down > 0 ? ` \xB7 ${down} down` : "");
     })()), /* @__PURE__ */ React.createElement("div", null, region.nodes.map((n, i) => {
       const active = n.ip === activeExit;
       const stuck = n.online && !n.reachable;
-      return /* @__PURE__ */ React.createElement("div", { key: n.ip, className: "dk-wrap", style: { display: "flex", alignItems: "center", gap: 12, rowGap: 6, padding: "10px 14px", borderBottom: i < region.nodes.length - 1 ? "1px solid var(--line)" : "none", background: active ? "color-mix(in oklab, var(--accent), transparent 92%)" : "transparent" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: n.reachable }), /* @__PURE__ */ React.createElement(Mono, { size: 13, copy: n.ip }, n.ip), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, n.host), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), n.reachable ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: n.ping > 200 ? "var(--warn)" : "var(--dim)" } }, n.ping, "ms") : stuck ? /* @__PURE__ */ React.createElement(Tag, { tone: "warn", title: "Announces online but IP won't pass \u2014 session desync or NAT-blocked" }, "online \xB7 no route") : /* @__PURE__ */ React.createElement(Tag, { tone: "off" }, "offline"), active ? /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => onSetExit(null) }, T.routing) : /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "route", onClick: () => n.reachable && onSetExit(n.ip), style: { opacity: n.reachable ? 1 : 0.4 } }, T.routeThru));
+      const failed = n.status === "failed";
+      const usable = n.reachable && featureOn !== false;
+      return /* @__PURE__ */ React.createElement("div", { key: n.ip, className: "dk-wrap", style: { display: "flex", alignItems: "center", gap: 12, rowGap: 6, padding: "10px 14px", borderBottom: i < region.nodes.length - 1 ? "1px solid var(--line)" : "none", background: active ? "color-mix(in oklab, var(--accent), transparent 92%)" : "transparent" } }, /* @__PURE__ */ React.createElement(StatusDot, { online: n.reachable }), /* @__PURE__ */ React.createElement(Mono, { size: 13, copy: n.ip }, n.ip), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, n.host), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), n.reachable ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: n.ping > 200 ? "var(--warn)" : "var(--dim)" } }, n.ping, "ms") : failed ? /* @__PURE__ */ React.createElement(Tag, { tone: "danger", title: "Failed 3 checks in a row \u2014 no longer checked; Reconnect to try again" }, T.exitFailed || "failed") : n.status === "unknown" ? /* @__PURE__ */ React.createElement(Tag, { tone: "off" }, T.exitNotChecked || "not checked") : stuck ? /* @__PURE__ */ React.createElement(Tag, { tone: "warn", title: "Announces online but IP won't pass \u2014 session desync or NAT-blocked" }, "online \xB7 no route") : n.status === "down" ? /* @__PURE__ */ React.createElement(Tag, { tone: "warn", title: "No answer \u2014 checked again only when you open this panel or press Refresh; 3 in a row and it is no longer checked" }, T.exitDown || "down", " \xB7 ", n.fails, "/3") : /* @__PURE__ */ React.createElement(Tag, { tone: "off" }, "offline"), failed && onReconnect ? /* @__PURE__ */ React.createElement(ReconnectBtn, { T, ip: n.ip, onReconnect }) : active ? /* @__PURE__ */ React.createElement(Btn, { tone: "ok", icon: "check", size: "sm", onClick: () => onSetExit(null) }, T.routing) : /* @__PURE__ */ React.createElement(Btn, { size: "sm", icon: "route", disabled: !usable, onClick: () => usable && onSetExit(n.ip), style: { opacity: usable ? 1 : 0.4 } }, T.routeThru));
     })));
   }
   function LanEnableCard({ backend, onArm, onCancel }) {
@@ -6231,12 +6316,15 @@ ${peer.address}`
       "\u53D6\u6D88,\u6062\u590D\u6D88\u606F"
     )));
   }
-  function NetworkTab({ T, me, peers, exits, activeExit, reqCount, onSetExit, onOpenChat, backend, onArmLan, onCancelLan }) {
+  function NetworkTab({ T, me, peers, exits, activeExit, exitFeature, routeFallback, onReconnectExit, onRefreshExits, reqCount, onSetExit, onOpenChat, backend, onArmLan, onCancelLan }) {
+    const ctl = exitControls({ exitFeature, routeFallback, exits });
+    const featureOn = !ctl.noExitNotice;
+    const anyFailed = ctl.anyFailed;
     if (backend && backend.switchable && !backend.hasVirtualLan) {
       return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { className: "dk-page", style: { maxWidth: 1040, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement(MyNode, { T, me, activeExit, peers, reqCount }), /* @__PURE__ */ React.createElement(LanEnableCard, { backend, onArm: onArmLan, onCancel: onCancelLan })));
     }
     const lanless = !!backend && backend.hasVirtualLan === false;
-    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { className: "dk-page", style: { maxWidth: 1040, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement(MyNode, { T, me, activeExit, peers, reqCount }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.peerRouting, count: peers.length }), /* @__PURE__ */ React.createElement(PeerTable, { T, peers, onOpenChat }), !peers.length && /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px", borderRadius: 11, border: "1px dashed var(--line)", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.noPeersYet || "No friends yet \u2014 add one from Chat and it shows up here with its route.")), lanless ? null : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.exitNodes, trailing: /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { icon: "plus", size: "sm" }, T.addExit)) }), activeExit && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, background: "color-mix(in oklab, var(--warn), transparent 90%)", border: "1px solid color-mix(in oklab, var(--warn), transparent 70%)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 17, color: "var(--warn)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, T.egressVia), /* @__PURE__ */ React.createElement(Mono, { size: 13, copy: activeExit }, activeExit), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "unlink", size: "sm", onClick: () => onSetExit(null) }, T.stopRouting)), /* @__PURE__ */ React.createElement("div", { className: "dk-grid1", style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, exits.map((r) => /* @__PURE__ */ React.createElement(ExitCard, { key: r.region, T, region: r, activeExit, onSetExit }))))));
+    return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { className: "dk-page", style: { maxWidth: 1040, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement(MyNode, { T, me, activeExit, peers, reqCount }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.peerRouting, count: peers.length }), /* @__PURE__ */ React.createElement(PeerTable, { T, peers, onOpenChat }), !peers.length && /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px", borderRadius: 11, border: "1px dashed var(--line)", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.noPeersYet || "No friends yet \u2014 add one from Chat and it shows up here with its route.")), lanless ? null : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.exitNodes, trailing: /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, ctl.refresh && onRefreshExits && /* @__PURE__ */ React.createElement(ReconnectBtn, { T, ip: null, onReconnect: () => onRefreshExits(), label: T.exitRefresh || "Refresh" }), ctl.reconnectAll && onReconnectExit && /* @__PURE__ */ React.createElement(ReconnectBtn, { T, ip: null, onReconnect: onReconnectExit, label: T.exitReconnectAll || "Reconnect all" }), /* @__PURE__ */ React.createElement(Btn, { icon: "plus", size: "sm" }, T.addExit)) }), ctl.noExitNotice && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, padding: "11px 14px", borderRadius: 10, background: "var(--panel-2)", border: "1px dashed var(--line)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 700, color: "var(--text)" } }, T.noExitAvailable || "No exit available \u2014 routing and proxy are off."), anyFailed && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)" } }, T.noExitHint || "Every exit failed 3 times and is no longer checked automatically. Press Reconnect to try one again.")), ctl.fallbackNotice && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, background: "color-mix(in oklab, var(--warn), transparent 90%)", border: "1px solid color-mix(in oklab, var(--warn), transparent 70%)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 17, color: "var(--warn)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, T.routeFellBack || "Routing fell back to direct: every exit it used failed. Reconnect one to route through it again.")), activeExit && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, background: "color-mix(in oklab, var(--warn), transparent 90%)", border: "1px solid color-mix(in oklab, var(--warn), transparent 70%)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 17, color: "var(--warn)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, T.egressVia), /* @__PURE__ */ React.createElement(Mono, { size: 13, copy: activeExit }, activeExit), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "unlink", size: "sm", onClick: () => onSetExit(null) }, T.stopRouting)), /* @__PURE__ */ React.createElement("div", { className: "dk-grid1", style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, exits.map((r) => /* @__PURE__ */ React.createElement(ExitCard, { key: r.region, T, region: r, activeExit, onSetExit, onReconnect: ctl.reconnect ? onReconnectExit : null, featureOn }))))));
   }
   Object.assign(window, { NetworkTab });
   var dkAudioCtx = null;
@@ -6648,6 +6736,16 @@ ${peer.address}`
       routeThru: "route",
       egressVia: "all egress routed via",
       stopRouting: "stop",
+      exitFailed: "failed",
+      exitReconnect: "Reconnect",
+      exitReconnectAll: "Reconnect all",
+      exitChecking: "checking\u2026",
+      exitNotChecked: "not checked",
+      exitDown: "down",
+      exitRefresh: "Refresh",
+      noExitAvailable: "No exit available \u2014 routing and proxy are off.",
+      noExitHint: "Every exit failed 3 checks in a row and is no longer checked. Press Reconnect to try one again.",
+      routeFellBack: "Routing fell back to direct: every exit it used failed. Reconnect one to route through it again.",
       identity: "Identity",
       userId: "user id",
       carrierAddr: "carrier address",
@@ -6850,6 +6948,16 @@ ${peer.address}`
       routeThru: "\u8DEF\u7531",
       egressVia: "\u5168\u90E8\u51FA\u53E3\u6D41\u91CF\u7ECF\u7531",
       stopRouting: "\u505C\u6B62",
+      exitFailed: "\u5DF2\u5931\u8D25",
+      exitReconnect: "\u91CD\u65B0\u8FDE\u63A5",
+      exitReconnectAll: "\u5168\u90E8\u91CD\u8FDE",
+      exitChecking: "\u68C0\u6D4B\u4E2D\u2026",
+      exitNotChecked: "\u672A\u68C0\u6D4B",
+      exitDown: "\u4E0D\u901A",
+      exitRefresh: "\u5237\u65B0",
+      noExitAvailable: "\u6CA1\u6709\u53EF\u7528\u7684\u51FA\u53E3 \u2014\u2014 \u8DEF\u7531\u548C\u4EE3\u7406\u5DF2\u5173\u95ED\u3002",
+      noExitHint: "\u6240\u6709\u51FA\u53E3\u90FD\u8FDE\u7EED 3 \u6B21\u68C0\u6D4B\u5931\u8D25,\u5DF2\u4E0D\u518D\u68C0\u6D4B\u3002\u70B9\u300C\u91CD\u65B0\u8FDE\u63A5\u300D\u518D\u8BD5\u4E00\u6B21\u3002",
+      routeFellBack: "\u8DEF\u7531\u5DF2\u6539\u56DE\u76F4\u8FDE:\u5B83\u4F7F\u7528\u7684\u51FA\u53E3\u5168\u90E8\u5931\u8D25\u3002\u91CD\u65B0\u8FDE\u63A5\u5176\u4E2D\u4E00\u4E2A\u5373\u53EF\u6062\u590D\u3002",
       identity: "\u8EAB\u4EFD",
       userId: "\u7528\u6237 ID",
       carrierAddr: "Carrier \u5730\u5740",
@@ -7144,7 +7252,7 @@ ${peer.address}`
       return hasTab(tabs, want) || DK_PEOPLE_TABS.includes(want) && showPeople ? want : firstTab;
     });
     const [activeId, setActiveId] = React.useState(null);
-    const data = useDaemonData();
+    const data = useDaemonData({ exits: tab === "network" });
     const me = data.me;
     const [upd, setUpd] = React.useState(null);
     React.useEffect(() => {
@@ -7507,6 +7615,14 @@ ${peer.address}`
     const onEdit = (name, description) => dkApi.setProfile(name, description).then(data.refresh);
     const onSetExit = () => {
     };
+    const onReconnectExit = (ip) => (ip ? dkApi.reconnectExit(ip) : dkApi.reconnectAllExits()).then((r) => {
+      data.refresh();
+      return r;
+    });
+    const onRefreshExits = () => dkApi.refreshExits().then((r) => {
+      data.refresh();
+      return r;
+    });
     const onOpenChat = (id) => {
       setTab("chat");
       openConversation(id);
@@ -7586,7 +7702,7 @@ ${peer.address}`
       fontWeight: 600,
       background: tab === n.id ? "var(--accent)" : "transparent",
       color: tab === n.id ? "#fff" : "var(--dim)"
-    } }, /* @__PURE__ */ React.createElement(Icon, { name: n.icon, size: 14, stroke: 2, color: tab === n.id ? "#fff" : "var(--dim)" }), n.label))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, phone, isProtocol, protocolFix, onBack: closeConversation, peers, requests, activeId, thread: activeId === ASSISTANT_ID ? assistant.thread : data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), hasEarlier: !!(activeId && activeId !== ASSISTANT_ID && data.earlier[activeId]), onAssistantRemove: activeId === ASSISTANT_ID ? assistant.removeFriends : null, onAssistantAdopt: activeId === ASSISTANT_ID ? assistant.adoptServicePeers : null, onLoadEarlier: () => activeId && data.loadEarlier(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr(""), muted: mutedIds, onToggleMute }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t, me, peers, phone, setTab }), tabs.map((x) => x.kind === "host" && tab === x.id ? /* @__PURE__ */ React.createElement(HostTabPane, { key: x.id, tab: x, props: { T, t, me, peers, phone, setTab }, lang: t.lang }) : null), tab === "profile" && /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement(Icon, { name: n.icon, size: 14, stroke: 2, color: tab === n.id ? "#fff" : "var(--dim)" }), n.label))), tab === "chat" && /* @__PURE__ */ React.createElement(ChatTab, { T, lang: t.lang, phone, isProtocol, protocolFix, onBack: closeConversation, peers, requests, activeId, thread: activeId === ASSISTANT_ID ? assistant.thread : data.threads[activeId], onSelect, onAct, onAdd, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread: () => activeId && data.loadThread(activeId), hasEarlier: !!(activeId && activeId !== ASSISTANT_ID && data.earlier[activeId]), onAssistantRemove: activeId === ASSISTANT_ID ? assistant.removeFriends : null, onAssistantAdopt: activeId === ASSISTANT_ID ? assistant.adoptServicePeers : null, onLoadEarlier: () => activeId && data.loadEarlier(activeId), prefillAddr: pendingAddr, onPrefillConsumed: () => setPendingAddr(""), muted: mutedIds, onToggleMute }), tab === "here" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "bridge", peers, meId: me.userId, onAdd, onOpenChat }), tab === "recommended" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "recommended", peers, meId: me.userId, onAdd, onOpenChat }), tab === "registered" && /* @__PURE__ */ React.createElement(DiscoverTab, { T, kind: "registered", peers, meId: me.userId, onAdd, onOpenChat }), tab === "network" && /* @__PURE__ */ React.createElement(NetworkTab, { T, me, peers, exits, activeExit, exitFeature: data.exitFeature, routeFallback: data.routeFallback, onReconnectExit, onRefreshExits, reqCount: requests.length, onSetExit, onOpenChat, backend, onArmLan: armLan, onCancelLan: cancelLan }), tab === "apps" && /* @__PURE__ */ React.createElement(AppsTab, { T, t, me, peers, phone, setTab }), tabs.map((x) => x.kind === "host" && tab === x.id ? /* @__PURE__ */ React.createElement(HostTabPane, { key: x.id, tab: x, props: { T, t, me, peers, phone, setTab }, lang: t.lang }) : null), tab === "profile" && /* @__PURE__ */ React.createElement(
       ProfileTab,
       {
         T,
