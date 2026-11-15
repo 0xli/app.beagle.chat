@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.39","builtAt":"2026-11-15T09:06:11.374Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.39","builtAt":"2026-11-15T21:25:37.557Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -90,7 +90,14 @@ globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.39","builtAt":"2026-11-1
     return out;
   }
   function b64ToBytes(b642) {
-    const bin = atob(b642.replace(/-/g, "+").replace(/_/g, "/"));
+    let s = String(b642);
+    const eq = s.indexOf("=");
+    if (eq >= 0)
+      s = s.slice(0, eq);
+    s = s.replace(/[^A-Za-z0-9+/_-]/g, "");
+    if (s.length % 4 === 1)
+      s = s.slice(0, -1);
+    const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
     const out = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++)
       out[i] = bin.charCodeAt(i);
