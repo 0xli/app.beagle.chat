@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.170","ui":"0.2.39","builtAt":"2026-11-05T06:17:07.969Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.39","builtAt":"2026-11-15T09:06:11.374Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -814,7 +814,7 @@ onmessage = (e) => {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
-      (function(nacl15) {
+      (function(nacl18) {
         "use strict";
         var gf = function(init) {
           var i, r = new Float64Array(16);
@@ -2827,7 +2827,7 @@ onmessage = (e) => {
           return n;
         }
         var crypto_secretbox_KEYBYTES = 32, crypto_secretbox_NONCEBYTES = 24, crypto_secretbox_ZEROBYTES = 32, crypto_secretbox_BOXZEROBYTES = 16, crypto_scalarmult_BYTES = 32, crypto_scalarmult_SCALARBYTES = 32, crypto_box_PUBLICKEYBYTES = 32, crypto_box_SECRETKEYBYTES = 32, crypto_box_BEFORENMBYTES = 32, crypto_box_NONCEBYTES = crypto_secretbox_NONCEBYTES, crypto_box_ZEROBYTES = crypto_secretbox_ZEROBYTES, crypto_box_BOXZEROBYTES = crypto_secretbox_BOXZEROBYTES, crypto_sign_BYTES = 64, crypto_sign_PUBLICKEYBYTES = 32, crypto_sign_SECRETKEYBYTES = 64, crypto_sign_SEEDBYTES = 32, crypto_hash_BYTES = 64;
-        nacl15.lowlevel = {
+        nacl18.lowlevel = {
           crypto_core_hsalsa20,
           crypto_stream_xor,
           crypto_stream,
@@ -2905,12 +2905,12 @@ onmessage = (e) => {
           for (var i = 0; i < arr.length; i++)
             arr[i] = 0;
         }
-        nacl15.randomBytes = function(n) {
+        nacl18.randomBytes = function(n) {
           var b = new Uint8Array(n);
           randombytes(b, n);
           return b;
         };
-        nacl15.secretbox = function(msg, nonce, key2) {
+        nacl18.secretbox = function(msg, nonce, key2) {
           checkArrayTypes(msg, nonce, key2);
           checkLengths(key2, nonce);
           var m = new Uint8Array(crypto_secretbox_ZEROBYTES + msg.length);
@@ -2920,7 +2920,7 @@ onmessage = (e) => {
           crypto_secretbox(c, m, m.length, nonce, key2);
           return c.subarray(crypto_secretbox_BOXZEROBYTES);
         };
-        nacl15.secretbox.open = function(box, nonce, key2) {
+        nacl18.secretbox.open = function(box, nonce, key2) {
           checkArrayTypes(box, nonce, key2);
           checkLengths(key2, nonce);
           var c = new Uint8Array(crypto_secretbox_BOXZEROBYTES + box.length);
@@ -2933,10 +2933,10 @@ onmessage = (e) => {
             return null;
           return m.subarray(crypto_secretbox_ZEROBYTES);
         };
-        nacl15.secretbox.keyLength = crypto_secretbox_KEYBYTES;
-        nacl15.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
-        nacl15.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
-        nacl15.scalarMult = function(n, p) {
+        nacl18.secretbox.keyLength = crypto_secretbox_KEYBYTES;
+        nacl18.secretbox.nonceLength = crypto_secretbox_NONCEBYTES;
+        nacl18.secretbox.overheadLength = crypto_secretbox_BOXZEROBYTES;
+        nacl18.scalarMult = function(n, p) {
           checkArrayTypes(n, p);
           if (n.length !== crypto_scalarmult_SCALARBYTES)
             throw new Error("bad n size");
@@ -2946,7 +2946,7 @@ onmessage = (e) => {
           crypto_scalarmult(q, n, p);
           return q;
         };
-        nacl15.scalarMult.base = function(n) {
+        nacl18.scalarMult.base = function(n) {
           checkArrayTypes(n);
           if (n.length !== crypto_scalarmult_SCALARBYTES)
             throw new Error("bad n size");
@@ -2954,32 +2954,32 @@ onmessage = (e) => {
           crypto_scalarmult_base(q, n);
           return q;
         };
-        nacl15.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
-        nacl15.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
-        nacl15.box = function(msg, nonce, publicKey, secretKey) {
-          var k = nacl15.box.before(publicKey, secretKey);
-          return nacl15.secretbox(msg, nonce, k);
+        nacl18.scalarMult.scalarLength = crypto_scalarmult_SCALARBYTES;
+        nacl18.scalarMult.groupElementLength = crypto_scalarmult_BYTES;
+        nacl18.box = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl18.box.before(publicKey, secretKey);
+          return nacl18.secretbox(msg, nonce, k);
         };
-        nacl15.box.before = function(publicKey, secretKey) {
+        nacl18.box.before = function(publicKey, secretKey) {
           checkArrayTypes(publicKey, secretKey);
           checkBoxLengths(publicKey, secretKey);
           var k = new Uint8Array(crypto_box_BEFORENMBYTES);
           crypto_box_beforenm(k, publicKey, secretKey);
           return k;
         };
-        nacl15.box.after = nacl15.secretbox;
-        nacl15.box.open = function(msg, nonce, publicKey, secretKey) {
-          var k = nacl15.box.before(publicKey, secretKey);
-          return nacl15.secretbox.open(msg, nonce, k);
+        nacl18.box.after = nacl18.secretbox;
+        nacl18.box.open = function(msg, nonce, publicKey, secretKey) {
+          var k = nacl18.box.before(publicKey, secretKey);
+          return nacl18.secretbox.open(msg, nonce, k);
         };
-        nacl15.box.open.after = nacl15.secretbox.open;
-        nacl15.box.keyPair = function() {
+        nacl18.box.open.after = nacl18.secretbox.open;
+        nacl18.box.keyPair = function() {
           var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
           var sk = new Uint8Array(crypto_box_SECRETKEYBYTES);
           crypto_box_keypair(pk, sk);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl15.box.keyPair.fromSecretKey = function(secretKey) {
+        nacl18.box.keyPair.fromSecretKey = function(secretKey) {
           checkArrayTypes(secretKey);
           if (secretKey.length !== crypto_box_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -2987,12 +2987,12 @@ onmessage = (e) => {
           crypto_scalarmult_base(pk, secretKey);
           return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
         };
-        nacl15.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
-        nacl15.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
-        nacl15.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
-        nacl15.box.nonceLength = crypto_box_NONCEBYTES;
-        nacl15.box.overheadLength = nacl15.secretbox.overheadLength;
-        nacl15.sign = function(msg, secretKey) {
+        nacl18.box.publicKeyLength = crypto_box_PUBLICKEYBYTES;
+        nacl18.box.secretKeyLength = crypto_box_SECRETKEYBYTES;
+        nacl18.box.sharedKeyLength = crypto_box_BEFORENMBYTES;
+        nacl18.box.nonceLength = crypto_box_NONCEBYTES;
+        nacl18.box.overheadLength = nacl18.secretbox.overheadLength;
+        nacl18.sign = function(msg, secretKey) {
           checkArrayTypes(msg, secretKey);
           if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -3000,7 +3000,7 @@ onmessage = (e) => {
           crypto_sign(signedMsg, msg, msg.length, secretKey);
           return signedMsg;
         };
-        nacl15.sign.open = function(signedMsg, publicKey) {
+        nacl18.sign.open = function(signedMsg, publicKey) {
           checkArrayTypes(signedMsg, publicKey);
           if (publicKey.length !== crypto_sign_PUBLICKEYBYTES)
             throw new Error("bad public key size");
@@ -3013,14 +3013,14 @@ onmessage = (e) => {
             m[i] = tmp[i];
           return m;
         };
-        nacl15.sign.detached = function(msg, secretKey) {
-          var signedMsg = nacl15.sign(msg, secretKey);
+        nacl18.sign.detached = function(msg, secretKey) {
+          var signedMsg = nacl18.sign(msg, secretKey);
           var sig = new Uint8Array(crypto_sign_BYTES);
           for (var i = 0; i < sig.length; i++)
             sig[i] = signedMsg[i];
           return sig;
         };
-        nacl15.sign.detached.verify = function(msg, sig, publicKey) {
+        nacl18.sign.detached.verify = function(msg, sig, publicKey) {
           checkArrayTypes(msg, sig, publicKey);
           if (sig.length !== crypto_sign_BYTES)
             throw new Error("bad signature size");
@@ -3035,13 +3035,13 @@ onmessage = (e) => {
             sm[i + crypto_sign_BYTES] = msg[i];
           return crypto_sign_open(m, sm, sm.length, publicKey) >= 0;
         };
-        nacl15.sign.keyPair = function() {
+        nacl18.sign.keyPair = function() {
           var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
           var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
           crypto_sign_keypair(pk, sk);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl15.sign.keyPair.fromSecretKey = function(secretKey) {
+        nacl18.sign.keyPair.fromSecretKey = function(secretKey) {
           checkArrayTypes(secretKey);
           if (secretKey.length !== crypto_sign_SECRETKEYBYTES)
             throw new Error("bad secret key size");
@@ -3050,7 +3050,7 @@ onmessage = (e) => {
             pk[i] = secretKey[32 + i];
           return { publicKey: pk, secretKey: new Uint8Array(secretKey) };
         };
-        nacl15.sign.keyPair.fromSeed = function(seed) {
+        nacl18.sign.keyPair.fromSeed = function(seed) {
           checkArrayTypes(seed);
           if (seed.length !== crypto_sign_SEEDBYTES)
             throw new Error("bad seed size");
@@ -3061,18 +3061,18 @@ onmessage = (e) => {
           crypto_sign_keypair(pk, sk, true);
           return { publicKey: pk, secretKey: sk };
         };
-        nacl15.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
-        nacl15.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
-        nacl15.sign.seedLength = crypto_sign_SEEDBYTES;
-        nacl15.sign.signatureLength = crypto_sign_BYTES;
-        nacl15.hash = function(msg) {
+        nacl18.sign.publicKeyLength = crypto_sign_PUBLICKEYBYTES;
+        nacl18.sign.secretKeyLength = crypto_sign_SECRETKEYBYTES;
+        nacl18.sign.seedLength = crypto_sign_SEEDBYTES;
+        nacl18.sign.signatureLength = crypto_sign_BYTES;
+        nacl18.hash = function(msg) {
           checkArrayTypes(msg);
           var h = new Uint8Array(crypto_hash_BYTES);
           crypto_hash(h, msg, msg.length);
           return h;
         };
-        nacl15.hash.hashLength = crypto_hash_BYTES;
-        nacl15.verify = function(x, y) {
+        nacl18.hash.hashLength = crypto_hash_BYTES;
+        nacl18.verify = function(x, y) {
           checkArrayTypes(x, y);
           if (x.length === 0 || y.length === 0)
             return false;
@@ -3080,14 +3080,14 @@ onmessage = (e) => {
             return false;
           return vn(x, 0, y, 0, x.length) === 0 ? true : false;
         };
-        nacl15.setPRNG = function(fn) {
+        nacl18.setPRNG = function(fn) {
           randombytes = fn;
         };
         (function() {
           var crypto2 = typeof self !== "undefined" ? self.crypto || self.msCrypto : null;
           if (crypto2 && crypto2.getRandomValues) {
             var QUOTA = 65536;
-            nacl15.setPRNG(function(x, n) {
+            nacl18.setPRNG(function(x, n) {
               var i, v = new Uint8Array(n);
               for (i = 0; i < n; i += QUOTA) {
                 crypto2.getRandomValues(v.subarray(i, i + Math.min(n - i, QUOTA)));
@@ -3099,7 +3099,7 @@ onmessage = (e) => {
           } else if (typeof __require !== "undefined") {
             crypto2 = (init_node_crypto(), __toCommonJS(node_crypto_exports));
             if (crypto2 && crypto2.randomBytes) {
-              nacl15.setPRNG(function(x, n) {
+              nacl18.setPRNG(function(x, n) {
                 var i, v = crypto2.randomBytes(n);
                 for (i = 0; i < n; i++)
                   x[i] = v[i];
@@ -6604,6 +6604,85 @@ onmessage = (e) => {
     }
   });
 
+  // node_modules/@decentnetwork/peer/dist/crypto/shared-key.js
+  function sharedKey(theirPublicKey, ourSecretKey) {
+    let table = tables.get(ourSecretKey);
+    if (!table) {
+      table = /* @__PURE__ */ new Map();
+      tables.set(ourSecretKey, table);
+    }
+    const id = bytesToHex2(theirPublicKey);
+    const hit = table.get(id);
+    if (hit)
+      return hit;
+    const key2 = boxBefore(theirPublicKey, ourSecretKey);
+    if (table.size >= MAX_PER_SECRET) {
+      const oldest = table.keys().next().value;
+      if (oldest !== void 0)
+        table.delete(oldest);
+    }
+    table.set(id, key2);
+    return key2;
+  }
+  function boxBefore(theirPublicKey, ourSecretKey) {
+    if (nativeOk === void 0)
+      nativeOk = selfCheck();
+    if (nativeOk) {
+      const key2 = nativeBefore(theirPublicKey, ourSecretKey);
+      if (key2)
+        return key2;
+    }
+    return import_tweetnacl5.default.box.before(theirPublicKey, ourSecretKey);
+  }
+  function nativeBefore(theirPublicKey, ourSecretKey) {
+    try {
+      let priv = privateKeys.get(ourSecretKey);
+      if (!priv) {
+        priv = (void 0)({ key: Buffer2.from(concatBytes([PKCS8_X25519, ourSecretKey])), format: "der", type: "pkcs8" });
+        privateKeys.set(ourSecretKey, priv);
+      }
+      const pub = (void 0)({ key: Buffer2.from(concatBytes([SPKI_X25519, theirPublicKey])), format: "der", type: "spki" });
+      const shared = (void 0)({ privateKey: priv, publicKey: pub });
+      const key2 = new Uint8Array(32);
+      hsalsa20(key2, ZERO16, new Uint8Array(shared), SIGMA);
+      return key2;
+    } catch {
+      return void 0;
+    }
+  }
+  function selfCheck() {
+    try {
+      if (!hsalsa20 || typeof void 0 !== "function" || typeof void 0 !== "function")
+        return false;
+      const a = import_tweetnacl5.default.box.keyPair();
+      const b = import_tweetnacl5.default.box.keyPair();
+      const native2 = nativeBefore(b.publicKey, a.secretKey);
+      const js = import_tweetnacl5.default.box.before(b.publicKey, a.secretKey);
+      return !!native2 && native2.length === 32 && native2.every((v, i) => v === js[i]);
+    } catch {
+      return false;
+    }
+  }
+  var import_tweetnacl5, tables, MAX_PER_SECRET, PKCS8_X25519, SPKI_X25519, SIGMA, ZERO16, hsalsa20, nativeOk, privateKeys;
+  var init_shared_key = __esm({
+    "node_modules/@decentnetwork/peer/dist/crypto/shared-key.js"() {
+      init_buffer_global();
+      init_process_global();
+      init_worker_timers();
+      init_node_crypto();
+      import_tweetnacl5 = __toESM(require_nacl_fast(), 1);
+      init_bytes();
+      tables = /* @__PURE__ */ new WeakMap();
+      MAX_PER_SECRET = 2048;
+      PKCS8_X25519 = Uint8Array.from([48, 46, 2, 1, 0, 48, 5, 6, 3, 43, 101, 110, 4, 34, 4, 32]);
+      SPKI_X25519 = Uint8Array.from([48, 42, 48, 5, 6, 3, 43, 101, 110, 3, 33, 0]);
+      SIGMA = new TextEncoder().encode("expand 32-byte k");
+      ZERO16 = new Uint8Array(16);
+      hsalsa20 = import_tweetnacl5.default.lowlevel?.crypto_core_hsalsa20;
+      privateKeys = /* @__PURE__ */ new WeakMap();
+    }
+  });
+
   // node_modules/@decentnetwork/peer/dist/compat/tox-onion.js
   function createOnionAnnounceRequest(opts) {
     ensureLen(opts.senderPublicKey, KEY_SIZE, "sender public key");
@@ -6620,7 +6699,7 @@ onmessage = (e) => {
       opts.dataPublicKey,
       opts.sendBack
     ]);
-    const encrypted = import_tweetnacl5.default.box(plain, nonce, opts.nodePublicKey, opts.senderSecretKey);
+    const encrypted = import_tweetnacl6.default.box.after(plain, nonce, sharedKey(opts.nodePublicKey, opts.senderSecretKey));
     return concatBytes([
       Uint8Array.of(NET_PACKET_ONION_ANNOUNCE_REQUEST),
       nonce,
@@ -6638,7 +6717,7 @@ onmessage = (e) => {
     const sendBack = packet.slice(1, 1 + SEND_BACK_SIZE);
     const nonce = packet.slice(1 + SEND_BACK_SIZE, 1 + SEND_BACK_SIZE + NONCE_SIZE2);
     const encrypted = packet.slice(1 + SEND_BACK_SIZE + NONCE_SIZE2);
-    const plain = import_tweetnacl5.default.box.open(encrypted, nonce, opts.nodePublicKey, opts.requesterSecretKey);
+    const plain = import_tweetnacl6.default.box.open.after(encrypted, nonce, sharedKey(opts.nodePublicKey, opts.requesterSecretKey));
     if (!plain || plain.length < 1 + KEY_SIZE) {
       return void 0;
     }
@@ -6656,8 +6735,8 @@ onmessage = (e) => {
     if (opts.onionDataPacket.length === 0) {
       throw new Error("onion data payload must not be empty");
     }
-    const temp = import_tweetnacl5.default.box.keyPair();
-    const encrypted = import_tweetnacl5.default.box(opts.onionDataPacket, opts.nonce, opts.routePublicKey, temp.secretKey);
+    const temp = import_tweetnacl6.default.box.keyPair();
+    const encrypted = import_tweetnacl6.default.box(opts.onionDataPacket, opts.nonce, opts.routePublicKey, temp.secretKey);
     return concatBytes([
       Uint8Array.of(NET_PACKET_ONION_DATA_REQUEST),
       opts.destinationPublicKey,
@@ -6675,13 +6754,13 @@ onmessage = (e) => {
       throw new Error("inner packet id must be uint8");
     }
     const plain = concatBytes([Uint8Array.of(opts.innerPacketId), opts.innerPayload]);
-    const encrypted = import_tweetnacl5.default.box(plain, opts.nonce, opts.receiverPublicKey, opts.senderSecretKey);
+    const encrypted = import_tweetnacl6.default.box.after(plain, opts.nonce, sharedKey(opts.receiverPublicKey, opts.senderSecretKey));
     return concatBytes([opts.senderPublicKey, encrypted]);
   }
   function deriveOnionHopKeys(nodePublicKey) {
     ensureLen(nodePublicKey, KEY_SIZE, "hop node public key");
-    const kp = import_tweetnacl5.default.box.keyPair();
-    return { publicKey: kp.publicKey, shared: import_tweetnacl5.default.box.before(nodePublicKey, kp.secretKey) };
+    const kp = import_tweetnacl6.default.box.keyPair();
+    return { publicKey: kp.publicKey, shared: boxBefore(nodePublicKey, kp.secretKey) };
   }
   function createOnionRequest0(opts) {
     ensureLen(opts.nodeAPublicKey, KEY_SIZE, "node A public key");
@@ -6690,21 +6769,21 @@ onmessage = (e) => {
     const nonce = randomBytes2(NONCE_SIZE2);
     const dPart = concatBytes([packIpPort(opts.nodeDHost, opts.nodeDPort), opts.payloadForNodeD]);
     const key2 = opts.hopKeys?.c ?? deriveOnionHopKeys(opts.nodeCPublicKey);
-    const cEncrypted = import_tweetnacl5.default.box.after(dPart, nonce, key2.shared);
+    const cEncrypted = import_tweetnacl6.default.box.after(dPart, nonce, key2.shared);
     const cPart = concatBytes([
       packIpPort(opts.nodeCHost, opts.nodeCPort),
       key2.publicKey,
       cEncrypted
     ]);
     const key1 = opts.hopKeys?.b ?? deriveOnionHopKeys(opts.nodeBPublicKey);
-    const bEncrypted = import_tweetnacl5.default.box.after(cPart, nonce, key1.shared);
+    const bEncrypted = import_tweetnacl6.default.box.after(cPart, nonce, key1.shared);
     const bPart = concatBytes([
       packIpPort(opts.nodeBHost, opts.nodeBPort),
       key1.publicKey,
       bEncrypted
     ]);
     const key0 = opts.hopKeys?.a ?? deriveOnionHopKeys(opts.nodeAPublicKey);
-    const aEncrypted = import_tweetnacl5.default.box.after(bPart, nonce, key0.shared);
+    const aEncrypted = import_tweetnacl6.default.box.after(bPart, nonce, key0.shared);
     return concatBytes([
       Uint8Array.of(NET_PACKET_ONION_REQUEST_0),
       nonce,
@@ -6718,14 +6797,14 @@ onmessage = (e) => {
     const nonce = randomBytes2(NONCE_SIZE2);
     const dPart = concatBytes([packIpPort(opts.nodeDHost, opts.nodeDPort), opts.payloadForNodeD]);
     const key2 = opts.hopKeys?.c ?? deriveOnionHopKeys(opts.nodeCPublicKey);
-    const cEncrypted = import_tweetnacl5.default.box.after(dPart, nonce, key2.shared);
+    const cEncrypted = import_tweetnacl6.default.box.after(dPart, nonce, key2.shared);
     const cPart = concatBytes([
       packIpPort(opts.nodeCHost, opts.nodeCPort),
       key2.publicKey,
       cEncrypted
     ]);
     const key1 = opts.hopKeys?.b ?? deriveOnionHopKeys(opts.nodeBPublicKey);
-    const bEncrypted = import_tweetnacl5.default.box.after(cPart, nonce, key1.shared);
+    const bEncrypted = import_tweetnacl6.default.box.after(cPart, nonce, key1.shared);
     return concatBytes([
       nonce,
       packIpPort(opts.nodeBHost, opts.nodeBPort),
@@ -6743,7 +6822,7 @@ onmessage = (e) => {
     const nonce = packet.slice(1, 1 + NONCE_SIZE2);
     const sourceTempPublicKey = packet.slice(1 + NONCE_SIZE2, 1 + NONCE_SIZE2 + KEY_SIZE);
     const encrypted = packet.slice(1 + NONCE_SIZE2 + KEY_SIZE);
-    const plain = import_tweetnacl5.default.box.open(encrypted, nonce, sourceTempPublicKey, opts.dataSecretKey);
+    const plain = import_tweetnacl6.default.box.open(encrypted, nonce, sourceTempPublicKey, opts.dataSecretKey);
     if (!plain || plain.length < KEY_SIZE + 16) {
       return void 0;
     }
@@ -6755,7 +6834,7 @@ onmessage = (e) => {
     }
     const senderPublicKey = payload.slice(0, KEY_SIZE);
     const encrypted = payload.slice(KEY_SIZE);
-    const plain = import_tweetnacl5.default.box.open(encrypted, opts.nonce, senderPublicKey, opts.receiverSecretKey);
+    const plain = import_tweetnacl6.default.box.open.after(encrypted, opts.nonce, sharedKey(senderPublicKey, opts.receiverSecretKey));
     if (!plain || plain.length === 0) {
       return void 0;
     }
@@ -6791,14 +6870,15 @@ onmessage = (e) => {
     out[18] = port & 255;
     return out;
   }
-  var import_tweetnacl5, NET_PACKET_ONION_ANNOUNCE_REQUEST, NET_PACKET_ONION_ANNOUNCE_RESPONSE, NET_PACKET_ONION_DATA_REQUEST, NET_PACKET_ONION_DATA_RESPONSE, ONION_FRIEND_REQUEST_ID, NET_PACKET_ONION_REQUEST_0, KEY_SIZE, NONCE_SIZE2, SEND_BACK_SIZE, PACKED_IP_PORT_SIZE;
+  var import_tweetnacl6, NET_PACKET_ONION_ANNOUNCE_REQUEST, NET_PACKET_ONION_ANNOUNCE_RESPONSE, NET_PACKET_ONION_DATA_REQUEST, NET_PACKET_ONION_DATA_RESPONSE, ONION_FRIEND_REQUEST_ID, NET_PACKET_ONION_REQUEST_0, KEY_SIZE, NONCE_SIZE2, SEND_BACK_SIZE, PACKED_IP_PORT_SIZE;
   var init_tox_onion = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/tox-onion.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
-      import_tweetnacl5 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl6 = __toESM(require_nacl_fast(), 1);
       init_bytes();
+      init_shared_key();
       NET_PACKET_ONION_ANNOUNCE_REQUEST = 131;
       NET_PACKET_ONION_ANNOUNCE_RESPONSE = 132;
       NET_PACKET_ONION_DATA_REQUEST = 133;
@@ -6825,7 +6905,7 @@ onmessage = (e) => {
     }
     const nonce = randomBytes2(NONCE_SIZE3);
     const plain = concatBytes([Uint8Array.of(opts.requestId), opts.data]);
-    const encrypted = import_tweetnacl6.default.box(plain, nonce, opts.receiverPublicKey, opts.sender.secretKey);
+    const encrypted = import_tweetnacl7.default.box.after(plain, nonce, sharedKey(opts.receiverPublicKey, opts.sender.secretKey));
     return concatBytes([
       Uint8Array.of(NET_PACKET_CRYPTO),
       opts.receiverPublicKey,
@@ -6851,7 +6931,7 @@ onmessage = (e) => {
     const senderPublicKey = packet.slice(1 + PUBLIC_KEY_SIZE2, 1 + PUBLIC_KEY_SIZE2 * 2);
     const nonce = packet.slice(1 + PUBLIC_KEY_SIZE2 * 2, 1 + PUBLIC_KEY_SIZE2 * 2 + NONCE_SIZE3);
     const encrypted = packet.slice(1 + PUBLIC_KEY_SIZE2 * 2 + NONCE_SIZE3);
-    const plain = import_tweetnacl6.default.box.open(encrypted, nonce, senderPublicKey, self2.secretKey);
+    const plain = import_tweetnacl7.default.box.open.after(encrypted, nonce, sharedKey(senderPublicKey, self2.secretKey));
     if (!plain || plain.length === 0) {
       return void 0;
     }
@@ -6872,14 +6952,15 @@ onmessage = (e) => {
     }
     return diff === 0;
   }
-  var import_tweetnacl6, NET_PACKET_CRYPTO, CRYPTO_PACKET_FRIEND_REQ, CRYPTO_PACKET_DHTPK, PUBLIC_KEY_SIZE2, NONCE_SIZE3, MAC_SIZE2, MAX_CRYPTO_REQUEST_SIZE;
+  var import_tweetnacl7, NET_PACKET_CRYPTO, CRYPTO_PACKET_FRIEND_REQ, CRYPTO_PACKET_DHTPK, PUBLIC_KEY_SIZE2, NONCE_SIZE3, MAC_SIZE2, MAX_CRYPTO_REQUEST_SIZE;
   var init_tox_dht_crypto = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/tox-dht-crypto.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
-      import_tweetnacl6 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl7 = __toESM(require_nacl_fast(), 1);
       init_bytes();
+      init_shared_key();
       NET_PACKET_CRYPTO = 32;
       CRYPTO_PACKET_FRIEND_REQ = 32;
       CRYPTO_PACKET_DHTPK = 156;
@@ -6896,7 +6977,7 @@ onmessage = (e) => {
   }
   function encodeDhtRpc(type2, sender, recipientPublicKey, plain) {
     const nonce = randomBytes2(NONCE_SIZE4);
-    const encrypted = import_tweetnacl7.default.box(plain, nonce, recipientPublicKey, sender.secretKey);
+    const encrypted = import_tweetnacl8.default.box.after(plain, nonce, sharedKey(recipientPublicKey, sender.secretKey));
     return concatBytes([Uint8Array.of(type2), sender.publicKey, nonce, encrypted]);
   }
   function decodeDhtRpc(packet, ourSecretKey) {
@@ -6908,7 +6989,7 @@ onmessage = (e) => {
     const senderPublicKey = packet.slice(1, 1 + KEY_SIZE2);
     const nonce = packet.slice(1 + KEY_SIZE2, 1 + KEY_SIZE2 + NONCE_SIZE4);
     const encrypted = packet.slice(1 + KEY_SIZE2 + NONCE_SIZE4);
-    const plain = import_tweetnacl7.default.box.open(encrypted, nonce, senderPublicKey, ourSecretKey);
+    const plain = import_tweetnacl8.default.box.open.after(encrypted, nonce, sharedKey(senderPublicKey, ourSecretKey));
     if (!plain)
       return void 0;
     return { type: type2, senderPublicKey, plain };
@@ -6957,14 +7038,15 @@ onmessage = (e) => {
     out.set(pk, 7);
     return out;
   }
-  var import_tweetnacl7, NET_PACKET_PING_REQUEST, NET_PACKET_PING_RESPONSE, NET_PACKET_GET_NODES2, NET_PACKET_SEND_NODES, KEY_SIZE2, NONCE_SIZE4, MAC_SIZE3;
+  var import_tweetnacl8, NET_PACKET_PING_REQUEST, NET_PACKET_PING_RESPONSE, NET_PACKET_GET_NODES2, NET_PACKET_SEND_NODES, KEY_SIZE2, NONCE_SIZE4, MAC_SIZE3;
   var init_dht_rpc = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/dht-rpc.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
-      import_tweetnacl7 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl8 = __toESM(require_nacl_fast(), 1);
       init_bytes();
+      init_shared_key();
       NET_PACKET_PING_REQUEST = 0;
       NET_PACKET_PING_RESPONSE = 1;
       NET_PACKET_GET_NODES2 = 2;
@@ -8351,34 +8433,6 @@ onmessage = (e) => {
     }
   });
 
-  // node_modules/@decentnetwork/peer/dist/crypto/shared-key.js
-  function sharedKey(theirPublicKey, ourSecretKey) {
-    const id = bytesToHex2(theirPublicKey);
-    const hit = cache.get(id);
-    if (hit && hit.sk === ourSecretKey)
-      return hit.key;
-    const key2 = import_tweetnacl8.default.box.before(theirPublicKey, ourSecretKey);
-    if (cache.size >= MAX_ENTRIES) {
-      const oldest = cache.keys().next().value;
-      if (oldest !== void 0)
-        cache.delete(oldest);
-    }
-    cache.set(id, { sk: ourSecretKey, key: key2 });
-    return key2;
-  }
-  var import_tweetnacl8, cache, MAX_ENTRIES;
-  var init_shared_key = __esm({
-    "node_modules/@decentnetwork/peer/dist/crypto/shared-key.js"() {
-      init_buffer_global();
-      init_process_global();
-      init_worker_timers();
-      import_tweetnacl8 = __toESM(require_nacl_fast(), 1);
-      init_bytes();
-      cache = /* @__PURE__ */ new Map();
-      MAX_ENTRIES = 1024;
-    }
-  });
-
   // node_modules/@decentnetwork/peer/dist/compat/net-crypto.js
   function createCookieRequest(opts) {
     if (opts.senderRealPublicKey.length !== KEY_SIZE3) {
@@ -8681,10 +8735,592 @@ onmessage = (e) => {
     }
   });
 
+  // node_modules/@decentnetwork/peer/dist/crypto/rendezvous.js
+  function createCarrierRendezvousAuthProof(identitySecretKey, serverEphemeralPublicKey, authTranscript) {
+    if (identitySecretKey.length !== import_tweetnacl10.default.box.secretKeyLength) {
+      throw new RangeError(`identitySecretKey must be ${import_tweetnacl10.default.box.secretKeyLength} bytes`);
+    }
+    if (serverEphemeralPublicKey.length !== import_tweetnacl10.default.box.publicKeyLength) {
+      throw new RangeError(`serverEphemeralPublicKey must be ${import_tweetnacl10.default.box.publicKeyLength} bytes`);
+    }
+    if (authTranscript.length === 0)
+      throw new RangeError("authTranscript must not be empty");
+    const rawShared = import_tweetnacl10.default.scalarMult(identitySecretKey, serverEphemeralPublicKey);
+    const isLowOrder = rawShared.every((byte) => byte === 0);
+    rawShared.fill(0);
+    if (isLowOrder)
+      throw new Error("serverEphemeralPublicKey is low order");
+    const shared = import_tweetnacl10.default.box.before(serverEphemeralPublicKey, identitySecretKey);
+    const authKey = createHmac("sha256", Buffer2.from(shared)).update(RENDEZVOUS_AUTH_KEY_DOMAIN, "utf8").digest();
+    shared.fill(0);
+    try {
+      return Uint8Array.from(createHmac("sha256", authKey).update(authTranscript).digest());
+    } finally {
+      authKey.fill(0);
+    }
+  }
+  var import_tweetnacl10, RENDEZVOUS_AUTH_KEY_DOMAIN;
+  var init_rendezvous = __esm({
+    "node_modules/@decentnetwork/peer/dist/crypto/rendezvous.js"() {
+      init_buffer_global();
+      init_process_global();
+      init_worker_timers();
+      init_node_crypto();
+      import_tweetnacl10 = __toESM(require_nacl_fast(), 1);
+      RENDEZVOUS_AUTH_KEY_DOMAIN = "RSP-CARRIER-AUTH-KEY/1";
+    }
+  });
+
+  // node_modules/@decentnetwork/peer/dist/compat/doorbell.js
+  function buildDoorbellTranscript(f) {
+    for (const [name, value] of Object.entries({ nodeId: f.nodeId, nonce: f.nonce, serverKey: f.serverKey, userid: f.userid })) {
+      if (typeof value !== "string" || value.length === 0 || value.includes("\n")) {
+        throw new TypeError(`transcript field ${name} must be a non-empty single-line string`);
+      }
+    }
+    if (!Number.isSafeInteger(f.expiresAt))
+      throw new TypeError("expiresAt must be an integer");
+    return new TextEncoder().encode([DOORBELL_TRANSCRIPT_TAG, f.nodeId, f.nonce, String(f.expiresAt), f.serverKey, f.userid].join("\n"));
+  }
+  async function createCarrierRendezvousAuthProofWebCrypto(identitySecretKey, serverEphemeralPublicKey, authTranscript) {
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle)
+      throw new Error("no HMAC available (node:crypto or WebCrypto)");
+    if (identitySecretKey.length !== import_tweetnacl11.default.box.secretKeyLength)
+      throw new RangeError("identitySecretKey must be 32 bytes");
+    if (serverEphemeralPublicKey.length !== import_tweetnacl11.default.box.publicKeyLength)
+      throw new RangeError("serverEphemeralPublicKey must be 32 bytes");
+    if (authTranscript.length === 0)
+      throw new RangeError("authTranscript must not be empty");
+    const raw = import_tweetnacl11.default.scalarMult(identitySecretKey, serverEphemeralPublicKey);
+    const lowOrder = raw.every((b) => b === 0);
+    raw.fill(0);
+    if (lowOrder)
+      throw new Error("serverEphemeralPublicKey is low order");
+    const shared = import_tweetnacl11.default.box.before(serverEphemeralPublicKey, identitySecretKey);
+    const hmac2 = async (key2, data) => {
+      const keyCopy = new Uint8Array(key2);
+      try {
+        const k = await subtle.importKey("raw", keyCopy, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+        return new Uint8Array(await subtle.sign("HMAC", k, new Uint8Array(data)));
+      } finally {
+        keyCopy.fill(0);
+      }
+    };
+    try {
+      const authKey = await hmac2(shared, new TextEncoder().encode(RENDEZVOUS_AUTH_KEY_DOMAIN));
+      try {
+        return await hmac2(authKey, authTranscript);
+      } finally {
+        authKey.fill(0);
+      }
+    } finally {
+      shared.fill(0);
+    }
+  }
+  async function makeProof(secretKey, serverKey, transcript) {
+    try {
+      return createCarrierRendezvousAuthProof(secretKey, serverKey, transcript);
+    } catch (err) {
+      if (err instanceof RangeError || /low order/.test(err?.message ?? ""))
+        throw err;
+      return createCarrierRendezvousAuthProofWebCrypto(secretKey, serverKey, transcript);
+    }
+  }
+  function toBase64(bytes) {
+    let s = "";
+    for (const b of bytes)
+      s += String.fromCharCode(b);
+    return btoa(s);
+  }
+  function frameText(data) {
+    if (typeof data === "string")
+      return data;
+    if (data instanceof ArrayBuffer)
+      return new TextDecoder().decode(data);
+    if (data instanceof Uint8Array)
+      return new TextDecoder().decode(data);
+    return null;
+  }
+  function unref(t) {
+    t?.unref?.();
+    return t;
+  }
+  function makeWatchdog(onExpire, confirmMs = WATCHDOG_CONFIRM_MS) {
+    let timer;
+    let generation = 0;
+    return {
+      arm(ms2) {
+        clearTimeout(timer);
+        const g = ++generation;
+        timer = unref(setTimeout(() => {
+          timer = unref(setTimeout(() => {
+            if (g === generation)
+              onExpire();
+          }, confirmMs));
+        }, ms2));
+      },
+      clear() {
+        generation++;
+        clearTimeout(timer);
+        timer = void 0;
+      }
+    };
+  }
+  function doorbellUrls(url) {
+    const u = new URL(url);
+    if (!["http:", "https:", "ws:", "wss:"].includes(u.protocol))
+      throw new TypeError(`unsupported doorbell URL ${url}`);
+    const secure = u.protocol === "https:" || u.protocol === "wss:";
+    const prefix = u.pathname.replace(/\/+$/, "").replace(/\/watch(\/stream)?$/, "");
+    return {
+      ws: `${secure ? "wss" : "ws"}://${u.host}${prefix}/watch`,
+      stream: `${secure ? "https" : "http"}://${u.host}${prefix}/watch/stream`
+    };
+  }
+  var import_tweetnacl11, DOORBELL_TRANSCRIPT_TAG, WATCHDOG_GRACE_MS, WATCHDOG_CONFIRM_MS, CONNECT_TIMEOUT_MS, STABLE_MS, _listeners, _secretKey, _urls, _transport2, _mode, _nodeId, _WebSocket, _fetch, _minBackoffMs, _maxBackoffMs, _watchdogGraceMs, _attempt, _stopped, _loop, _closeCurrent, _sleepCancel, _connected, _emit, emit_fn, _run, run_fn, _nextDelay, nextDelay_fn, _sleep, sleep_fn, _authFor, authFor_fn, _onFrame, onFrame_fn, _onceWs, onceWs_fn, _onceStream, onceStream_fn, DoorbellClient;
+  var init_doorbell = __esm({
+    "node_modules/@decentnetwork/peer/dist/compat/doorbell.js"() {
+      init_buffer_global();
+      init_process_global();
+      init_worker_timers();
+      import_tweetnacl11 = __toESM(require_nacl_fast());
+      init_rendezvous();
+      init_base58();
+      DOORBELL_TRANSCRIPT_TAG = "DOORBELL/1";
+      WATCHDOG_GRACE_MS = 1e4;
+      WATCHDOG_CONFIRM_MS = 2e3;
+      CONNECT_TIMEOUT_MS = 15e3;
+      STABLE_MS = 1e4;
+      DoorbellClient = class {
+        constructor(o) {
+          __privateAdd(this, _emit);
+          __privateAdd(this, _run);
+          __privateAdd(this, _nextDelay);
+          __privateAdd(this, _sleep);
+          __privateAdd(this, _authFor);
+          // Frames after auth, common to both transports.
+          __privateAdd(this, _onFrame);
+          __privateAdd(this, _onceWs);
+          __privateAdd(this, _onceStream);
+          __publicField(this, "userid");
+          /** Transport of the live connection, or null. */
+          __publicField(this, "transport", null);
+          __privateAdd(this, _listeners, /* @__PURE__ */ new Map());
+          __privateAdd(this, _secretKey, void 0);
+          __privateAdd(this, _urls, void 0);
+          __privateAdd(this, _transport2, void 0);
+          __privateAdd(this, _mode, void 0);
+          __privateAdd(this, _nodeId, void 0);
+          __privateAdd(this, _WebSocket, void 0);
+          __privateAdd(this, _fetch, void 0);
+          __privateAdd(this, _minBackoffMs, void 0);
+          __privateAdd(this, _maxBackoffMs, void 0);
+          __privateAdd(this, _watchdogGraceMs, void 0);
+          __privateAdd(this, _attempt, 0);
+          __privateAdd(this, _stopped, true);
+          __privateAdd(this, _loop, null);
+          __privateAdd(this, _closeCurrent, null);
+          __privateAdd(this, _sleepCancel, null);
+          __privateAdd(this, _connected, false);
+          if (!o?.url)
+            throw new TypeError("url is required");
+          if (!(o.secretKey instanceof Uint8Array) || o.secretKey.length !== 32) {
+            throw new TypeError("secretKey must be 32 bytes");
+          }
+          __privateSet(this, _secretKey, new Uint8Array(o.secretKey));
+          this.userid = bytesToBase58(import_tweetnacl11.default.box.keyPair.fromSecretKey(__privateGet(this, _secretKey)).publicKey);
+          __privateSet(this, _urls, doorbellUrls(o.url));
+          __privateSet(this, _transport2, o.transport ?? "auto");
+          if (!["auto", "ws", "stream"].includes(__privateGet(this, _transport2)))
+            throw new TypeError(`bad transport ${o.transport}`);
+          const globalWs = globalThis.WebSocket;
+          __privateSet(this, _WebSocket, o.WebSocket === null ? null : o.WebSocket ?? globalWs ?? null);
+          if (__privateGet(this, _transport2) === "ws" && !__privateGet(this, _WebSocket))
+            throw new Error("transport ws needs a WebSocket implementation");
+          __privateSet(this, _mode, __privateGet(this, _transport2) === "stream" || !__privateGet(this, _WebSocket) ? "stream" : "ws");
+          __privateSet(this, _nodeId, o.nodeId);
+          __privateSet(this, _fetch, o.fetch);
+          __privateSet(this, _minBackoffMs, o.minBackoffMs ?? 1e3);
+          __privateSet(this, _maxBackoffMs, o.maxBackoffMs ?? 6e4);
+          __privateSet(this, _watchdogGraceMs, o.watchdogGraceMs ?? WATCHDOG_GRACE_MS);
+        }
+        on(event, fn) {
+          let set = __privateGet(this, _listeners).get(event);
+          if (!set)
+            __privateGet(this, _listeners).set(event, set = /* @__PURE__ */ new Set());
+          set.add(fn);
+          return this;
+        }
+        off(event, fn) {
+          __privateGet(this, _listeners).get(event)?.delete(fn);
+          return this;
+        }
+        /** True between "ready" and the next disconnect. */
+        get connected() {
+          return __privateGet(this, _connected);
+        }
+        start() {
+          if (!__privateGet(this, _stopped))
+            return this;
+          __privateSet(this, _stopped, false);
+          __privateSet(this, _loop, __privateMethod(this, _run, run_fn).call(this));
+          return this;
+        }
+        async stop() {
+          var _a, _b;
+          __privateSet(this, _stopped, true);
+          (_a = __privateGet(this, _closeCurrent)) == null ? void 0 : _a.call(this);
+          (_b = __privateGet(this, _sleepCancel)) == null ? void 0 : _b.call(this);
+          await __privateGet(this, _loop);
+        }
+      };
+      _listeners = new WeakMap();
+      _secretKey = new WeakMap();
+      _urls = new WeakMap();
+      _transport2 = new WeakMap();
+      _mode = new WeakMap();
+      _nodeId = new WeakMap();
+      _WebSocket = new WeakMap();
+      _fetch = new WeakMap();
+      _minBackoffMs = new WeakMap();
+      _maxBackoffMs = new WeakMap();
+      _watchdogGraceMs = new WeakMap();
+      _attempt = new WeakMap();
+      _stopped = new WeakMap();
+      _loop = new WeakMap();
+      _closeCurrent = new WeakMap();
+      _sleepCancel = new WeakMap();
+      _connected = new WeakMap();
+      _emit = new WeakSet();
+      emit_fn = function(event, arg) {
+        for (const fn of __privateGet(this, _listeners).get(event) ?? []) {
+          try {
+            fn(arg);
+          } catch (err) {
+            if (event !== "error")
+              __privateMethod(this, _emit, emit_fn).call(this, "error", err instanceof Error ? err : new Error(String(err)));
+          }
+        }
+      };
+      _run = new WeakSet();
+      run_fn = async function() {
+        while (!__privateGet(this, _stopped)) {
+          const mode = __privateGet(this, _mode);
+          let r;
+          try {
+            r = mode === "ws" ? await __privateMethod(this, _onceWs, onceWs_fn).call(this) : await __privateMethod(this, _onceStream, onceStream_fn).call(this);
+          } catch (err) {
+            r = { gotHello: false, ready: false, readyMs: 0, code: 0, reason: err?.message ?? String(err) };
+          }
+          __privateSet(this, _connected, false);
+          this.transport = null;
+          if (__privateGet(this, _stopped))
+            break;
+          __privateMethod(this, _emit, emit_fn).call(this, "disconnect", { transport: mode, code: r.code, reason: r.reason, wasReady: r.ready });
+          if (r.authError)
+            __privateMethod(this, _emit, emit_fn).call(this, "error", new Error(`doorbell refused auth: ${r.authError}`));
+          await __privateMethod(this, _sleep, sleep_fn).call(this, __privateMethod(this, _nextDelay, nextDelay_fn).call(this, mode, r));
+        }
+      };
+      _nextDelay = new WeakSet();
+      nextDelay_fn = function(mode, r) {
+        if (r.ready && r.readyMs >= STABLE_MS)
+          __privateSet(this, _attempt, 0);
+        if (r.code === 1012 || r.reason === "restart") {
+          __privateSet(this, _attempt, Math.min(__privateGet(this, _attempt), 1));
+          return 500 + Math.random() * 2500;
+        }
+        if (r.code === 4009 || r.reason === "replaced")
+          return __privateGet(this, _maxBackoffMs);
+        if (!r.gotHello && __privateGet(this, _transport2) === "auto") {
+          __privateSet(this, _mode, mode === "ws" ? "stream" : __privateGet(this, _WebSocket) ? "ws" : "stream");
+        }
+        __privateWrapper(this, _attempt)._++;
+        const base2 = Math.min(__privateGet(this, _maxBackoffMs), __privateGet(this, _minBackoffMs) * 2 ** (__privateGet(this, _attempt) - 1));
+        let delay = base2 / 2 + Math.random() * base2 / 2;
+        if (r.authError)
+          delay = Math.max(delay, Math.min(1e4, __privateGet(this, _maxBackoffMs)));
+        return delay;
+      };
+      _sleep = new WeakSet();
+      sleep_fn = function(ms2) {
+        return new Promise((resolve2) => {
+          const t = unref(setTimeout(() => {
+            __privateSet(this, _sleepCancel, null);
+            resolve2();
+          }, ms2));
+          __privateSet(this, _sleepCancel, () => {
+            clearTimeout(t);
+            __privateSet(this, _sleepCancel, null);
+            resolve2();
+          });
+        });
+      };
+      _authFor = new WeakSet();
+      authFor_fn = async function(hello) {
+        if (hello.v !== 1)
+          throw new Error(`unsupported doorbell protocol v${hello.v}`);
+        if (__privateGet(this, _nodeId) && hello.node !== __privateGet(this, _nodeId))
+          throw new Error(`doorbell is node ${hello.node}, expected ${__privateGet(this, _nodeId)}`);
+        if (typeof hello.serverKey !== "string" || hello.serverKey.length > 64)
+          throw new Error("bad serverKey in hello");
+        let serverKey;
+        try {
+          serverKey = base58ToBytes(hello.serverKey);
+        } catch {
+          throw new Error("bad serverKey in hello");
+        }
+        if (serverKey.length !== 32)
+          throw new Error("bad serverKey in hello");
+        const transcript = buildDoorbellTranscript({
+          nodeId: hello.node,
+          nonce: hello.nonce,
+          expiresAt: hello.expiresAt,
+          serverKey: hello.serverKey,
+          userid: this.userid
+        });
+        const proof = await makeProof(__privateGet(this, _secretKey), serverKey, transcript);
+        return { type: "auth", nonce: hello.nonce, userid: this.userid, proof: toBase64(proof) };
+      };
+      _onFrame = new WeakSet();
+      onFrame_fn = function(msg, ctx) {
+        switch (msg.type) {
+          case "ready":
+            ctx.res.ready = true;
+            ctx.readyAt = Date.now();
+            ctx.pingMs = (Number(msg.ping) || 50) * 1e3;
+            ctx.arm(ctx.pingMs * 2 + __privateGet(this, _watchdogGraceMs));
+            __privateSet(this, _connected, true);
+            this.transport = ctx.transport;
+            __privateMethod(this, _emit, emit_fn).call(this, "ready", { transport: ctx.transport, ping: Number(msg.ping) || 50 });
+            __privateMethod(this, _emit, emit_fn).call(this, "mail", { reason: "ready" });
+            break;
+          case "ping":
+            if (ctx.res.ready)
+              ctx.arm(ctx.pingMs * 2 + __privateGet(this, _watchdogGraceMs));
+            break;
+          case "mail":
+            if (ctx.res.ready) {
+              ctx.arm(ctx.pingMs * 2 + __privateGet(this, _watchdogGraceMs));
+              __privateMethod(this, _emit, emit_fn).call(this, "mail", { reason: "ring" });
+            }
+            break;
+          case "call":
+            if (ctx.res.ready) {
+              ctx.arm(ctx.pingMs * 2 + __privateGet(this, _watchdogGraceMs));
+              const payload = msg.payload;
+              if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+                const ts = Number(msg.ts);
+                __privateMethod(this, _emit, emit_fn).call(this, "call", { payload, ...Number.isFinite(ts) ? { ts } : {} });
+              }
+            }
+            break;
+          default:
+            break;
+          case "error":
+            ctx.res.authError = String(msg.code);
+            ctx.res.reason = String(msg.code);
+            break;
+          case "bye":
+            ctx.res.code = Number(msg.code) || 0;
+            ctx.res.reason = String(msg.reason ?? "");
+            break;
+        }
+      };
+      _onceWs = new WeakSet();
+      onceWs_fn = function() {
+        const WS = __privateGet(this, _WebSocket);
+        if (!WS)
+          return Promise.resolve({ gotHello: false, ready: false, readyMs: 0, code: 0, reason: "no WebSocket implementation" });
+        return new Promise((resolve2) => {
+          const res = { gotHello: false, ready: false, readyMs: 0, code: 0, reason: "" };
+          let ws;
+          let settled = false;
+          const finish = (extra) => {
+            if (settled)
+              return;
+            settled = true;
+            dog.clear();
+            __privateSet(this, _closeCurrent, null);
+            if (ctx.readyAt)
+              res.readyMs = Date.now() - ctx.readyAt;
+            Object.assign(res, extra);
+            resolve2(res);
+          };
+          const kill = (reason) => {
+            res.reason = res.reason || reason;
+            try {
+              if (typeof ws?.terminate === "function")
+                ws.terminate();
+              else
+                ws?.close();
+            } catch {
+            }
+            finish({});
+          };
+          const dog = makeWatchdog(() => kill("watchdog"));
+          const ctx = { res, transport: "ws", readyAt: 0, pingMs: 5e4, arm: (ms2) => dog.arm(ms2) };
+          __privateSet(this, _closeCurrent, () => {
+            try {
+              ws?.close(1e3);
+            } catch {
+            }
+            finish({ reason: "stopped" });
+          });
+          try {
+            ws = new WS(__privateGet(this, _urls).ws);
+          } catch (err) {
+            finish({ reason: err?.message ?? String(err) });
+            return;
+          }
+          ctx.arm(CONNECT_TIMEOUT_MS);
+          ws.addEventListener("message", (ev) => {
+            const text = frameText(ev.data);
+            let msg = null;
+            try {
+              msg = text ? JSON.parse(text) : null;
+            } catch {
+              msg = null;
+            }
+            if (!msg || typeof msg.type !== "string")
+              return;
+            if (msg.type === "hello") {
+              if (res.gotHello)
+                return;
+              res.gotHello = true;
+              __privateMethod(this, _authFor, authFor_fn).call(this, msg).then((auth) => {
+                if (!settled)
+                  ws.send(JSON.stringify(auth));
+              }, (err) => kill(`bad_hello: ${err?.message ?? String(err)}`));
+              return;
+            }
+            __privateMethod(this, _onFrame, onFrame_fn).call(this, msg, ctx);
+          });
+          ws.addEventListener("close", (ev) => finish({ code: ev?.code ?? 0, reason: res.reason || ev?.reason || "" }));
+          ws.addEventListener("error", () => {
+          });
+        });
+      };
+      _onceStream = new WeakSet();
+      onceStream_fn = async function() {
+        const fetchFn = __privateGet(this, _fetch) ?? globalThis.fetch;
+        if (!fetchFn)
+          throw new Error("no fetch implementation");
+        const ac = new AbortController();
+        const res = { gotHello: false, ready: false, readyMs: 0, code: 0, reason: "" };
+        const dog = makeWatchdog(() => {
+          res.reason = res.reason || "watchdog";
+          ac.abort();
+        });
+        const ctx = { res, transport: "stream", readyAt: 0, pingMs: 5e4, arm: (ms2) => dog.arm(ms2) };
+        __privateSet(this, _closeCurrent, () => {
+          res.reason = "stopped";
+          ac.abort();
+        });
+        try {
+          ctx.arm(CONNECT_TIMEOUT_MS);
+          const h = await fetchFn(__privateGet(this, _urls).stream, { signal: ac.signal, headers: { accept: "application/json" } });
+          if (!h.ok) {
+            res.code = h.status;
+            res.reason = `hello_http_${h.status}`;
+            await h.body?.cancel?.().catch(() => {
+            });
+            return res;
+          }
+          const hello = await h.json();
+          if (hello?.type !== "hello") {
+            res.reason = "bad_hello";
+            return res;
+          }
+          res.gotHello = true;
+          const auth = await __privateMethod(this, _authFor, authFor_fn).call(this, hello);
+          const s = await fetchFn(__privateGet(this, _urls).stream, {
+            method: "POST",
+            signal: ac.signal,
+            headers: { "content-type": "application/json", accept: "application/x-ndjson" },
+            body: JSON.stringify(auth)
+          });
+          if (!s.ok) {
+            let code = null;
+            try {
+              code = String((await s.json()).code ?? "") || null;
+            } catch {
+              code = null;
+            }
+            res.code = s.status;
+            res.reason = code || `http_${s.status}`;
+            if (s.status === 401)
+              res.authError = res.reason;
+            return res;
+          }
+          if (!s.body) {
+            res.reason = "no_body";
+            return res;
+          }
+          const reader = s.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          for (; ; ) {
+            const { value, done } = await reader.read();
+            if (done)
+              break;
+            buf += decoder.decode(value, { stream: true });
+            let i;
+            while ((i = buf.indexOf("\n")) >= 0) {
+              const line = buf.slice(0, i);
+              buf = buf.slice(i + 1);
+              if (!line)
+                continue;
+              let msg = null;
+              try {
+                msg = JSON.parse(line);
+              } catch {
+                msg = null;
+              }
+              if (msg && typeof msg.type === "string")
+                __privateMethod(this, _onFrame, onFrame_fn).call(this, msg, ctx);
+            }
+            if (buf.length > 4096) {
+              res.reason = "oversized_frame";
+              break;
+            }
+          }
+          if (!res.reason)
+            res.reason = "eof";
+        } catch (err) {
+          const e = err;
+          if (!res.reason)
+            res.reason = e?.cause?.code || e?.message || e?.name || String(err);
+        } finally {
+          dog.clear();
+          __privateSet(this, _closeCurrent, null);
+          if (ctx.readyAt)
+            res.readyMs = Date.now() - ctx.readyAt;
+          try {
+            ac.abort();
+          } catch {
+          }
+        }
+        return res;
+      };
+    }
+  });
+
   // node_modules/@decentnetwork/peer/dist/compat/express.js
+  function expressDoorbellUrl(node) {
+    if (node.doorbell === false)
+      return void 0;
+    if (typeof node.doorbell === "string" && node.doorbell.trim())
+      return node.doorbell.trim();
+    return KNOWN_EXPRESS_DOORBELLS[`${String(node.host).toLowerCase()}:${node.port}`];
+  }
+  function doorbellBaseUrl(url) {
+    return doorbellUrls(url).stream.replace(/\/watch\/stream$/, "");
+  }
   function encrypt(key2, plain) {
     const nonce = randomBytes2(NONCE_SIZE6);
-    const cipher = import_tweetnacl10.default.secretbox(plain, nonce, key2);
+    const cipher = import_tweetnacl12.default.secretbox(plain, nonce, key2);
     const out = new Uint8Array(nonce.length + cipher.length);
     out.set(nonce, 0);
     out.set(cipher, nonce.length);
@@ -8696,7 +9332,7 @@ onmessage = (e) => {
     }
     const nonce = encrypted.slice(0, NONCE_SIZE6);
     const cipher = encrypted.slice(NONCE_SIZE6);
-    return import_tweetnacl10.default.secretbox.open(cipher, nonce, key2) ?? void 0;
+    return import_tweetnacl12.default.secretbox.open(cipher, nonce, key2) ?? void 0;
   }
   function parseExpressResponseFrames(body2) {
     const out = [];
@@ -8724,7 +9360,7 @@ onmessage = (e) => {
     const buf = new Uint8Array(fromBytes.length + payload.length);
     buf.set(fromBytes, 0);
     buf.set(payload, fromBytes.length);
-    return "xm:" + bytesToBase58(import_tweetnacl10.default.hash(buf).slice(0, 18));
+    return "xm:" + bytesToBase58(import_tweetnacl12.default.hash(buf).slice(0, 18));
   }
   function decodePullMessage(bytes) {
     const bb = new ByteBuffer(bytes);
@@ -8776,22 +9412,31 @@ onmessage = (e) => {
     const length = table.bb.__vector_len(table.bb_pos + offset);
     return table.bb.bytes().slice(vector, vector + length);
   }
-  var import_tweetnacl10, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _health, _callbacks, _debug, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
+  var import_tweetnacl12, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, DEFAULT_DOORBELL_SAFETY_PULL_MS, KNOWN_EXPRESS_DOORBELLS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _health, _callbacks, _debug, _doorbellOpts, _safetyPullMs, _bells, _lastPullMs, _inflight, _again, _pullCount, _pullNodeCoalesced, pullNodeCoalesced_fn, _pullNode, pullNode_fn, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
   var init_express = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/express.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
       init_flatbuffers();
-      import_tweetnacl10 = __toESM(require_nacl_fast());
+      import_tweetnacl12 = __toESM(require_nacl_fast());
       init_base58();
       init_bytes();
       init_shared_key();
+      init_doorbell();
       EXPRESS_MAGIC = 3396265365;
       NONCE_SIZE6 = 24;
       HTTP_TIMEOUT_MS = 15e3;
+      DEFAULT_DOORBELL_SAFETY_PULL_MS = 5 * 6e4;
+      KNOWN_EXPRESS_DOORBELLS = Object.freeze({
+        "lens.beagle.chat:443": "https://lens.beagle.chat"
+      });
       LegacyExpressClient = class {
         constructor(opts) {
+          /** At most one pull per node at a time. A ring (`queue`) during a pull asks
+           *  for one more pull after it; a timer tick during a pull is dropped. */
+          __privateAdd(this, _pullNodeCoalesced);
+          __privateAdd(this, _pullNode);
           __privateAdd(this, _postEncrypted);
           __privateAdd(this, _deleteUntilOn);
           __privateAdd(this, _withAnyNode);
@@ -8810,8 +9455,21 @@ onmessage = (e) => {
           // whatever the peer's debug setting was. That is why a stalled pull looked
           // identical to a pull that never ran.
           __privateAdd(this, _debug, process.env.DECENT_DEBUG === "1");
+          __privateAdd(this, _doorbellOpts, void 0);
+          __privateAdd(this, _safetyPullMs, void 0);
+          /** One watch per node that has a doorbell, keyed "host:port". */
+          __privateAdd(this, _bells, /* @__PURE__ */ new Map());
+          /** Per node: when its last pull started, the pull in flight, and whether a
+           *  ring arrived during it (then it runs once more, so a message stored after
+           *  the GET was answered is not left until the next safety pull). */
+          __privateAdd(this, _lastPullMs, /* @__PURE__ */ new Map());
+          __privateAdd(this, _inflight, /* @__PURE__ */ new Map());
+          __privateAdd(this, _again, /* @__PURE__ */ new Set());
+          __privateAdd(this, _pullCount, /* @__PURE__ */ new Map());
           if (opts.debug)
             __privateSet(this, _debug, true);
+          __privateSet(this, _doorbellOpts, opts.doorbell ?? {});
+          __privateSet(this, _safetyPullMs, Math.max(1, __privateGet(this, _doorbellOpts).safetyPullMs ?? DEFAULT_DOORBELL_SAFETY_PULL_MS));
           __privateSet(this, _selfKeyPair, opts.selfKeyPair);
           __privateSet(this, _selfUserId, opts.selfUserId);
           __privateSet(this, _selfAddress, opts.selfAddress);
@@ -8822,11 +9480,13 @@ onmessage = (e) => {
               throw new Error(`invalid express public key for ${node.host}:${node.port}`);
             }
             return {
+              id: `${node.host}:${node.port}`,
               host: node.host,
               port: node.port,
               tls: node.tls !== false,
               // default HTTPS; opt into HTTP with tls:false
-              sharedKey: sharedKey(expressPk, __privateGet(this, _selfKeyPair).secretKey)
+              sharedKey: sharedKey(expressPk, __privateGet(this, _selfKeyPair).secretKey),
+              doorbellUrl: expressDoorbellUrl(node)
             };
           }));
         }
@@ -8845,96 +9505,115 @@ onmessage = (e) => {
           const friendEncrypted = encrypt(friendSharedKey, carrierPacket);
           await __privateMethod(this, _postEncrypted, postEncrypted_fn).call(this, friendUserId, friendEncrypted);
         }
-        /** Reachability of each configured relay, for diag. */
+        /** Reachability of each configured relay, for diag. `doorbell` is "off"
+         *  (node has none, or it is disabled), "down" (watch not up: the node polls)
+         *  or "ready" (watched: pulled on a ring and every safetyPullMs). */
         health() {
           return __privateGet(this, _nodes2).map((n) => {
-            const id = `${n.host}:${n.port}`;
-            const h = __privateGet(this, _health).get(id);
-            return { node: id, fails: h?.fails ?? 0, lastError: h?.lastError ?? "", lastOkMs: h?.lastOkMs ?? 0 };
+            const h = __privateGet(this, _health).get(n.id);
+            const bell = __privateGet(this, _bells).get(n.id);
+            return {
+              node: n.id,
+              fails: h?.fails ?? 0,
+              lastError: h?.lastError ?? "",
+              lastOkMs: h?.lastOkMs ?? 0,
+              doorbell: !bell ? "off" : bell.connected ? "ready" : "down",
+              ...bell?.transport ? { doorbellTransport: bell.transport } : {},
+              pulls: __privateGet(this, _pullCount).get(n.id) ?? 0
+            };
           });
+        }
+        /**
+         * Open one doorbell watch per node that has one. Each watch pulls its node
+         * when it becomes ready (anything that arrived while we were away) and on
+         * every ring. Returns how many watches run. Idempotent.
+         */
+        startDoorbells() {
+          if (__privateGet(this, _doorbellOpts).enabled === false)
+            return 0;
+          for (const node of __privateGet(this, _nodes2)) {
+            if (!node.doorbellUrl || __privateGet(this, _bells).has(node.id))
+              continue;
+            let bell;
+            try {
+              bell = new DoorbellClient({
+                url: node.doorbellUrl,
+                secretKey: __privateGet(this, _selfKeyPair).secretKey,
+                transport: __privateGet(this, _doorbellOpts).transport ?? "auto",
+                WebSocket: __privateGet(this, _doorbellOpts).WebSocket,
+                fetch: __privateGet(this, _doorbellOpts).fetch,
+                minBackoffMs: __privateGet(this, _doorbellOpts).minBackoffMs,
+                maxBackoffMs: __privateGet(this, _doorbellOpts).maxBackoffMs
+              });
+            } catch (error) {
+              __privateMethod(this, _debugLog, debugLog_fn).call(this, `doorbell for ${node.id} not started: ${error?.message ?? String(error)}`);
+              continue;
+            }
+            bell.on("ready", ({ transport }) => __privateMethod(this, _debugLog, debugLog_fn).call(this, `doorbell ${node.id} ready over ${transport}; polling stops for this node`));
+            bell.on("mail", ({ reason }) => {
+              void __privateMethod(this, _pullNodeCoalesced, pullNodeCoalesced_fn).call(this, node, reason, true).catch(() => {
+              });
+            });
+            bell.on("disconnect", ({ transport, code, reason, wasReady }) => __privateMethod(this, _debugLog, debugLog_fn).call(this, `doorbell ${node.id} ${transport} down (code=${code} reason=${reason} wasReady=${wasReady}); polling this node until it is back`));
+            bell.on("error", (error) => __privateMethod(this, _debugLog, debugLog_fn).call(this, `doorbell ${node.id}: ${error.message}`));
+            bell.on("call", ({ payload, ts }) => {
+              __privateMethod(this, _debugLog, debugLog_fn).call(this, `doorbell ${node.id} call frame`);
+              __privateGet(this, _callbacks).onDoorbellCall?.(node.id, payload, ts);
+            });
+            __privateGet(this, _bells).set(node.id, bell);
+            bell.start();
+            __privateMethod(this, _debugLog, debugLog_fn).call(this, `doorbell ${node.id} watching ${node.doorbellUrl}`);
+          }
+          return __privateGet(this, _bells).size;
+        }
+        /** Base URLs of the doorbells this client watches (or would, once started),
+         *  one per doorbell, for registering with the push gateway. Empty when the
+         *  doorbell is turned off. */
+        doorbellBases() {
+          if (__privateGet(this, _doorbellOpts).enabled === false)
+            return [];
+          const out = /* @__PURE__ */ new Set();
+          for (const n of __privateGet(this, _nodes2)) {
+            if (!n.doorbellUrl)
+              continue;
+            try {
+              out.add(doorbellBaseUrl(n.doorbellUrl));
+            } catch {
+            }
+          }
+          return [...out];
+        }
+        async stopDoorbells() {
+          const bells = [...__privateGet(this, _bells).values()];
+          __privateGet(this, _bells).clear();
+          await Promise.allSettled(bells.map((b) => b.stop()));
+        }
+        /**
+         * One tick of the poll timer. A node whose doorbell is ready is pulled only
+         * when its last pull is safetyPullMs old; every other node (no doorbell, or
+         * the watch is down) is pulled as it always was.
+         */
+        async pollTick() {
+          const now = Date.now();
+          const due = [];
+          for (const node of __privateGet(this, _nodes2)) {
+            const bell = __privateGet(this, _bells).get(node.id);
+            if (!bell?.connected) {
+              due.push({ node, reason: "poll" });
+            } else if (now - (__privateGet(this, _lastPullMs).get(node.id) ?? 0) >= __privateGet(this, _safetyPullMs)) {
+              due.push({ node, reason: "safety" });
+            }
+          }
+          for (const { node, reason } of due)
+            await __privateMethod(this, _pullNodeCoalesced, pullNodeCoalesced_fn).call(this, node, reason, false);
         }
         async pullOnce() {
           __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${__privateGet(this, _nodes2).length} node(s)`);
           if (!__privateGet(this, _nodes2).length) {
             return;
           }
-          const now = Date.now();
-          for (const node of __privateGet(this, _nodes2)) {
-            const id = `${node.host}:${node.port}`;
-            const h = __privateGet(this, _health).get(id) ?? { fails: 0, lastError: "", lastOkMs: 0, nextTryMs: 0 };
-            if (h.fails > 0 && now < h.nextTryMs)
-              continue;
-            let body2;
-            try {
-              body2 = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
-            } catch (error) {
-              const msg = error?.message ?? String(error);
-              h.fails += 1;
-              h.lastError = msg;
-              h.nextTryMs = now + Math.min(12e4, 5e3 * 2 ** Math.min(5, h.fails - 1));
-              __privateGet(this, _health).set(id, h);
-              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${id} failed (${h.fails} in a row): ${msg}`);
-              if (h.fails === 1 || h.fails % 10 === 0) {
-                __privateGet(this, _callbacks).onNodeUnreachable?.(id, msg, h.fails);
-              }
-              continue;
-            }
-            if (h.fails > 0) {
-              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${id} recovered after ${h.fails} failure(s)`);
-              __privateGet(this, _callbacks).onNodeRecovered?.(id, h.fails);
-            }
-            __privateGet(this, _health).set(id, { fails: 0, lastError: "", lastOkMs: now, nextTryMs: 0 });
-            const messages = parseExpressResponseFrames(body2);
-            if (messages.length === 0) {
-              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${body2.length} byte(s) from ${node.host} parsed to 0 frames`);
-              continue;
-            }
-            __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce got ${messages.length} offline frame(s) from ${node.host}:${node.port}`);
-            let lastTimestamp = 0;
-            let requestCount = 0;
-            let messageCount = 0;
-            for (const encrypted of messages) {
-              const plain = decrypt(node.sharedKey, encrypted);
-              if (!plain) {
-                continue;
-              }
-              const msg = decodePullMessage(plain);
-              if (!msg) {
-                continue;
-              }
-              lastTimestamp = Math.max(lastTimestamp, msg.timestamp);
-              if (msg.type === "R") {
-                if (!msg.address || msg.address !== __privateGet(this, _selfAddress)) {
-                  __privateMethod(this, _debugLog, debugLog_fn).call(this, `drop offline request with unmatched address from ${msg.from}`);
-                  continue;
-                }
-                __privateGet(this, _callbacks).onOfflineFriendRequest(msg.from, msg.payload, msg.timestamp);
-                requestCount += 1;
-                __privateMethod(this, _debugLog, debugLog_fn).call(this, `offline friend request from ${msg.from} ts=${msg.timestamp}`);
-              } else if (msg.type === "M") {
-                try {
-                  const friendPk = base58ToBytes(msg.from);
-                  if (friendPk.length !== 32) {
-                    continue;
-                  }
-                  const friendSharedKey = sharedKey(friendPk, __privateGet(this, _selfKeyPair).secretKey);
-                  const packet = decrypt(friendSharedKey, msg.payload);
-                  if (!packet) {
-                    continue;
-                  }
-                  __privateGet(this, _callbacks).onOfflineFriendMessage(msg.from, packet, msg.timestamp, offlineDedupKey(msg.from, msg.payload));
-                  messageCount += 1;
-                  __privateMethod(this, _debugLog, debugLog_fn).call(this, `offline message from ${msg.from} ts=${msg.timestamp}`);
-                } catch {
-                }
-              }
-            }
-            if (lastTimestamp > 0) {
-              __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull processed from ${node.host}: requests=${requestCount} messages=${messageCount}; ack until ts=${lastTimestamp}`);
-              await __privateMethod(this, _deleteUntilOn, deleteUntilOn_fn).call(this, node, lastTimestamp).catch(() => {
-              });
-            }
-          }
+          for (const node of __privateGet(this, _nodes2))
+            await __privateMethod(this, _pullNodeCoalesced, pullNodeCoalesced_fn).call(this, node, "manual", false);
         }
       };
       _nodes2 = new WeakMap();
@@ -8945,6 +9624,119 @@ onmessage = (e) => {
       _health = new WeakMap();
       _callbacks = new WeakMap();
       _debug = new WeakMap();
+      _doorbellOpts = new WeakMap();
+      _safetyPullMs = new WeakMap();
+      _bells = new WeakMap();
+      _lastPullMs = new WeakMap();
+      _inflight = new WeakMap();
+      _again = new WeakMap();
+      _pullCount = new WeakMap();
+      _pullNodeCoalesced = new WeakSet();
+      pullNodeCoalesced_fn = function(node, reason, queue) {
+        const running = __privateGet(this, _inflight).get(node.id);
+        if (running) {
+          if (queue)
+            __privateGet(this, _again).add(node.id);
+          return running;
+        }
+        const run = (async () => {
+          try {
+            let why = reason;
+            do {
+              __privateGet(this, _again).delete(node.id);
+              __privateGet(this, _lastPullMs).set(node.id, Date.now());
+              __privateGet(this, _pullCount).set(node.id, (__privateGet(this, _pullCount).get(node.id) ?? 0) + 1);
+              await __privateMethod(this, _pullNode, pullNode_fn).call(this, node, why);
+              why = "ring";
+            } while (__privateGet(this, _again).has(node.id));
+          } finally {
+            __privateGet(this, _inflight).delete(node.id);
+          }
+        })();
+        __privateGet(this, _inflight).set(node.id, run);
+        return run;
+      };
+      _pullNode = new WeakSet();
+      pullNode_fn = async function(node, reason) {
+        {
+          const now = Date.now();
+          const id = node.id;
+          const h = __privateGet(this, _health).get(id) ?? { fails: 0, lastError: "", lastOkMs: 0, nextTryMs: 0 };
+          if (h.fails > 0 && now < h.nextTryMs && reason !== "ring" && reason !== "ready")
+            return;
+          __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull ${id} (${reason})`);
+          let body2;
+          try {
+            body2 = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
+          } catch (error) {
+            const msg = error?.message ?? String(error);
+            h.fails += 1;
+            h.lastError = msg;
+            h.nextTryMs = now + Math.min(12e4, 5e3 * 2 ** Math.min(5, h.fails - 1));
+            __privateGet(this, _health).set(id, h);
+            __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${id} failed (${h.fails} in a row): ${msg}`);
+            if (h.fails === 1 || h.fails % 10 === 0) {
+              __privateGet(this, _callbacks).onNodeUnreachable?.(id, msg, h.fails);
+            }
+            return;
+          }
+          if (h.fails > 0) {
+            __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull from ${id} recovered after ${h.fails} failure(s)`);
+            __privateGet(this, _callbacks).onNodeRecovered?.(id, h.fails);
+          }
+          __privateGet(this, _health).set(id, { fails: 0, lastError: "", lastOkMs: now, nextTryMs: 0 });
+          const messages = parseExpressResponseFrames(body2);
+          if (messages.length === 0) {
+            __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${body2.length} byte(s) from ${node.host} parsed to 0 frames`);
+            return;
+          }
+          __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce got ${messages.length} offline frame(s) from ${node.host}:${node.port}`);
+          let lastTimestamp = 0;
+          let requestCount = 0;
+          let messageCount = 0;
+          for (const encrypted of messages) {
+            const plain = decrypt(node.sharedKey, encrypted);
+            if (!plain) {
+              continue;
+            }
+            const msg = decodePullMessage(plain);
+            if (!msg) {
+              continue;
+            }
+            lastTimestamp = Math.max(lastTimestamp, msg.timestamp);
+            if (msg.type === "R") {
+              if (!msg.address || msg.address !== __privateGet(this, _selfAddress)) {
+                __privateMethod(this, _debugLog, debugLog_fn).call(this, `drop offline request with unmatched address from ${msg.from}`);
+                continue;
+              }
+              __privateGet(this, _callbacks).onOfflineFriendRequest(msg.from, msg.payload, msg.timestamp);
+              requestCount += 1;
+              __privateMethod(this, _debugLog, debugLog_fn).call(this, `offline friend request from ${msg.from} ts=${msg.timestamp}`);
+            } else if (msg.type === "M") {
+              try {
+                const friendPk = base58ToBytes(msg.from);
+                if (friendPk.length !== 32) {
+                  continue;
+                }
+                const friendSharedKey = sharedKey(friendPk, __privateGet(this, _selfKeyPair).secretKey);
+                const packet = decrypt(friendSharedKey, msg.payload);
+                if (!packet) {
+                  continue;
+                }
+                __privateGet(this, _callbacks).onOfflineFriendMessage(msg.from, packet, msg.timestamp, offlineDedupKey(msg.from, msg.payload));
+                messageCount += 1;
+                __privateMethod(this, _debugLog, debugLog_fn).call(this, `offline message from ${msg.from} ts=${msg.timestamp}`);
+              } catch {
+              }
+            }
+          }
+          if (lastTimestamp > 0) {
+            __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull processed from ${node.host}: requests=${requestCount} messages=${messageCount}; ack until ts=${lastTimestamp}`);
+            await __privateMethod(this, _deleteUntilOn, deleteUntilOn_fn).call(this, node, lastTimestamp).catch(() => {
+            });
+          }
+        }
+      };
       _postEncrypted = new WeakSet();
       postEncrypted_fn = async function(to, plainData) {
         await __privateMethod(this, _withAnyNode, withAnyNode_fn).call(this, async (node) => {
@@ -9012,6 +9804,182 @@ onmessage = (e) => {
     }
   });
 
+  // node_modules/@decentnetwork/peer/dist/compat/express-push.js
+  function base64url(bytes) {
+    let s = "";
+    for (const b of bytes)
+      s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  async function sha2562(bytes) {
+    try {
+      return Uint8Array.from(createHash("sha256").update(bytes).digest());
+    } catch {
+      const subtle = globalThis.crypto?.subtle;
+      if (!subtle)
+        throw new Error("no SHA-256 available (node:crypto or WebCrypto)");
+      return new Uint8Array(await subtle.digest("SHA-256", new Uint8Array(bytes)));
+    }
+  }
+  async function expressPushTranscript(nodeUserId, action, callerUserId, timeMs, body2) {
+    const text = [EXPRESS_PUSH_PROOF_DOMAIN, nodeUserId, action, callerUserId, timeMs, base64url(await sha2562(body2))].join("\n");
+    return new TextEncoder().encode(text);
+  }
+  async function createExpressPushProof(secretKey, nodeUserId, action, callerUserId, timeMs, body2) {
+    const nodeKey = base58ToBytes(nodeUserId);
+    if (nodeKey.length !== 32)
+      throw new Error("gateway node userid must decode to 32 bytes");
+    const transcript = await expressPushTranscript(nodeUserId, action, callerUserId, timeMs, body2);
+    let proof;
+    try {
+      proof = createCarrierRendezvousAuthProof(secretKey, nodeKey, transcript);
+    } catch (err) {
+      if (err instanceof RangeError || /low order/.test(err?.message ?? ""))
+        throw err;
+      proof = await createCarrierRendezvousAuthProofWebCrypto(secretKey, nodeKey, transcript);
+    }
+    return base64url(proof);
+  }
+  function encodeExpressPushForm(fields) {
+    const pairs = Array.isArray(fields) ? fields : Object.entries(fields);
+    const seen = /* @__PURE__ */ new Set();
+    for (const [k] of pairs) {
+      if (seen.has(k))
+        throw new Error(`push form field ${k} given twice`);
+      seen.add(k);
+      if (k === "appKey")
+        throw new Error("the appKey never goes to the gateway");
+    }
+    return new URLSearchParams(pairs).toString();
+  }
+  var import_tweetnacl13, EXPRESS_PUSH_PROOF_DOMAIN, DEFAULT_EXPRESS_PUSH_URL, DEFAULT_EXPRESS_PUSH_NODE_USERID, DEFAULT_EXPRESS_PUSH_TIMEOUT_MS, _secretKey2, _timeoutMs, _fetch2, _now, _lastTimeMs, _offsetMs, _timeMs, timeMs_fn, _exchange, exchange_fn, ExpressPushGateway;
+  var init_express_push = __esm({
+    "node_modules/@decentnetwork/peer/dist/compat/express-push.js"() {
+      init_buffer_global();
+      init_process_global();
+      init_worker_timers();
+      import_tweetnacl13 = __toESM(require_nacl_fast(), 1);
+      init_node_crypto();
+      init_rendezvous();
+      init_doorbell();
+      init_base58();
+      EXPRESS_PUSH_PROOF_DOMAIN = "EXPRESS-PUSH/1";
+      DEFAULT_EXPRESS_PUSH_URL = "https://express.beagle.chat";
+      DEFAULT_EXPRESS_PUSH_NODE_USERID = "D7tCMLQQ3bCEzGUr9baGjAdoNvGJUtiDVGD7JJG3pCJW";
+      DEFAULT_EXPRESS_PUSH_TIMEOUT_MS = 6e3;
+      ExpressPushGateway = class {
+        constructor(o) {
+          // Strictly increasing: two identical requests in one millisecond would carry
+          // the same proof, and the gateway accepts a proof once.
+          __privateAdd(this, _timeMs);
+          __privateAdd(this, _exchange);
+          __publicField(this, "url");
+          __publicField(this, "nodeUserId");
+          __publicField(this, "callerUserId");
+          __privateAdd(this, _secretKey2, void 0);
+          __privateAdd(this, _timeoutMs, void 0);
+          __privateAdd(this, _fetch2, void 0);
+          __privateAdd(this, _now, void 0);
+          __privateAdd(this, _lastTimeMs, 0);
+          /** Learned from a clock refusal: the gateway's clock minus ours. */
+          __privateAdd(this, _offsetMs, 0);
+          if (!(o.secretKey instanceof Uint8Array) || o.secretKey.length !== 32)
+            throw new TypeError("secretKey must be 32 bytes");
+          __privateSet(this, _secretKey2, new Uint8Array(o.secretKey));
+          const derived = bytesToBase58(import_tweetnacl13.default.box.keyPair.fromSecretKey(__privateGet(this, _secretKey2)).publicKey);
+          if (o.callerUserId !== derived)
+            throw new Error("callerUserId does not match secretKey");
+          this.callerUserId = o.callerUserId;
+          this.url = (o.url ?? DEFAULT_EXPRESS_PUSH_URL).replace(/\/+$/, "");
+          this.nodeUserId = o.nodeUserId ?? DEFAULT_EXPRESS_PUSH_NODE_USERID;
+          __privateSet(this, _timeoutMs, o.timeoutMs ?? DEFAULT_EXPRESS_PUSH_TIMEOUT_MS);
+          __privateSet(this, _fetch2, o.fetch);
+          __privateSet(this, _now, o.now ?? Date.now);
+        }
+        /**
+         * One request through the gateway. A clock the gateway calls more than 5 min
+         * off is corrected from its `serverTime` and the request is resent once (a
+         * refused request delivered nothing). Every other answer is final.
+         */
+        async send(action, fields) {
+          const body2 = new TextEncoder().encode(encodeExpressPushForm(fields));
+          const first = await __privateMethod(this, _exchange, exchange_fn).call(this, action, body2, __privateMethod(this, _timeMs, timeMs_fn).call(this, __privateGet(this, _now).call(this) + __privateGet(this, _offsetMs)));
+          if (first.answered && first.status === 400 && first.refusedByGateway) {
+            const serverTime = Number(first.body?.data?.serverTime);
+            if (Number.isSafeInteger(serverTime) && serverTime > 0) {
+              __privateSet(this, _offsetMs, serverTime - __privateGet(this, _now).call(this));
+              __privateSet(this, _lastTimeMs, 0);
+              return __privateMethod(this, _exchange, exchange_fn).call(this, action, body2, __privateMethod(this, _timeMs, timeMs_fn).call(this, serverTime));
+            }
+          }
+          return first;
+        }
+      };
+      _secretKey2 = new WeakMap();
+      _timeoutMs = new WeakMap();
+      _fetch2 = new WeakMap();
+      _now = new WeakMap();
+      _lastTimeMs = new WeakMap();
+      _offsetMs = new WeakMap();
+      _timeMs = new WeakSet();
+      timeMs_fn = function(candidate) {
+        const t = Math.max(Math.floor(candidate), __privateGet(this, _lastTimeMs) + 1);
+        __privateSet(this, _lastTimeMs, t);
+        return t;
+      };
+      _exchange = new WeakSet();
+      exchange_fn = async function(action, body2, timeMs) {
+        const fetchFn = __privateGet(this, _fetch2) ?? globalThis.fetch;
+        if (!fetchFn)
+          return { answered: false, reason: "no fetch implementation" };
+        const time = String(timeMs);
+        const proof = await createExpressPushProof(__privateGet(this, _secretKey2), this.nodeUserId, action, this.callerUserId, time, body2);
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), __privateGet(this, _timeoutMs));
+        timer.unref?.();
+        let res;
+        let text;
+        try {
+          res = await fetchFn(`${this.url}/push/${action}/${encodeURIComponent(this.callerUserId)}`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/x-www-form-urlencoded",
+              "x-express-time": time,
+              "x-express-proof": proof
+            },
+            body: new Uint8Array(body2),
+            signal: ac.signal
+          });
+          text = await res.text();
+        } catch (err) {
+          const e = err;
+          return { answered: false, reason: e?.name === "AbortError" ? "timeout" : e?.cause?.code || e?.message || String(err) };
+        } finally {
+          clearTimeout(timer);
+        }
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+          return { answered: false, status: res.status, reason: `http_${res.status}` };
+        }
+        let json2 = null;
+        try {
+          json2 = JSON.parse(text);
+        } catch {
+          json2 = null;
+        }
+        const code = json2 && json2.code !== void 0 && json2.code !== null ? String(json2.code) : void 0;
+        return {
+          answered: true,
+          status: res.status,
+          ...code !== void 0 ? { code } : {},
+          ok: res.status === 200 && code === "0",
+          ...json2?.data?.muted === true ? { muted: true } : {},
+          ...json2?.data?.source === "express" ? { refusedByGateway: true } : {},
+          body: json2 ?? text
+        };
+      };
+    }
+  });
+
   // src/shims/node-net.js
   function configuredBridges() {
     let ls = null;
@@ -9053,7 +10021,7 @@ onmessage = (e) => {
   function createConnection(opts) {
     return new WsSocket(opts);
   }
-  var DEFAULT_BRIDGE, bridgeCursor, bridgeTickets, _listeners, _ws, _destroyed, _connected, _attempt, _target, _open, open_fn, _emit, emit_fn, WsSocket, connect;
+  var DEFAULT_BRIDGE, bridgeCursor, bridgeTickets, _listeners2, _ws, _destroyed, _connected2, _attempt2, _target, _open, open_fn, _emit2, emit_fn2, WsSocket, connect;
   var init_node_net = __esm({
     "src/shims/node-net.js"() {
       init_buffer_global();
@@ -9090,12 +10058,12 @@ onmessage = (e) => {
         constructor({ host, port }) {
           /** Open against bridge #attempt; failover happens in onclose. */
           __privateAdd(this, _open);
-          __privateAdd(this, _emit);
-          __privateAdd(this, _listeners, /* @__PURE__ */ new Map());
+          __privateAdd(this, _emit2);
+          __privateAdd(this, _listeners2, /* @__PURE__ */ new Map());
           __privateAdd(this, _ws, void 0);
           __privateAdd(this, _destroyed, false);
-          __privateAdd(this, _connected, false);
-          __privateAdd(this, _attempt, 0);
+          __privateAdd(this, _connected2, false);
+          __privateAdd(this, _attempt2, 0);
           __privateAdd(this, _target, null);
           this.writableLength = 0;
           this.destroyed = false;
@@ -9103,9 +10071,9 @@ onmessage = (e) => {
           __privateMethod(this, _open, open_fn).call(this, 0);
         }
         on(event, fn) {
-          if (!__privateGet(this, _listeners).has(event))
-            __privateGet(this, _listeners).set(event, /* @__PURE__ */ new Set());
-          __privateGet(this, _listeners).get(event).add(fn);
+          if (!__privateGet(this, _listeners2).has(event))
+            __privateGet(this, _listeners2).set(event, /* @__PURE__ */ new Set());
+          __privateGet(this, _listeners2).get(event).add(fn);
           return this;
         }
         once(event, fn) {
@@ -9113,7 +10081,7 @@ onmessage = (e) => {
           return this.on(event, fn);
         }
         removeListener(event, fn) {
-          __privateGet(this, _listeners).get(event)?.delete(fn);
+          __privateGet(this, _listeners2).get(event)?.delete(fn);
           return this;
         }
         off(event, fn) {
@@ -9141,16 +10109,16 @@ onmessage = (e) => {
           this.destroy();
         }
       };
-      _listeners = new WeakMap();
+      _listeners2 = new WeakMap();
       _ws = new WeakMap();
       _destroyed = new WeakMap();
-      _connected = new WeakMap();
-      _attempt = new WeakMap();
+      _connected2 = new WeakMap();
+      _attempt2 = new WeakMap();
       _target = new WeakMap();
       _open = new WeakSet();
       open_fn = function(attempt) {
         const { host, port } = __privateGet(this, _target);
-        __privateSet(this, _attempt, attempt);
+        __privateSet(this, _attempt2, attempt);
         __privateSet(this, _ws, new WebSocket(bridgeUrl(host, port, attempt)));
         __privateGet(this, _ws).binaryType = "arraybuffer";
         wsStat("opened");
@@ -9186,12 +10154,12 @@ onmessage = (e) => {
               return;
             }
             if (msg.t === "connect") {
-              __privateSet(this, _connected, true);
+              __privateSet(this, _connected2, true);
               wsStat("upstream");
-              __privateMethod(this, _emit, emit_fn).call(this, "connect");
+              __privateMethod(this, _emit2, emit_fn2).call(this, "connect");
             } else if (msg.t === "ticket" && msg.ticket) {
               const bs = configuredBridges();
-              bridgeTickets.set(bs[(bridgeCursor + __privateGet(this, _attempt)) % bs.length], msg.ticket);
+              bridgeTickets.set(bs[(bridgeCursor + __privateGet(this, _attempt2)) % bs.length], msg.ticket);
             } else if (msg.t === "challenge") {
               const sig = globalThis.__BEAGLE_PEER_AUTH__?.sign?.(msg.origin, msg.n);
               if (sig) {
@@ -9201,16 +10169,16 @@ onmessage = (e) => {
                 }
               }
             } else if (msg.t === "error")
-              __privateMethod(this, _emit, emit_fn).call(this, "error", new Error(msg.m || "bridge error"));
+              __privateMethod(this, _emit2, emit_fn2).call(this, "error", new Error(msg.m || "bridge error"));
             return;
           }
-          __privateMethod(this, _emit, emit_fn).call(this, "data", Buffer2.from(ev.data));
+          __privateMethod(this, _emit2, emit_fn2).call(this, "data", Buffer2.from(ev.data));
         };
         __privateGet(this, _ws).onerror = () => {
           wsStat("errored");
         };
         __privateGet(this, _ws).onclose = (ev) => {
-          wsStat(__privateGet(this, _connected) ? "closed" : "closedBeforeConnect");
+          wsStat(__privateGet(this, _connected2) ? "closed" : "closedBeforeConnect");
           if (ev && (ev.code === 4401 || ev.code === 4403)) {
             globalThis.__beagleBridgeDenial = {
               code: ev.code,
@@ -9219,23 +10187,23 @@ onmessage = (e) => {
             };
           }
           const bridgeCount = configuredBridges().length;
-          if (!__privateGet(this, _connected) && !__privateGet(this, _destroyed) && __privateGet(this, _attempt) + 1 < bridgeCount) {
+          if (!__privateGet(this, _connected2) && !__privateGet(this, _destroyed) && __privateGet(this, _attempt2) + 1 < bridgeCount) {
             rotateBridge();
-            __privateMethod(this, _open, open_fn).call(this, __privateGet(this, _attempt) + 1);
+            __privateMethod(this, _open, open_fn).call(this, __privateGet(this, _attempt2) + 1);
             return;
           }
-          if (!__privateGet(this, _connected) && !__privateGet(this, _destroyed)) {
-            __privateMethod(this, _emit, emit_fn).call(this, "error", new Error(
+          if (!__privateGet(this, _connected2) && !__privateGet(this, _destroyed)) {
+            __privateMethod(this, _emit2, emit_fn2).call(this, "error", new Error(
               ev && ev.code === 1013 ? "all bridges at capacity" : "bridge unreachable"
             ));
           }
           this.destroyed = true;
-          __privateMethod(this, _emit, emit_fn).call(this, "close");
+          __privateMethod(this, _emit2, emit_fn2).call(this, "close");
         };
       };
-      _emit = new WeakSet();
-      emit_fn = function(event, arg) {
-        for (const fn of [...__privateGet(this, _listeners).get(event) ?? []]) {
+      _emit2 = new WeakSet();
+      emit_fn2 = function(event, arg) {
+        for (const fn of [...__privateGet(this, _listeners2).get(event) ?? []]) {
           if (fn.__once)
             this.removeListener(event, fn);
           fn(arg);
@@ -9260,13 +10228,13 @@ onmessage = (e) => {
     TCP_PACKET_ROUTING_RESPONSE: () => TCP_PACKET_ROUTING_RESPONSE,
     TcpRelayClient: () => TcpRelayClient
   });
-  var import_tweetnacl11, KEY_SIZE4, NONCE_SIZE7, MAC_SIZE5, RELAY_SEND_BUFFER_CAP, TCP_HANDSHAKE_PLAIN_SIZE, TCP_CLIENT_HANDSHAKE_SIZE, TCP_SERVER_HANDSHAKE_SIZE, TCP_PACKET_ROUTING_REQUEST, TCP_PACKET_ROUTING_RESPONSE, TCP_PACKET_CONNECTION_NOTIFICATION, TCP_PACKET_DISCONNECT_NOTIFICATION, TCP_PACKET_PING, TCP_PACKET_PONG, TCP_PACKET_OOB_SEND, TCP_PACKET_OOB_RECV, TCP_PACKET_ONION_REQUEST, TCP_PACKET_ONION_RESPONSE, MAX_PACKET_SIZE, CARRIER_TCP_MAGIC, _opts, _socket, _state, _debug2, _tempKeyPair, _sentNonce, _recvNonce, _sessionKey, _rxBuf, _cidByFriend, _friendByCid, _routesRequested, _buildHandshake, buildHandshake_fn, _processHandshakeResponse, processHandshakeResponse_fn, _onData2, onData_fn2, _decryptFrame, decryptFrame_fn, _sendFrame, sendFrame_fn, _dispatch, dispatch_fn, _close, close_fn, _log, log_fn, TcpRelayClient;
+  var import_tweetnacl14, KEY_SIZE4, NONCE_SIZE7, MAC_SIZE5, RELAY_SEND_BUFFER_CAP, TCP_HANDSHAKE_PLAIN_SIZE, TCP_CLIENT_HANDSHAKE_SIZE, TCP_SERVER_HANDSHAKE_SIZE, TCP_PACKET_ROUTING_REQUEST, TCP_PACKET_ROUTING_RESPONSE, TCP_PACKET_CONNECTION_NOTIFICATION, TCP_PACKET_DISCONNECT_NOTIFICATION, TCP_PACKET_PING, TCP_PACKET_PONG, TCP_PACKET_OOB_SEND, TCP_PACKET_OOB_RECV, TCP_PACKET_ONION_REQUEST, TCP_PACKET_ONION_RESPONSE, MAX_PACKET_SIZE, CARRIER_TCP_MAGIC, _opts, _socket, _state, _debug2, _tempKeyPair, _sentNonce, _recvNonce, _sessionKey, _rxBuf, _cidByFriend, _friendByCid, _routesRequested, _buildHandshake, buildHandshake_fn, _processHandshakeResponse, processHandshakeResponse_fn, _onData2, onData_fn2, _decryptFrame, decryptFrame_fn, _sendFrame, sendFrame_fn, _dispatch, dispatch_fn, _close, close_fn, _log, log_fn, TcpRelayClient;
   var init_tcp_relay = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/tcp-relay.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
-      import_tweetnacl11 = __toESM(require_nacl_fast());
+      import_tweetnacl14 = __toESM(require_nacl_fast());
       init_node_net();
       init_node_events();
       init_bytes();
@@ -9546,14 +10514,14 @@ onmessage = (e) => {
       _buildHandshake = new WeakSet();
       buildHandshake_fn = function() {
         __privateSet(this, _tempKeyPair, (() => {
-          const kp = import_tweetnacl11.default.box.keyPair();
+          const kp = import_tweetnacl14.default.box.keyPair();
           return { publicKey: kp.publicKey, secretKey: kp.secretKey };
         })());
         __privateSet(this, _sentNonce, randomBytes2(NONCE_SIZE7));
         const plain = concatBytes([__privateGet(this, _tempKeyPair).publicKey, __privateGet(this, _sentNonce)]);
         const handshakeNonce = randomBytes2(NONCE_SIZE7);
-        const sharedKey2 = import_tweetnacl11.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
-        const encrypted = import_tweetnacl11.default.box.after(plain, handshakeNonce, sharedKey2);
+        const sharedKey2 = import_tweetnacl14.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
+        const encrypted = import_tweetnacl14.default.box.after(plain, handshakeNonce, sharedKey2);
         return concatBytes([__privateGet(this, _opts).selfKeyPair.publicKey, handshakeNonce, encrypted]);
       };
       _processHandshakeResponse = new WeakSet();
@@ -9563,8 +10531,8 @@ onmessage = (e) => {
         }
         const nonce = hs.subarray(0, NONCE_SIZE7);
         const cipher = hs.subarray(NONCE_SIZE7);
-        const sharedKey2 = import_tweetnacl11.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
-        const plain = import_tweetnacl11.default.box.open.after(cipher, nonce, sharedKey2);
+        const sharedKey2 = import_tweetnacl14.default.box.before(__privateGet(this, _opts).serverPublicKey, __privateGet(this, _opts).selfKeyPair.secretKey);
+        const plain = import_tweetnacl14.default.box.open.after(cipher, nonce, sharedKey2);
         if (!plain || plain.length !== TCP_HANDSHAKE_PLAIN_SIZE) {
           throw new Error("handshake response decrypt failed");
         }
@@ -9573,7 +10541,7 @@ onmessage = (e) => {
         if (!__privateGet(this, _tempKeyPair)) {
           throw new Error("no temp keypair set");
         }
-        __privateSet(this, _sessionKey, import_tweetnacl11.default.box.before(serverTempPub, __privateGet(this, _tempKeyPair).secretKey));
+        __privateSet(this, _sessionKey, import_tweetnacl14.default.box.before(serverTempPub, __privateGet(this, _tempKeyPair).secretKey));
         __privateSet(this, _recvNonce, new Uint8Array(recvNonce));
         __privateGet(this, _tempKeyPair).secretKey.fill(0);
       };
@@ -9607,7 +10575,7 @@ onmessage = (e) => {
       decryptFrame_fn = function(cipher) {
         if (!__privateGet(this, _sessionKey) || !__privateGet(this, _recvNonce))
           return void 0;
-        const opened = import_tweetnacl11.default.secretbox.open(cipher, __privateGet(this, _recvNonce), __privateGet(this, _sessionKey));
+        const opened = import_tweetnacl14.default.secretbox.open(cipher, __privateGet(this, _recvNonce), __privateGet(this, _sessionKey));
         if (!opened)
           return void 0;
         incrementNonce(__privateGet(this, _recvNonce));
@@ -9624,7 +10592,7 @@ onmessage = (e) => {
         if (droppable && __privateGet(this, _socket).writableLength > RELAY_SEND_BUFFER_CAP) {
           return false;
         }
-        const cipher = import_tweetnacl11.default.secretbox(payload, __privateGet(this, _sentNonce), __privateGet(this, _sessionKey));
+        const cipher = import_tweetnacl14.default.secretbox(payload, __privateGet(this, _sentNonce), __privateGet(this, _sessionKey));
         incrementNonce(__privateGet(this, _sentNonce));
         const frame = Buffer2.alloc(4 + 2 + cipher.length);
         frame.set(CARRIER_TCP_MAGIC, 0);
@@ -9747,7 +10715,7 @@ onmessage = (e) => {
   });
 
   // node_modules/@decentnetwork/peer/dist/compat/tcp-relay-pool.js
-  var ONION_RELAY_FANOUT, KEY_SIZE5, MAX_RELAY_CONNECTIONS, RECONNECT_BASE_MS, RECONNECT_MAX_MS, _opts2, _relays, _stopped, _wantedFriends, _onlineRelaysByFriend, _debug3, _openOne, openOne_fn, _scheduleReconnect, scheduleReconnect_fn, _emitStatus, emitStatus_fn, _log2, log_fn2, TcpRelayPool;
+  var ONION_RELAY_FANOUT, KEY_SIZE5, MAX_RELAY_CONNECTIONS, RECONNECT_BASE_MS, RECONNECT_MAX_MS, _opts2, _relays, _stopped2, _wantedFriends, _onlineRelaysByFriend, _debug3, _openOne, openOne_fn, _scheduleReconnect, scheduleReconnect_fn, _emitStatus, emitStatus_fn, _log2, log_fn2, TcpRelayPool;
   var init_tcp_relay_pool = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/tcp-relay-pool.js"() {
       init_buffer_global();
@@ -9773,7 +10741,7 @@ onmessage = (e) => {
           __privateAdd(this, _log2);
           __privateAdd(this, _opts2, void 0);
           __privateAdd(this, _relays, []);
-          __privateAdd(this, _stopped, false);
+          __privateAdd(this, _stopped2, false);
           // Friends we want routed on every connected relay. Re-asserted on
           // reconnect.
           __privateAdd(this, _wantedFriends, /* @__PURE__ */ new Map());
@@ -9814,7 +10782,7 @@ onmessage = (e) => {
         }
         /** Tear down all relay connections. */
         async stop() {
-          __privateSet(this, _stopped, true);
+          __privateSet(this, _stopped2, true);
           for (const r of __privateGet(this, _relays)) {
             if (r.reconnectTimer)
               clearTimeout(r.reconnectTimer);
@@ -9839,7 +10807,7 @@ onmessage = (e) => {
          * Returns the index of the relay (existing or newly added).
          */
         addRelay(node) {
-          if (__privateGet(this, _stopped))
+          if (__privateGet(this, _stopped2))
             return -1;
           if (!node.pk)
             return -1;
@@ -10003,13 +10971,13 @@ onmessage = (e) => {
       };
       _opts2 = new WeakMap();
       _relays = new WeakMap();
-      _stopped = new WeakMap();
+      _stopped2 = new WeakMap();
       _wantedFriends = new WeakMap();
       _onlineRelaysByFriend = new WeakMap();
       _debug3 = new WeakMap();
       _openOne = new WeakSet();
       openOne_fn = async function(idx) {
-        if (__privateGet(this, _stopped))
+        if (__privateGet(this, _stopped2))
           return;
         const managed = __privateGet(this, _relays)[idx];
         if (!managed)
@@ -10089,7 +11057,7 @@ onmessage = (e) => {
       };
       _scheduleReconnect = new WeakSet();
       scheduleReconnect_fn = function(idx) {
-        if (__privateGet(this, _stopped))
+        if (__privateGet(this, _stopped2))
           return;
         const managed = __privateGet(this, _relays)[idx];
         if (!managed)
@@ -10164,7 +11132,7 @@ onmessage = (e) => {
       }
       const publicKey = hexToBytes2(parsed.publicKey);
       const secretKey = hexToBytes2(parsed.secretKey);
-      if (publicKey.length !== import_tweetnacl12.default.box.publicKeyLength || secretKey.length !== import_tweetnacl12.default.box.secretKeyLength) {
+      if (publicKey.length !== import_tweetnacl15.default.box.publicKeyLength || secretKey.length !== import_tweetnacl15.default.box.secretKeyLength) {
         throw new Error("invalid key file key length");
       }
       return { publicKey, secretKey };
@@ -10174,7 +11142,7 @@ onmessage = (e) => {
         throw error;
       }
     }
-    const generated = import_tweetnacl12.default.box.keyPair();
+    const generated = import_tweetnacl15.default.box.keyPair();
     const keyPair = {
       publicKey: generated.publicKey,
       secretKey: generated.secretKey
@@ -10189,7 +11157,7 @@ onmessage = (e) => {
 `);
     return keyPair;
   }
-  var import_tweetnacl12;
+  var import_tweetnacl15;
   var init_keypair = __esm({
     "node_modules/@decentnetwork/peer/dist/crypto/keypair.js"() {
       init_buffer_global();
@@ -10197,7 +11165,7 @@ onmessage = (e) => {
       init_worker_timers();
       init_node_stub();
       init_node_stub();
-      import_tweetnacl12 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl15 = __toESM(require_nacl_fast(), 1);
       init_bytes();
     }
   });
@@ -10987,7 +11955,7 @@ onmessage = (e) => {
     if (opts.ourSecretKey.length !== 32) {
       throw new Error(`ourSecretKey must be 32 bytes, got ${opts.ourSecretKey.length}`);
     }
-    const sharedKey2 = import_tweetnacl13.default.box.before(opts.bootnodePublicKey, opts.ourSecretKey);
+    const sharedKey2 = import_tweetnacl16.default.box.before(opts.bootnodePublicKey, opts.ourSecretKey);
     const nonce = randomBytes2(24);
     const digest = createHmac("sha256", Buffer2.from(sharedKey2)).update(nonce).digest();
     const nonceB58 = bytesToBase58(nonce);
@@ -11000,14 +11968,14 @@ onmessage = (e) => {
       password: passwordB58
     };
   }
-  var import_tweetnacl13, CARRIER_TURN_PORT, CARRIER_TURN_REALM, CARRIER_TURN_USER_SUFFIX;
+  var import_tweetnacl16, CARRIER_TURN_PORT, CARRIER_TURN_REALM, CARRIER_TURN_USER_SUFFIX;
   var init_turn_creds = __esm({
     "node_modules/@decentnetwork/peer/dist/turn-creds.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
       init_node_crypto();
-      import_tweetnacl13 = __toESM(require_nacl_fast(), 1);
+      import_tweetnacl16 = __toESM(require_nacl_fast(), 1);
       init_base58();
       init_bytes();
       CARRIER_TURN_PORT = 3478;
@@ -11293,7 +12261,7 @@ onmessage = (e) => {
     return diff === 0;
   }
   function createEphemeralKeyPair() {
-    return import_tweetnacl14.default.box.keyPair();
+    return import_tweetnacl17.default.box.keyPair();
   }
   function xorCloser(target, a, b) {
     const n = Math.min(target.length, a.length, b.length);
@@ -11519,6 +12487,26 @@ onmessage = (e) => {
       return true;
     return false;
   }
+  function expressPushRegisterEnabled(option) {
+    if (option === false)
+      return false;
+    if (typeof option?.registerDoorbell === "boolean")
+      return option.registerDoorbell;
+    const env = process.env.DECENT_EXPRESS_PUSH_REGISTER?.trim().toLowerCase();
+    if (env === "0" || env === "false" || env === "off")
+      return false;
+    return true;
+  }
+  function expressDoorbellEnabled(option) {
+    if (typeof option === "boolean")
+      return option;
+    const env = process.env.DECENT_EXPRESS_DOORBELL?.trim().toLowerCase();
+    if (env === "0" || env === "false" || env === "off")
+      return false;
+    if (env === "1" || env === "true" || env === "on")
+      return true;
+    return typeof process.versions?.node === "string";
+  }
   function readEnvInt(name, fallback) {
     const raw = process.env[name];
     if (!raw) {
@@ -11527,7 +12515,7 @@ onmessage = (e) => {
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
-  var import_tweetnacl14, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, ONION_HOP_KEY_TTL_MS, ONION_HOP_KEY_CACHE_MAX, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_TRANSPORT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, PENDING_REQUESTER_PROFILE_MAX, PENDING_REQUESTER_PROFILE_TTL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _onionHopKeyCache, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _pendingRequesterProfiles, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _persistInFlight, _persistPending, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _requesterAvatar, requesterAvatar_fn, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _onExpressFriendMessage, onExpressFriendMessage_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _encodeOwnNickname, encodeOwnNickname_fn, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn, _encodeOwnUserInfo, encodeOwnUserInfo_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _onionHopKeys, onionHopKeys_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
+  var import_tweetnacl17, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, EXPRESS_DOORBELL_SAFETY_MS, EXPRESS_PUSH_REREGISTER_MS, DOORBELL_CALL_SEEN_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, ONION_HOP_KEY_TTL_MS, ONION_HOP_KEY_CACHE_MAX, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_TRANSPORT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, PENDING_REQUESTER_PROFILE_MAX, PENDING_REQUESTER_PROFILE_TTL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPush, _expressPushRegisterTimer, _expressPushRegisterFails, _doorbellCallsSeen, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _onionHopKeyCache, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _pendingRequesterProfiles, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _persistInFlight, _persistPending, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _requesterAvatar, requesterAvatar_fn, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _onExpressFriendMessage, onExpressFriendMessage_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _scheduleDoorbellRegister, scheduleDoorbellRegister_fn, _markDoorbellCall, markDoorbellCall_fn, _onDoorbellCall, onDoorbellCall_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _encodeOwnNickname, encodeOwnNickname_fn, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn, _encodeOwnUserInfo, encodeOwnUserInfo_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _onionHopKeys, onionHopKeys_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
   var init_peer = __esm({
     "node_modules/@decentnetwork/peer/dist/peer.js"() {
       init_buffer_global();
@@ -11539,7 +12527,7 @@ onmessage = (e) => {
       init_node_stub();
       init_node_stub();
       init_node_stub();
-      import_tweetnacl14 = __toESM(require_nacl_fast());
+      import_tweetnacl17 = __toESM(require_nacl_fast());
       init_address();
       init_bootstrap();
       init_inline_file();
@@ -11551,6 +12539,7 @@ onmessage = (e) => {
       init_dnft1();
       init_net_crypto();
       init_express();
+      init_express_push();
       init_tcp_relay_pool();
       init_dht();
       init_keypair();
@@ -11604,6 +12593,9 @@ onmessage = (e) => {
       SELF_ANNOUNCE_BATCH_SIZE = readEnvInt("DECENT_SELF_ANNOUNCE_BATCH_SIZE", 12);
       ONION_DATA_ATTEMPTS = readEnvInt("DECENT_ONION_DATA_ATTEMPTS", 5);
       EXPRESS_PULL_INTERVAL_MS = readEnvInt("DECENT_EXPRESS_PULL_INTERVAL_MS", 4e3);
+      EXPRESS_DOORBELL_SAFETY_MS = readEnvInt("DECENT_EXPRESS_DOORBELL_SAFETY_MS", 3e5);
+      EXPRESS_PUSH_REREGISTER_MS = 24 * 36e5;
+      DOORBELL_CALL_SEEN_MS = 15 * 6e4;
       FRIEND_PING_INTERVAL_MS = readEnvInt("DECENT_FRIEND_PING_INTERVAL_MS", 4e3);
       FRIEND_CONNECTION_LOOP_MS = readEnvInt("DECENT_FRIEND_CONNECTION_LOOP_MS", 250);
       DHT_PK_ANNOUNCE_COOLDOWN_MS = readEnvInt("DECENT_DHT_PK_ANNOUNCE_COOLDOWN_MS", 25e3);
@@ -11754,6 +12746,10 @@ onmessage = (e) => {
           /** Count nodes whose acknowledged store is still within its TTL. */
           __privateAdd(this, _publishSelfAnnounceStoredCount);
           __privateAdd(this, _ensureSelfAnnounceLoop);
+          __privateAdd(this, _scheduleDoorbellRegister);
+          /** Returns true when this callId/action had not been seen yet. */
+          __privateAdd(this, _markDoorbellCall);
+          __privateAdd(this, _onDoorbellCall);
           __privateAdd(this, _ensureExpressPullLoop);
           __privateAdd(this, _ensureFriendConnectionLoop);
           __privateAdd(this, _doFriendConnections);
@@ -12113,6 +13109,11 @@ onmessage = (e) => {
            *  entries just miss and fall back to the scan. */
           __privateAdd(this, _cryptoEndpointIndex, /* @__PURE__ */ new Map());
           __privateAdd(this, _express, void 0);
+          __privateAdd(this, _expressPush, void 0);
+          __privateAdd(this, _expressPushRegisterTimer, void 0);
+          __privateAdd(this, _expressPushRegisterFails, 0);
+          /** callId -> which actions were already emitted (or seen elsewhere). */
+          __privateAdd(this, _doorbellCallsSeen, /* @__PURE__ */ new Map());
           __privateAdd(this, _expressPollTimer, void 0);
           /**
            * Pool of persistent TCP relay connections. Carrier bootstrap nodes
@@ -12552,7 +13553,7 @@ onmessage = (e) => {
               }
               state.peerSessionPublicKey = hs.sessionPublicKey;
               state.peerBaseNonce = hs.baseNonce.slice();
-              state.sessionSharedKey = import_tweetnacl14.default.box.before(hs.sessionPublicKey, state.ourSessionKeyPair.secretKey);
+              state.sessionSharedKey = import_tweetnacl17.default.box.before(hs.sessionPublicKey, state.ourSessionKeyPair.secretKey);
               state.established = true;
               state.sessionEstablishedAtMs = Date.now();
               state.rehsCount = void 0;
@@ -12820,6 +13821,7 @@ onmessage = (e) => {
               selfUserId: this.userid(),
               selfAddress: this.address(),
               debug: __privateGet(this, _debug4),
+              doorbell: { enabled: expressDoorbellEnabled(__privateGet(this, _opts3).expressDoorbell), safetyPullMs: EXPRESS_DOORBELL_SAFETY_MS },
               callbacks: {
                 onOfflineFriendRequest: (fromUserId, packet) => {
                   __privateMethod(this, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn).call(this, fromUserId, packet);
@@ -12840,8 +13842,19 @@ onmessage = (e) => {
                 },
                 onNodeRecovered: (node, afterFailures) => {
                   __privateGet(this, _events).emit("expressRecovered", { node, afterFailures });
-                }
+                },
+                onDoorbellCall: (node, payload, ts) => __privateMethod(this, _onDoorbellCall, onDoorbellCall_fn).call(this, node, payload, ts)
               }
+            }));
+          }
+          if (__privateGet(this, _opts3).expressPush !== false) {
+            const o = __privateGet(this, _opts3).expressPush ?? {};
+            __privateSet(this, _expressPush, new ExpressPushGateway({
+              callerUserId: this.userid(),
+              secretKey: __privateGet(this, _keyPair2).secretKey,
+              url: o.url ?? (process.env.DECENT_EXPRESS_PUSH_URL?.trim() || DEFAULT_EXPRESS_PUSH_URL),
+              nodeUserId: o.nodeUserId,
+              timeoutMs: o.timeoutMs
             }));
           }
           __privateGet(this, _udp).on("datagram", __privateGet(this, _onDatagram));
@@ -12943,6 +13956,13 @@ onmessage = (e) => {
           if (__privateGet(this, _expressPollTimer)) {
             clearInterval(__privateGet(this, _expressPollTimer));
             __privateSet(this, _expressPollTimer, void 0);
+          }
+          if (__privateGet(this, _expressPushRegisterTimer)) {
+            clearTimeout(__privateGet(this, _expressPushRegisterTimer));
+            __privateSet(this, _expressPushRegisterTimer, void 0);
+          }
+          if (__privateGet(this, _express)) {
+            await Promise.race([__privateGet(this, _express).stopDoorbells(), new Promise((r) => setTimeout(r, 2e3).unref?.())]);
           }
           if (__privateGet(this, _selfAnnounceTimer)) {
             clearInterval(__privateGet(this, _selfAnnounceTimer));
@@ -13487,6 +14507,38 @@ onmessage = (e) => {
           __privateMethod(this, _cancelTextAckWait, cancelTextAckWait_fn).call(this, deliveryId);
           throw lastError ?? new Error(`text delivery ACK timed out for ${pubkey}`);
         }
+        /**
+         * Post a text straight to the express store-and-forward relay, whatever the
+         * live session looks like.
+         *
+         * sendText decides live-vs-express on its own, and it calls a session live
+         * when a ping arrived in the last FRIEND_TIMEOUT_MS (32 s). A phone that was
+         * just backgrounded, or one still starting up, passes that test while its
+         * app answers nothing, so a host that wants "no proof → offline now" had no
+         * way to say it: the "offline" send went live again and the message sat
+         * unconfirmed (decent-hq, mac-dev → Android, 2026-11-05).
+         *
+         * A friend that reads the delivery envelope (protoVersion >= 2) gets it
+         * wrapped with `deliveryId`, so a copy that also went live is shown once
+         * (the receiver remembers delivered ids). Others get the plain packet, as
+         * sendText's own express fallback sends it. Throws when there is no express
+         * node, or the post fails.
+         */
+        async sendTextViaExpress(pubkey, text, opts = {}) {
+          const friend = __privateGet(this, _friends).get(pubkey);
+          if (!friend)
+            throw new Error(`Not a friend: ${pubkey}`);
+          if (text.length === 0)
+            throw new Error("empty text is not posted to express");
+          if (!__privateGet(this, _express)?.hasNodes())
+            throw new Error("no express node is configured");
+          const enveloped = (friend.protoVersion ?? 0) >= 2;
+          const deliveryId = enveloped ? opts.deliveryId ?? createTextDeliveryId() : void 0;
+          const body2 = deliveryId ? encodeTextAckEnvelope({ t: "msg", id: deliveryId, text }) : text;
+          await __privateGet(this, _express).sendOfflineText(pubkey, encodeFriendMessagePacket(body2));
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `sendTextViaExpress: posted to express for ${pubkey}${deliveryId ? ` (id ${deliveryId})` : ""}`);
+          return deliveryId ? { delivery: "offline", deliveryId } : { delivery: "offline" };
+        }
         waitForFriendConnected(pubkey, timeoutMs = 3e4) {
           return __privateMethod(this, _waitForFriendConnected, waitForFriendConnected_fn).call(this, pubkey, timeoutMs);
         }
@@ -13503,6 +14555,71 @@ onmessage = (e) => {
         expressHealth() {
           return __privateGet(this, _express)?.health() ?? [];
         }
+        /**
+         * A call push that arrived over a doorbell watch (see DoorbellCallEvent).
+         * Once per callId and action; a "call" after its "decline" is dropped.
+         */
+        onDoorbellCall(cb) {
+          __privateGet(this, _events).on("doorbellCall", cb);
+        }
+        /**
+         * Tell the peer a call already reached the host some other way (a Carrier
+         * invite with the same callId), so a doorbell copy is not emitted again.
+         */
+        noteCallSeen(callId, action = "call") {
+          __privateMethod(this, _markDoorbellCall, markDoorbellCall_fn).call(this, callId, action);
+        }
+        /** The push gateway client (undefined when `expressPush: false`), e.g. for
+         *  peer-webrtc's BeaglePushClient `gateway` option. */
+        expressPushGateway() {
+          return __privateGet(this, _expressPush);
+        }
+        /**
+         * Register every doorbell this peer watches with the push gateway
+         * (tokenType=doorbell), so a call push for us reaches the watch. Runs on
+         * start by itself; the gateway keeps a registration 30 days. Never sent to
+         * the push server directly: a doorbell must not become a device token.
+         */
+        async registerDoorbellPush() {
+          const gw = __privateGet(this, _expressPush);
+          if (!gw || !__privateGet(this, _express))
+            return [];
+          const appName = (__privateGet(this, _opts3).expressPush || void 0)?.appName ?? "beagleschat";
+          const out = [];
+          for (const token of __privateGet(this, _express).doorbellBases()) {
+            const result = await gw.send("register", [
+              ["account", this.userid()],
+              ["token", token],
+              ["tokenType", "doorbell"],
+              ["appName", appName]
+            ]);
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express push register doorbell ${token}: ` + (result.answered ? `http=${result.status} code=${result.code ?? "-"}` : `no answer (${result.reason})`));
+            out.push({ token, result });
+          }
+          return out;
+        }
+        /**
+         * A call or decline push through the gateway, for an outgoing call:
+         * `account` = the callee, `payload.userId` must be us. Gateway only — no
+         * appKey here. When `answered` is false nothing can have been delivered, and
+         * a host that keeps the direct push server call may use it; when it is true
+         * the request must not be sent again by any route.
+         */
+        async sendCallPush(calleeUserId, payload, opts = {}) {
+          const gw = __privateGet(this, _expressPush);
+          if (!gw)
+            return { answered: false, reason: "express push gateway is off" };
+          const body2 = { ...payload, userId: payload.userId ?? this.userid() };
+          if (body2.userId !== this.userid())
+            throw new Error("a call push names its caller: payload.userId must be our userid");
+          const fields = [
+            ["env", opts.env ?? "prod"],
+            ["account", calleeUserId],
+            ["payload", JSON.stringify(body2)],
+            ["appName", opts.appName ?? "webrtc"]
+          ];
+          return gw.send("call", fields);
+        }
         onExpressUnreachable(cb) {
           __privateGet(this, _events).on("expressUnreachable", cb);
         }
@@ -13515,12 +14632,29 @@ onmessage = (e) => {
         /** @internal Test seam: deliver a text message exactly as if it arrived off
          *  the wire. Exists so the ACK-before-handlers ordering is testable without
          *  a network — do not use outside tests. */
+        /** @internal Test seam: a call frame as the express client hands it over. */
+        _testDoorbellCall(node, payload, ts) {
+          __privateMethod(this, _onDoorbellCall, onDoorbellCall_fn).call(this, node, payload, ts);
+        }
+        /** @internal Test seam: start the express pull loop (doorbells, register)
+         *  without joining the DHT. */
+        _testStartExpressLoops() {
+          __privateMethod(this, _ensureExpressPullLoop, ensureExpressPullLoop_fn).call(this);
+        }
         /** Test seam: an offline message as the express client hands it over. */
         _testExpressFriendMessage(fromUserId, packet, dedupKey) {
           __privateMethod(this, _onExpressFriendMessage, onExpressFriendMessage_fn).call(this, fromUserId, packet, dedupKey);
         }
         _testDispatchTextMessage(msg) {
           return __privateMethod(this, _dispatchTextMessage, dispatchTextMessage_fn).call(this, msg);
+        }
+        /** @internal Test seam: load the persisted friend store without start(). */
+        _testLoadPersistedFriends() {
+          return __privateMethod(this, _loadPersistedFriends, loadPersistedFriends_fn).call(this);
+        }
+        /** @internal Test seam: stand in for the express client (no network). */
+        _testUseExpress(client) {
+          __privateSet(this, _express, client);
         }
         /** Test seam: an offline friend request as the express client hands it over. */
         _testExpressFriendRequest(fromUserId, packet) {
@@ -13545,7 +14679,7 @@ onmessage = (e) => {
           let session = __privateGet(this, _friendSessions).get(fromPubkey);
           if (!session) {
             session = {
-              ourSessionKeyPair: import_tweetnacl14.default.box.keyPair(),
+              ourSessionKeyPair: import_tweetnacl17.default.box.keyPair(),
               ourBaseNonce: randomBytes2(24),
               sessionSharedKey: randomBytes2(32),
               established: true,
@@ -13954,6 +15088,10 @@ onmessage = (e) => {
       _friendSessions = new WeakMap();
       _cryptoEndpointIndex = new WeakMap();
       _express = new WeakMap();
+      _expressPush = new WeakMap();
+      _expressPushRegisterTimer = new WeakMap();
+      _expressPushRegisterFails = new WeakMap();
+      _doorbellCallsSeen = new WeakMap();
       _expressPollTimer = new WeakMap();
       _tcpRelays = new WeakMap();
       _selfAnnounceTimer = new WeakMap();
@@ -14395,7 +15533,7 @@ onmessage = (e) => {
         if (extraNodes.length === 0 && __privateGet(this, _keyPair2) && extra.length > 24 + 16) {
           const nonce = extra.slice(0, 24);
           const encrypted = extra.slice(24);
-          const openedBySender = import_tweetnacl14.default.box.open(encrypted, nonce, senderPublicKey, __privateGet(this, _keyPair2).secretKey);
+          const openedBySender = import_tweetnacl17.default.box.open(encrypted, nonce, senderPublicKey, __privateGet(this, _keyPair2).secretKey);
           if (openedBySender) {
             const decryptedNodes = parsePackedNodes(openedBySender);
             if (decryptedNodes.length > 0) {
@@ -14404,7 +15542,7 @@ onmessage = (e) => {
             }
           }
           if (extraNodes.length === 0) {
-            const openedByDhtPk = import_tweetnacl14.default.box.open(encrypted, nonce, friendDhtPublicKey, __privateGet(this, _keyPair2).secretKey);
+            const openedByDhtPk = import_tweetnacl17.default.box.open(encrypted, nonce, friendDhtPublicKey, __privateGet(this, _keyPair2).secretKey);
             if (openedByDhtPk) {
               const decryptedNodes = parsePackedNodes(openedByDhtPk);
               if (decryptedNodes.length > 0) {
@@ -15056,20 +16194,98 @@ onmessage = (e) => {
         }, SELF_ANNOUNCE_INTERVAL_MS));
         __privateGet(this, _selfAnnounceTimer).unref?.();
       };
+      _scheduleDoorbellRegister = new WeakSet();
+      scheduleDoorbellRegister_fn = function(delayMs) {
+        if (!__privateGet(this, _expressPush) || !expressPushRegisterEnabled(__privateGet(this, _opts3).expressPush))
+          return;
+        if (__privateGet(this, _expressPushRegisterTimer))
+          clearTimeout(__privateGet(this, _expressPushRegisterTimer));
+        __privateSet(this, _expressPushRegisterTimer, setTimeout(() => {
+          __privateSet(this, _expressPushRegisterTimer, void 0);
+          void this.registerDoorbellPush().then((results) => {
+            const unreachable = results.some((r) => !r.result.answered);
+            if (unreachable) {
+              __privateSet(this, _expressPushRegisterFails, __privateGet(this, _expressPushRegisterFails) + 1);
+              __privateMethod(this, _scheduleDoorbellRegister, scheduleDoorbellRegister_fn).call(this, Math.min(36e5, 6e4 * 2 ** Math.min(6, __privateGet(this, _expressPushRegisterFails) - 1)));
+            } else {
+              __privateSet(this, _expressPushRegisterFails, 0);
+              __privateMethod(this, _scheduleDoorbellRegister, scheduleDoorbellRegister_fn).call(this, EXPRESS_PUSH_REREGISTER_MS);
+            }
+          }, (error) => {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express push register failed: ${error?.message ?? String(error)}`);
+            __privateSet(this, _expressPushRegisterFails, __privateGet(this, _expressPushRegisterFails) + 1);
+            __privateMethod(this, _scheduleDoorbellRegister, scheduleDoorbellRegister_fn).call(this, 36e5);
+          });
+        }, delayMs));
+        __privateGet(this, _expressPushRegisterTimer).unref?.();
+      };
+      _markDoorbellCall = new WeakSet();
+      markDoorbellCall_fn = function(callId, action) {
+        const now = Date.now();
+        if (__privateGet(this, _doorbellCallsSeen).size > 256) {
+          for (const [id, v] of __privateGet(this, _doorbellCallsSeen))
+            if (now - v.at > DOORBELL_CALL_SEEN_MS)
+              __privateGet(this, _doorbellCallsSeen).delete(id);
+        }
+        const seen = __privateGet(this, _doorbellCallsSeen).get(callId);
+        const fresh = seen && now - seen.at <= DOORBELL_CALL_SEEN_MS ? seen : { call: false, decline: false, at: now };
+        const isNew = action === "call" ? !fresh.call && !fresh.decline : !fresh.decline;
+        fresh[action] = true;
+        fresh.at = now;
+        __privateGet(this, _doorbellCallsSeen).set(callId, fresh);
+        return isNew;
+      };
+      _onDoorbellCall = new WeakSet();
+      onDoorbellCall_fn = function(node, payload, ts) {
+        const callId = payload.callId;
+        const callerUserId = payload.userId;
+        const action = payload.action;
+        if (typeof callId !== "string" || !callId || callId.length > 200)
+          return;
+        if (action !== "call" && action !== "decline")
+          return;
+        if (typeof callerUserId !== "string")
+          return;
+        try {
+          if (base58ToBytes(callerUserId).length !== 32)
+            return;
+        } catch {
+          return;
+        }
+        if (!__privateMethod(this, _markDoorbellCall, markDoorbellCall_fn).call(this, callId, action)) {
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `doorbell ${action} ${callId} from ${callerUserId} already seen \u2014 not emitted again`);
+          return;
+        }
+        const event = {
+          callId,
+          action,
+          callerUserId,
+          isFriend: __privateGet(this, _friends).has(callerUserId),
+          payload,
+          ...ts !== void 0 ? { ts } : {},
+          node
+        };
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `doorbell ${action} ${callId} from ${callerUserId} via ${node}`);
+        __privateGet(this, _events).emit("doorbellCall", event);
+      };
       _ensureExpressPullLoop = new WeakSet();
       ensureExpressPullLoop_fn = function() {
         if (!__privateGet(this, _express)?.hasNodes() || __privateGet(this, _expressPollTimer) || EXPRESS_PULL_INTERVAL_MS <= 0) {
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull loop NOT started: hasClient=${!!__privateGet(this, _express)} hasNodes=${!!__privateGet(this, _express)?.hasNodes()} alreadyRunning=${!!__privateGet(this, _expressPollTimer)} interval=${EXPRESS_PULL_INTERVAL_MS}`);
           return;
         }
-        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull loop started, every ${EXPRESS_PULL_INTERVAL_MS}ms`);
-        const pull = () => {
-          void __privateGet(this, _express)?.pullOnce().catch((error) => {
+        const watched = __privateGet(this, _express).startDoorbells();
+        if (watched > 0)
+          __privateMethod(this, _scheduleDoorbellRegister, scheduleDoorbellRegister_fn).call(this, 0);
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull loop started, every ${EXPRESS_PULL_INTERVAL_MS}ms` + (watched ? `; ${watched} node(s) watched by a doorbell (safety pull every ${EXPRESS_DOORBELL_SAFETY_MS}ms)` : ""));
+        void __privateGet(this, _express).pullOnce().catch((error) => {
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull failed: ${error.message}`);
+        });
+        __privateSet(this, _expressPollTimer, setInterval(() => {
+          void __privateGet(this, _express)?.pollTick().catch((error) => {
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `express pull failed: ${error.message}`);
           });
-        };
-        pull();
-        __privateSet(this, _expressPollTimer, setInterval(pull, EXPRESS_PULL_INTERVAL_MS));
+        }, EXPRESS_PULL_INTERVAL_MS));
         __privateGet(this, _expressPollTimer).unref?.();
       };
       _ensureFriendConnectionLoop = new WeakSet();
@@ -18786,7 +20002,6 @@ ${ts}`);
   init_buffer_global();
   init_process_global();
   init_worker_timers();
-  init_express();
 
   // src/fetch-json.js
   init_buffer_global();
@@ -18879,6 +20094,116 @@ ${ts}`);
     const cfg = await fetchJsonWithTimeout(configUrl);
     return normalizeExpressNodes(cfg.expressNodes);
   }
+
+  // src/doorbell.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  function isDoorbellStreamUrl(url) {
+    try {
+      return /\/watch\/stream$/.test(new URL(url, globalThis.location?.href).pathname);
+    } catch {
+      return false;
+    }
+  }
+  function doorbellStreamInit(init) {
+    if (!init || !init.headers)
+      return init;
+    const headers = {};
+    const src = typeof init.headers.forEach === "function" && !Array.isArray(init.headers) ? (() => {
+      const o = {};
+      init.headers.forEach((v, k) => {
+        o[k] = v;
+      });
+      return o;
+    })() : Array.isArray(init.headers) ? Object.fromEntries(init.headers) : init.headers;
+    for (const [k, v] of Object.entries(src)) {
+      if (k.toLowerCase() === "content-type" && /json/i.test(String(v)))
+        headers[k] = "text/plain;charset=UTF-8";
+      else
+        headers[k] = v;
+    }
+    return { ...init, headers };
+  }
+  function createDoorbellReporter({ health, probe, log, now = () => Date.now(), graceMs = 2e4, pollMs = 4e3 }) {
+    const nodes = /* @__PURE__ */ new Map();
+    const started = now();
+    function say(level, msg) {
+      try {
+        log(level, "[beagle] offline mail: " + msg);
+      } catch {
+      }
+    }
+    function tick() {
+      let list;
+      try {
+        list = health() || [];
+      } catch {
+        return;
+      }
+      for (const h of list) {
+        if (!h || !h.node || h.doorbell === "off" || !h.doorbell)
+          continue;
+        let n = nodes.get(h.node);
+        if (!n) {
+          n = { state: "down", since: started, reported: false, everReady: false };
+          nodes.set(h.node, n);
+        }
+        if (h.doorbell === "ready") {
+          if (n.state !== "ready") {
+            const via = h.doorbellTransport || "?";
+            if (n.reported)
+              say("info", `doorbell ${h.node} is back (${via}); messages arrive at once again.`);
+            else if (!n.everReady)
+              say("info", `doorbell ${h.node} ready over ${via}; messages arrive at once.`);
+            n.state = "ready";
+            n.reported = false;
+            n.everReady = true;
+          }
+          continue;
+        }
+        if (n.state === "ready") {
+          n.state = "down";
+          n.since = now();
+          n.reported = false;
+        }
+        if (!n.reported && now() - n.since >= graceMs) {
+          n.reported = true;
+          const node = h.node;
+          const lead = `doorbell ${node} is not reachable`;
+          const tail = `; polling the relay every ${Math.round(pollMs / 1e3)} s instead, so messages still arrive, a few seconds later. Said once until it is back.`;
+          Promise.resolve().then(() => probe(node)).then(
+            (why) => say("warn", lead + (why ? ` (${why})` : "") + tail),
+            () => say("warn", lead + tail)
+          );
+        }
+      }
+    }
+    return { tick };
+  }
+  async function probeDoorbell(streamUrl, { fetch: f = globalThis.fetch, timeoutMs = 5e3 } = {}) {
+    const ac = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = ac ? setTimeout(() => ac.abort(), timeoutMs) : null;
+    try {
+      const r = await f(streamUrl, { headers: { accept: "application/json" }, ...ac ? { signal: ac.signal } : {} });
+      try {
+        await r.body?.cancel?.();
+      } catch {
+      }
+      if (!r.ok)
+        return `${new URL(streamUrl).host} answered HTTP ${r.status}`;
+      return `${new URL(streamUrl).host} answers, but the watch does not stay up: a proxy, firewall or extension may be blocking it`;
+    } catch (err) {
+      return `${new URL(streamUrl).host} does not answer: ${err?.name === "AbortError" ? "timeout" : err?.message || String(err)}`;
+    } finally {
+      if (timer)
+        clearTimeout(timer);
+    }
+  }
+
+  // src/backend-c.js
+  init_express();
+  init_doorbell();
 
   // src/request-picture.js
   init_buffer_global();
@@ -18994,6 +20319,17 @@ ${ts}`);
       keyPair,
       bootstrapNodes,
       expressNodes,
+      // Hold a beagle-doorbell watch on each express node that has one (lens),
+      // and pull that node when it rings instead of every 4 s (peer 0.1.173+).
+      // Off in a browser unless asked for. This Peer's express client is the only
+      // one the app has, so this is the only watch: a tab that does not hold the
+      // tab lock runs no Peer and holds none.
+      expressDoorbell: true,
+      // ...but do not register that doorbell with the call-push gateway. That is
+      // for calls through the doorbell, which this build does not answer
+      // (beagle-ui 0.2.39's call code), and express.beagle.chat sends no CORS
+      // headers, so from a page every register would fail and retry.
+      expressPush: { registerDoorbell: false },
       tcpOnlyBootstrap: true,
       nickname: profile.name || void 0,
       // An empty introduction goes out empty (peer 0.1.170); undefined meant the SDK's "decent peer".
@@ -19055,6 +20391,16 @@ ${ts}`);
       } catch {
       }
     });
+    const doorbellReporter = createDoorbellReporter({
+      health: () => peer.expressHealth ? peer.expressHealth() : [],
+      probe: (nodeId) => {
+        const i = nodeId.lastIndexOf(":");
+        const url = expressDoorbellUrl({ host: nodeId.slice(0, i), port: Number(nodeId.slice(i + 1)) });
+        return url ? probeDoorbell(doorbellUrls(url).stream) : Promise.resolve("");
+      },
+      log: (level, msg) => console[level === "warn" ? "warn" : "info"](msg)
+    });
+    const doorbellTimer = setInterval(() => doorbellReporter.tick(), 5e3);
     peer.onText((msg) => {
       confirm(msg.pubkey);
       if (msg.text && msg.text.length > 4096) {
@@ -19732,6 +21078,7 @@ ${ts}`);
       profile: () => profile,
       async stop() {
         clearInterval(sweepTimer);
+        clearInterval(doorbellTimer);
         try {
           await peer.stop();
         } catch {
@@ -20778,7 +22125,7 @@ ${ts}`);
       super(64, SHA512_IV2);
     }
   };
-  var sha2562 = /* @__PURE__ */ createHasher2(
+  var sha2563 = /* @__PURE__ */ createHasher2(
     () => new _SHA2562(),
     /* @__PURE__ */ oidNist2(1)
   );
@@ -21538,7 +22885,7 @@ ${ts}`);
       throw new Error("invalid wnaf");
     return d;
   }
-  function wnafWalk(zero, tables, digits) {
+  function wnafWalk(zero, tables2, digits) {
     let max = 0;
     for (const d of digits)
       max = Math.max(max, d.length);
@@ -21549,7 +22896,7 @@ ${ts}`);
       for (let i = 0; i < digits.length; i++) {
         const w = digits[i][bit];
         if (w) {
-          const item = tables[i][Math.abs(w) - 1 >> 1];
+          const item = tables2[i][Math.abs(w) - 1 >> 1];
           acc = acc.add(w < 0 ? item.negate() : item);
         }
       }
@@ -21768,9 +23115,9 @@ ${ts}`);
     validateMSMScalars(scalars, c.Fn, allowOversized ? c.Fn.ORDER ** _4n2 : void 0);
     if (points.length !== scalars.length)
       throw new Error("arrays of points and scalars must have equal length");
-    const tables = points.map((p) => oddMultiples(p, 4));
+    const tables2 = points.map((p) => oddMultiples(p, 4));
     const digits = scalars.map((n) => wnafDigits(n, 4));
-    return wnafWalk(c.ZERO, tables, digits);
+    return wnafWalk(c.ZERO, tables2, digits);
   }
   function createField(order, field, isLE2) {
     if (field) {
@@ -22887,7 +24234,7 @@ ${ts}`);
     Fp: Fpk1,
     endo: secp256k1_ENDO
   });
-  var secp256k1 = /* @__PURE__ */ ecdsa(Pointk1, sha2562);
+  var secp256k1 = /* @__PURE__ */ ecdsa(Pointk1, sha2563);
   var _0n6 = /* @__PURE__ */ BigInt(0);
   var _1n5 = /* @__PURE__ */ BigInt(1);
   var _2n4 = /* @__PURE__ */ BigInt(2);
@@ -24573,6 +25920,9 @@ ${body2.length}`);
     const nativeFetch = window.fetch.bind(window);
     window.fetch = async (input, init) => {
       let url = typeof input === "string" ? input : input?.url ?? "";
+      if (isDoorbellStreamUrl(url) && !url.startsWith("/")) {
+        return nativeFetch(input, doorbellStreamInit(init));
+      }
       if (relayHosts2.size) {
         const rewritten = rewriteRelayUrl(url, relayHosts2);
         if (rewritten !== url)
