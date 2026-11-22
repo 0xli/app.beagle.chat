@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.44","builtAt":"2026-11-22T00:00:18.766Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.44","builtAt":"2026-11-22T00:43:38.427Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -20217,7 +20217,7 @@ ${ts}`);
   init_process_global();
   init_worker_timers();
 
-  // vendor/rsp/packages/client/src/index.js
+  // node_modules/@decentnetwork/rendezvous-client/src/index.js
   init_buffer_global();
   init_process_global();
   init_worker_timers();
@@ -23727,7 +23727,7 @@ ${ts}`);
     connect: lookup2
   });
 
-  // vendor/rsp/packages/protocol/src/index.js
+  // node_modules/@decentnetwork/rendezvous-protocol/src/index.js
   init_buffer_global();
   init_process_global();
   init_worker_timers();
@@ -23848,7 +23848,7 @@ ${ts}`);
     return signal;
   }
 
-  // vendor/rsp/packages/client/src/index.js
+  // node_modules/@decentnetwork/rendezvous-client/src/index.js
   function utf8Bytes(value2) {
     if (typeof globalThis.TextEncoder === "function")
       return new globalThis.TextEncoder().encode(value2);
