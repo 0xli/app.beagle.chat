@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.44","builtAt":"2026-11-22T00:43:38.427Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.44","builtAt":"2026-11-23T05:23:27.558Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -20217,6 +20217,11 @@ ${ts}`);
   init_process_global();
   init_worker_timers();
 
+  // node_modules/@decentnetwork/peer-webrtc/dist/rsp.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+
   // node_modules/@decentnetwork/rendezvous-client/src/index.js
   init_buffer_global();
   init_process_global();
@@ -23731,7 +23736,9 @@ ${ts}`);
   init_buffer_global();
   init_process_global();
   init_worker_timers();
-  var AUTH_DOMAIN = "RSP-AUTH/1";
+  var PROTOCOL = "rsp/2";
+  var AUTH_DOMAIN = "RSP-AUTH/2";
+  var SIGNAL_TTL_MS = 15e3;
   var IDENTITY_METHODS = Object.freeze([
     "carrier-x25519",
     "ethereum-eip191",
@@ -23930,6 +23937,7 @@ ${ts}`);
         autoConnect: false,
         forceNew: true,
         reconnection: false,
+        query: { rsp: PROTOCOL },
         transports: options.transports ?? ["websocket"]
       });
       this.hello = null;
@@ -23940,10 +23948,15 @@ ${ts}`);
         return this.hello;
       const hello = once(this.socket, "server:hello", this.timeoutMs);
       this.socket.connect();
-      this.hello = await hello;
-      if (this.hello.protocol !== "rsp/1")
-        throw new RendezvousError("unsupported_protocol", `Unsupported protocol ${this.hello.protocol}`);
-      return this.hello;
+      return this.acceptHello(await hello);
+    }
+    acceptHello(hello) {
+      if (hello?.protocol !== PROTOCOL) {
+        this.close();
+        throw new RendezvousError("unsupported_protocol", "The server does not support RSP/2");
+      }
+      this.hello = hello;
+      return hello;
     }
     request(operation, options) {
       const next = this.queue.then(() => this.performRequest(operation, options));
@@ -23958,7 +23971,7 @@ ${ts}`);
         fresh.catch(() => {
         });
         await emitAck(this.socket, "auth:challenge", {}, this.timeoutMs);
-        this.hello = hello = await fresh;
+        hello = this.acceptHello(await fresh);
         this.consumedChallenge = false;
       }
       const self2 = validateIdentity(await this.signer.descriptor());
@@ -24042,27 +24055,107 @@ ${ts}`);
       }
     };
   }
+  function parseRspAdvertisement(extra) {
+    if (typeof extra !== "string" || utf8Bytes(extra).length > 255)
+      return void 0;
+    try {
+      const rsp = JSON.parse(extra)?.rsp;
+      if (rsp?.protocol !== PROTOCOL || typeof rsp.nodeUrl !== "string")
+        return void 0;
+      const url2 = new URL(rsp.nodeUrl);
+      if (url2.username || url2.password || url2.search || url2.hash)
+        return void 0;
+      const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url2.hostname);
+      if (url2.protocol !== "https:" && !(url2.protocol === "http:" && loopback))
+        return void 0;
+      if (url2.pathname !== "/")
+        return void 0;
+      return { rsp: true, nodeUrl: url2.origin };
+    } catch {
+      return void 0;
+    }
+  }
 
-  // src/rsp-browser.js
-  init_doorbell();
-  init_base58();
-
-  // vendor/rsp/rsp-call.ts
+  // node_modules/@decentnetwork/peer-webrtc/dist/signal.js
   init_buffer_global();
   init_process_global();
   init_worker_timers();
+  var SDP_TYPES = /* @__PURE__ */ new Set([
+    "offer",
+    "answer",
+    "candidate",
+    "remove-candidates",
+    "prAnswer",
+    "bye",
+    "action",
+    "event"
+  ]);
+  function decodeSignal(input) {
+    const text = (typeof input === "string" ? input : new TextDecoder().decode(input)).replace(/\0+$/u, "").trim();
+    const obj = JSON.parse(text);
+    if (typeof obj.type !== "string" || !SDP_TYPES.has(obj.type)) {
+      throw new Error(`RtcSignal: invalid or missing "type" (${String(obj.type)})`);
+    }
+    if (typeof obj.callId !== "string" || obj.callId.length === 0) {
+      throw new Error('RtcSignal: missing "callId"');
+    }
+    const signal = { type: obj.type, callId: obj.callId };
+    if (typeof obj.sdp === "string")
+      signal.sdp = obj.sdp;
+    const rawCandidates = Array.isArray(obj.candidates) ? obj.candidates : obj.candidate && typeof obj.candidate === "object" ? [obj.candidate] : void 0;
+    if (rawCandidates) {
+      signal.candidates = rawCandidates.map((x) => x && typeof x === "object" ? x : void 0).map((c) => ({ c, line: candidateLine(c) })).filter((e) => e.line !== void 0).map(({ c, line }) => ({
+        sdp: line,
+        sdpMLineIndex: typeof c.sdpMLineIndex === "number" ? c.sdpMLineIndex : 0,
+        sdpMid: typeof c.sdpMid === "string" ? c.sdpMid : null
+      }));
+    }
+    if (typeof obj.reason === "string")
+      signal.reason = obj.reason;
+    if (Array.isArray(obj.options)) {
+      signal.options = obj.options.filter((o) => o === "audio" || o === "video" || o === "data");
+    }
+    if (obj.action === "accept" || obj.action === "reject")
+      signal.action = obj.action;
+    if (typeof obj.event === "string")
+      signal.event = obj.event;
+    return signal;
+  }
+  function candidateLine(c) {
+    if (!c)
+      return void 0;
+    if (typeof c.sdp === "string")
+      return c.sdp;
+    if (typeof c.candidate === "string")
+      return c.candidate;
+    return void 0;
+  }
+
+  // node_modules/@decentnetwork/peer-webrtc/dist/rsp.js
   var auth = (i) => ({ callId: i.callId, peer: i.caller, callExpiresAt: i.expiresAt, capability: i.joinCapability });
+  var receivedTypes = /* @__PURE__ */ new Map([
+    ["call.accept", "action"],
+    ["call.reject", "action"],
+    ["call.cancel", "bye"],
+    ["call.hangup", "bye"],
+    ["webrtc.offer", "offer"],
+    ["webrtc.answer", "answer"],
+    ["webrtc.candidate", "candidate"]
+  ]);
   var RspCallBridge = class {
     constructor(o) {
-      this.o = o;
+      __publicField(this, "o");
       __publicField(this, "listener");
       __publicField(this, "retry");
       __publicField(this, "stopped", true);
+      __publicField(this, "generation", 0);
+      __publicField(this, "openingClients", /* @__PURE__ */ new Set());
       __publicField(this, "failures", 0);
       __publicField(this, "calls", /* @__PURE__ */ new Map());
       __publicField(this, "ended", /* @__PURE__ */ new Map());
       __publicField(this, "opening", /* @__PURE__ */ new Map());
       __publicField(this, "listening", false);
+      this.o = o;
     }
     get status() {
       return { listening: this.listening, calls: this.calls.size };
@@ -24091,7 +24184,7 @@ ${ts}`);
         client.close();
         for (const c of [...this.calls.values()])
           if (c.client === client)
-            this.finish(c, "failed");
+            this.transportLost(c);
         if (!this.stopped && !this.retry) {
           const delay = Math.min(3e4, (this.o.retryMs ?? 500) * 2 ** Math.min(this.failures++, 6));
           this.retry = setTimeout(() => {
@@ -24129,20 +24222,30 @@ ${ts}`);
       });
       client.on("call:ended", ({ callId, reason }) => {
         const c = this.calls.get(callId);
-        if (c)
-          this.finish(c, reason ?? "caller-left");
+        if (c?.client !== client)
+          return;
+        if (c.accepted && (reason === "peer-left" || reason === "signaling-expired")) {
+          this.setTransport(c, "unavailable");
+          return;
+        }
+        this.finish(c, reason ?? "caller-left");
+      });
+      client.on("call:peer-ready", ({ callId }) => {
+        const c = this.calls.get(callId);
+        if (c?.client === client)
+          this.markJoined(c);
       });
       client.on("call:peer-offline", ({ callId, resumeDeadline }) => {
         const c = this.calls.get(callId);
-        if (!c || c.client !== client || !Number.isFinite(resumeDeadline))
+        if (c?.client !== client || !Number.isFinite(resumeDeadline))
           return;
-        clearTimeout(c.peerOfflineTimer);
-        c.peerOfflineTimer = setTimeout(() => this.finish(c, "peer-left"), Math.max(0, resumeDeadline - Date.now()));
+        if (c.accepted)
+          this.setTransport(c, "recovering");
       });
       client.on("call:peer-resumed", ({ callId }) => {
         const c = this.calls.get(callId);
-        if (c?.client === client)
-          clearTimeout(c.peerOfflineTimer);
+        if (c?.client === client && c.accepted)
+          this.setTransport(c, "online");
       });
       client.on("call:rejected", ({ callId }) => {
         const c = this.calls.get(callId);
@@ -24151,7 +24254,13 @@ ${ts}`);
           this.finish(c, "declined");
         }
       });
-      client.on("signal", (e) => {
+      client.on("signal", (raw) => {
+        let e;
+        try {
+          e = validateSignalShape(raw);
+        } catch {
+          return;
+        }
         const c = this.calls.get(e.callId);
         if (!c || c.client !== client)
           return;
@@ -24167,10 +24276,12 @@ ${ts}`);
         joined: false,
         accepted: false,
         sequence: 0,
+        receivedSequence: 0,
         candidates: [],
         ringing: false,
         pushed: false,
         sending: Promise.resolve(),
+        transport: "online",
         timer: setTimeout(() => {
           if (c.incoming && !c.accepted)
             this.o.missed?.(c.peer, c.invite.callId);
@@ -24183,7 +24294,7 @@ ${ts}`);
     }
     /** Also used for a held invitation delivered by the existing doorbell callback. */
     async invitation(i, doorbell = false) {
-      if (this.stopped || !i || i.protocol !== "rsp/1" || i.callee?.id !== this.o.self || i.callee.method !== "carrier-x25519" || i.caller?.method !== "carrier-x25519" || !this.o.isFriend(i.caller.id) || i.nodeUrl !== this.o.nodeUrl || !/^[A-Za-z0-9_-]{16,128}$/.test(i.callId) || !Number.isSafeInteger(i.expiresAt) || // The node owns expiry. Its clock can be ahead of this machine by
+      if (this.stopped || !i || i.protocol !== PROTOCOL || i.callee?.id !== this.o.self || i.callee.method !== "carrier-x25519" || i.caller?.method !== "carrier-x25519" || !this.o.isFriend(i.caller.id) || i.nodeUrl !== this.o.nodeUrl || !/^[A-Za-z0-9_-]{16,128}$/.test(i.callId) || !Number.isSafeInteger(i.expiresAt) || // The node owns expiry. Its clock can be ahead of this machine by
       // the protocol's allowed 30 s skew, even for a valid 60 s call.
       i.expiresAt <= Date.now() || i.expiresAt > Date.now() + 6e4 + 3e4 || typeof i.joinCapability !== "string" || i.joinCapability.length > 128)
         return;
@@ -24205,10 +24316,7 @@ ${ts}`);
       const c = this.newCall(i, client, true);
       if (!standing) {
         this.wire(client);
-        client.on("disconnect", () => {
-          if (this.calls.has(i.callId))
-            this.finish(c, "failed");
-        });
+        this.watchTransport(c, client);
       }
       try {
         if (standing)
@@ -24229,9 +24337,14 @@ ${ts}`);
     }
     /** Null means no RSP advertisement or unreachable node: use the legacy path. */
     async send(userid, data, testOnly = false) {
-      const s = this.o.decodeSignal(data);
+      if (this.stopped)
+        return null;
+      const s = decodeSignal(data);
       if (!s.callId)
         return null;
+      for (const [id, expiry] of this.ended)
+        if (expiry < Date.now())
+          this.ended.delete(id);
       const existing = this.calls.get(s.callId);
       if (existing) {
         if (existing.peer !== userid)
@@ -24241,8 +24354,8 @@ ${ts}`);
       }
       const pending2 = this.opening.get(s.callId);
       if (pending2) {
-        await pending2;
-        return this.send(userid, data);
+        const result = await pending2;
+        return result ? this.send(userid, data) : null;
       }
       if (this.ended.has(s.callId))
         return { pushed: false, reached: true };
@@ -24256,11 +24369,14 @@ ${ts}`);
       try {
         return await operation;
       } finally {
-        this.opening.delete(s.callId);
+        if (this.opening.get(s.callId) === operation)
+          this.opening.delete(s.callId);
       }
     }
     async create(userid, offer, ad, testOnly) {
+      const generation = this.generation;
       const client = new RendezvousClient(ad.nodeUrl, this.o.signer, { timeoutMs: 2e3 });
+      this.openingClients.add(client);
       let earlyRinging = false;
       const rememberRinging = ({ callId }) => {
         if (callId === offer.callId)
@@ -24277,45 +24393,44 @@ ${ts}`);
           media: offer.options?.includes("video") ? ["audio", "video"] : ["audio"]
         });
       } catch {
+        client.close();
+        return null;
+      } finally {
         client.off("call:ringing", rememberRinging);
+        this.openingClients.delete(client);
+      }
+      if (this.stopped || generation !== this.generation) {
         client.close();
         return null;
       }
-      if (this.stopped) {
-        client.close();
-        return null;
-      }
-      const { callerResumeCapability: _secret, ...invitation } = result.call;
-      const c = this.newCall({ protocol: "rsp/1", ...invitation }, client, false);
-      client.off("call:ringing", rememberRinging);
+      const { callerResumeCapability, ...invitation } = result.call;
+      const c = this.newCall({ protocol: PROTOCOL, ...invitation }, client, false);
+      c.resumeCapability = callerResumeCapability;
       if (earlyRinging) {
         c.ringing = true;
         this.o.deliver(c.peer, { type: "event", event: "ringing", callId: c.invite.callId });
       }
       c.offer = offer;
-      client.on("disconnect", () => {
-        if (this.calls.has(c.invite.callId))
-          this.finish(c, "failed");
-      });
+      this.watchTransport(c, client);
       await new Promise((resolve2) => {
         const t = setTimeout(resolve2, this.o.waitMs ?? 2e3);
         c.wake = () => {
           clearTimeout(t);
           resolve2();
         };
-        if (c.ringing)
+        if (c.ringing || c.joined)
           c.wake();
       });
       if (!this.calls.has(c.invite.callId))
         return { pushed: false, reached: true };
-      if (testOnly && !c.ringing && !c.accepted) {
+      if (testOnly && !c.ringing && !c.joined) {
         await this.end(c, "timeout");
         throw new Error("RSP test: no friend listener answered within 2 seconds");
       }
-      if (!c.ringing && !c.accepted) {
+      if (!c.ringing && !c.joined) {
         const delivery = await this.o.push(userid, c.invite);
         c.pushed = delivery === "accepted";
-        if (delivery === "undelivered" && !c.ringing && !c.accepted && this.calls.get(c.invite.callId) === c) {
+        if (delivery === "undelivered" && !c.ringing && !c.joined && this.calls.get(c.invite.callId) === c) {
           this.calls.delete(c.invite.callId);
           clearTimeout(c.timer);
           try {
@@ -24346,10 +24461,11 @@ ${ts}`);
           return;
         c.answering = true;
         try {
-          await c.client.join(auth(c.invite));
+          const reply = await c.client.join(auth(c.invite));
           if (!this.calls.has(c.invite.callId))
             return;
-          c.joined = true;
+          c.resumeCapability = reply.calleeResumeCapability;
+          this.markJoined(c);
           c.accepted = true;
           this.o.notify(c.peer, { dkRtc: 1, kind: "call-ring-stop", callId: c.invite.callId, reason: "answered" });
           await this.envelope(c, "call.accept", s);
@@ -24378,39 +24494,57 @@ ${ts}`);
         await this.envelope(c, type2, s);
     }
     envelope(c, type2, signal) {
-      const next = c.sending.then(() => c.client.sendSignal({
-        version: 1,
-        callId: c.invite.callId,
-        type: type2,
-        sequence: ++c.sequence,
-        timestamp: Date.now(),
-        expiresAt: c.invite.expiresAt,
-        encoding: "json",
-        payload: JSON.stringify(signal)
-      }));
+      const next = c.sending.then(async () => {
+        if (c.transport === "recovering")
+          await this.waitForTransport(c);
+        if (c.transport !== "online")
+          return;
+        const timestamp = Date.now();
+        return c.client.sendSignal({
+          version: 1,
+          callId: c.invite.callId,
+          type: type2,
+          sequence: ++c.sequence,
+          timestamp,
+          expiresAt: timestamp + SIGNAL_TTL_MS,
+          encoding: "json",
+          payload: JSON.stringify(signal)
+        }).catch((error) => {
+          if (!c.accepted || type2 === "call.accept")
+            throw error;
+          if (error.code === "peer_not_ready") {
+            this.setTransport(c, "recovering");
+            return;
+          }
+          if (error.code === "call_not_found" || error.code === "call_expired") {
+            this.setTransport(c, "unavailable");
+            return;
+          }
+          if (error.code === "timeout")
+            this.transportLost(c);
+        });
+      });
       c.sending = next.catch(() => {
       });
       return next;
     }
     async receive(c, e) {
-      const s = this.o.decodeSignal(e.payload);
-      if (s.callId !== c.invite.callId)
+      if (e.encoding !== "json" || e.sequence <= c.receivedSequence || e.expiresAt <= e.timestamp || e.expiresAt - e.timestamp > SIGNAL_TTL_MS)
         return;
-      const expected = {
-        "call.accept": "action",
-        "call.reject": "action",
-        "call.cancel": "bye",
-        "call.hangup": "bye",
-        "webrtc.offer": "offer",
-        "webrtc.answer": "answer",
-        "webrtc.candidate": "candidate"
-      };
-      if (expected[e.type] !== s.type)
+      let s;
+      try {
+        s = decodeSignal(e.payload);
+      } catch {
         return;
+      }
+      if (s.callId !== c.invite.callId || receivedTypes.get(e.type) !== s.type)
+        return;
+      if (e.type === "call.accept" && s.action !== "accept" || e.type === "call.reject" && s.action !== "reject")
+        return;
+      c.receivedSequence = e.sequence;
       if (e.type === "call.accept" && !c.incoming) {
+        this.markJoined(c);
         c.accepted = true;
-        c.joined = true;
-        c.wake?.();
         if (c.offer)
           await this.envelope(c, "webrtc.offer", c.offer);
         for (const candidate of c.candidates.splice(0))
@@ -24425,23 +24559,103 @@ ${ts}`);
         if (c.incoming && !c.joined)
           await c.client.reject(auth(c.invite));
         else
-          await this.envelope(c, c.accepted ? "call.hangup" : "call.cancel", { type: "bye", callId: c.invite.callId, reason: "normal" });
+          await this.envelope(c, c.joined ? "call.hangup" : "call.cancel", { type: "bye", callId: c.invite.callId, reason: "normal" });
       } catch {
       }
       this.finish(c, reason);
     }
     finish(c, reason) {
-      if (!this.calls.delete(c.invite.callId))
+      if (this.calls.get(c.invite.callId) !== c)
         return;
+      this.calls.delete(c.invite.callId);
       this.ended.set(c.invite.callId, Date.now() + 12e4);
       clearTimeout(c.timer);
-      clearTimeout(c.peerOfflineTimer);
+      clearTimeout(c.retry);
       c.wake?.();
+      c.resumeCapability = void 0;
+      this.setTransport(c, "unavailable");
       if (c.incoming)
         this.o.notify(c.peer, { dkRtc: 1, kind: "call-ring-stop", callId: c.invite.callId, reason });
       this.o.deliver(c.peer, { type: "bye", reason: "normal", callId: c.invite.callId });
       if (c.client !== this.listener)
         c.client.close();
+    }
+    markJoined(c) {
+      c.joined = true;
+      clearTimeout(c.timer);
+      c.wake?.();
+    }
+    watchTransport(c, client) {
+      client.on("disconnect", () => {
+        if (c.client === client && this.calls.get(c.invite.callId) === c)
+          this.transportLost(c);
+      });
+    }
+    setTransport(c, state) {
+      c.transport = state;
+      if (state !== "recovering")
+        c.transportChanged?.();
+    }
+    waitForTransport(c) {
+      return new Promise((resolve2) => {
+        const complete = () => {
+          c.transportChanged = void 0;
+          clearTimeout(timer);
+          resolve2();
+        };
+        const timer = setTimeout(complete, 2e3);
+        c.transportChanged = complete;
+      });
+    }
+    transportLost(c) {
+      if (!c.accepted) {
+        this.finish(c, "failed");
+        return;
+      }
+      if (this.stopped || c.resumeUntil || !c.resumeCapability || c.transport === "unavailable")
+        return;
+      this.setTransport(c, "recovering");
+      c.resumeUntil = Date.now() + 1e4;
+      c.client.close();
+      void this.resume(c, 250);
+    }
+    async resume(c, delay) {
+      const capability = c.resumeCapability;
+      if (this.calls.get(c.invite.callId) !== c || !capability)
+        return;
+      const client = new RendezvousClient(c.invite.nodeUrl, this.o.signer, { timeoutMs: 1500 });
+      this.wire(client);
+      c.client = client;
+      try {
+        const reply = await client.resume({
+          callId: c.invite.callId,
+          role: c.incoming ? "callee" : "caller",
+          peer: c.incoming ? c.invite.caller : c.invite.callee,
+          callExpiresAt: c.invite.expiresAt,
+          capability
+        });
+        if (this.calls.get(c.invite.callId) !== c) {
+          client.close();
+          return;
+        }
+        this.setTransport(c, reply.peerOnline === false ? "recovering" : "online");
+        c.resumeUntil = void 0;
+        this.watchTransport(c, client);
+      } catch (error) {
+        client.close();
+        if (this.calls.get(c.invite.callId) !== c)
+          return;
+        const code = error?.code;
+        if (code === "call_not_found" || code === "call_expired" || Date.now() + delay >= (c.resumeUntil ?? 0)) {
+          this.setTransport(c, "unavailable");
+          c.resumeUntil = void 0;
+          return;
+        }
+        c.retry = setTimeout(() => {
+          void this.resume(c, Math.min(delay * 2, 2e3));
+        }, delay);
+        c.retry.unref?.();
+      }
     }
     forget(callId) {
       const c = this.calls.get(callId);
@@ -24450,6 +24664,11 @@ ${ts}`);
     }
     close() {
       this.stopped = true;
+      this.generation++;
+      this.opening.clear();
+      for (const client of this.openingClients)
+        client.close();
+      this.openingClients.clear();
       clearTimeout(this.retry);
       this.retry = void 0;
       for (const c of [...this.calls.values()])
@@ -24461,30 +24680,34 @@ ${ts}`);
     }
   };
 
+  // node_modules/@decentnetwork/peer-webrtc/dist/index.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+
   // src/rsp-browser.js
+  init_doorbell();
+  init_base58();
   var RSP_NODE_URL = "https://rio.beagle.chat";
-  var RSP_PROFILE = JSON.stringify({ rsp: { protocol: "rsp/1", nodeUrl: RSP_NODE_URL } });
-  function decodeRtc(data) {
-    const text = typeof data === "string" ? data : new TextDecoder().decode(data);
-    const raw = JSON.parse(text.replace(/\0+$/u, "").trim());
-    const candidates = raw.candidates ?? (raw.candidate ? [raw.candidate] : null);
-    if (Array.isArray(candidates)) {
-      raw.candidates = candidates.map((c) => ({ ...c, sdp: c?.sdp ?? c?.candidate }));
-    }
-    return globalThis.PeerWebRTC.decodeSignal(JSON.stringify(raw));
-  }
-  function isAdvertised(friend) {
-    try {
-      const rsp = JSON.parse(friend?.extra ?? "{}")?.rsp;
-      return rsp?.protocol === "rsp/1" && rsp.nodeUrl === RSP_NODE_URL;
-    } catch {
-      return false;
-    }
+  var RSP_PROFILE = JSON.stringify({ rsp: { protocol: PROTOCOL, nodeUrl: RSP_NODE_URL } });
+  function isRspCapable(extra) {
+    const ad = parseRspAdvertisement(extra);
+    return !!ad && ad.nodeUrl === new URL(RSP_NODE_URL).origin;
   }
   function createBrowserCallRouter({ peer, userid, secretKey, emit, sendCarrier, log }) {
     function friend(id) {
       return peer.friends().find((f) => (f.userid || f.pubkey) === id && (f.status !== "requested" || f.acceptedAt));
     }
+    const live = /* @__PURE__ */ new Set();
+    const onPageHide = () => {
+      for (const callId of live)
+        rsp.forget(callId);
+      live.clear();
+    };
+    const ended = (s) => {
+      if (s?.callId && (s.type === "bye" || s.type === "action" && s.action === "reject"))
+        live.delete(s.callId);
+    };
     const rsp = new RspCallBridge({
       self: userid,
       signer: carrierSigner({
@@ -24493,12 +24716,19 @@ ${ts}`);
       }),
       nodeUrl: RSP_NODE_URL,
       isFriend: (id) => !!friend(id),
-      advertisement: (id) => isAdvertised(friend(id)) ? { rsp: true, nodeUrl: RSP_NODE_URL } : void 0,
-      decodeSignal: decodeRtc,
-      notify: (id, signal) => emit(id, JSON.stringify(signal)),
-      deliver: (id, signal) => emit(id, JSON.stringify(signal)),
-      // The Express call-push endpoint currently denies cross-origin browser
-      // requests. A non-ringing RSP attempt can safely fall back to Carrier.
+      advertisement: (id) => isRspCapable(friend(id)?.extra) ? { rsp: true, nodeUrl: RSP_NODE_URL } : void 0,
+      notify: (id, envelope) => {
+        if (envelope?.kind === "call-ring-stop" && envelope.reason !== "answered")
+          live.delete(envelope.callId);
+        emit(id, JSON.stringify(envelope));
+      },
+      deliver: (id, signal) => {
+        ended(signal);
+        emit(id, JSON.stringify(signal));
+      },
+      // No wake push from a browser yet: Express's call-push endpoint answers a
+      // page's preflight without CORS headers. A callee that is not listening
+      // then gets the call over Carrier instead ("undelivered" = leave RSP).
       push: async () => "undelivered",
       log
     });
@@ -24518,12 +24748,16 @@ ${ts}`);
         return sendCarrier(id, data);
       let signal;
       try {
-        signal = decodeRtc(data);
+        signal = decodeSignal(data);
       } catch {
         return sendCarrier(id, data);
       }
-      if (await rsp.fromUi(id, signal))
+      ended(signal);
+      if (await rsp.fromUi(id, signal)) {
+        if (signal.type === "action" && signal.action === "accept")
+          live.add(signal.callId);
         return { ok: true };
+      }
       const routeId = id + ":" + signal.callId;
       let route = routes.get(routeId);
       if (!route && signal.type === "offer" && !signal.options?.includes("data")) {
@@ -24532,7 +24766,9 @@ ${ts}`);
             routes.delete(key2);
         route = { usedAt: Date.now(), pending: choose(id, data) };
         routes.set(routeId, route);
-        const { result: result2 } = await route.pending;
+        const { path: path2, result: result2 } = await route.pending;
+        if (path2 === "rsp")
+          live.add(signal.callId);
         return result2;
       }
       if (!route)
@@ -24547,12 +24783,26 @@ ${ts}`);
       return { ok: true };
     }
     return {
-      start: () => rsp.start(),
+      start() {
+        rsp.start();
+        try {
+          globalThis.addEventListener?.("beforeunload", onPageHide);
+          globalThis.addEventListener?.("pagehide", onPageHide);
+        } catch {
+        }
+      },
       close() {
+        try {
+          globalThis.removeEventListener?.("beforeunload", onPageHide);
+          globalThis.removeEventListener?.("pagehide", onPageHide);
+        } catch {
+        }
         rsp.close();
         routes.clear();
+        live.clear();
       },
-      send
+      send,
+      status: () => rsp.status
     };
   }
 
