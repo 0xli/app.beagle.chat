@@ -2144,6 +2144,257 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     const action = friend ? "chat" : address ? isGroup ? "join" : "add" : null;
     return { userid, address, isGroup, friend, action };
   }
+  var ENS_GATEWAY = "https://ens-gateway.beaglechat.workers.dev";
+  function cleanName(name) {
+    return String(name == null ? "" : name).replace(/[\u0000-\u001f\u007f]+/g, "").trim();
+  }
+  function ensLabel(name) {
+    return cleanName(name).toLowerCase().replace(/\.beagles\.eth$/, "");
+  }
+  function claimsBeaglesName(name) {
+    return /\.beagles\.eth$/i.test(cleanName(name));
+  }
+  function ensVerdict(shown, record) {
+    const label = cleanName(shown);
+    const out = { label, mark: false, hint: null, claimed: null };
+    if (!label || record === void 0)
+      return out;
+    const gw = record && typeof record.name === "string" && record.name ? record.name : null;
+    if (gw && ensLabel(label) === ensLabel(gw))
+      return { ...out, mark: true };
+    if (!claimsBeaglesName(label))
+      return out;
+    if (gw)
+      return { label: gw, mark: true, hint: null, claimed: label };
+    return { ...out, hint: "self-claimed" };
+  }
+  function createEnsVerifier({
+    fetchImpl = typeof fetch === "function" ? fetch.bind(globalThis) : null,
+    gateway = ENS_GATEWAY,
+    ttlMs = 30 * 6e4,
+    failTtlMs = 2 * 6e4,
+    concurrency = 4,
+    now = () => Date.now()
+  } = {}) {
+    const cache = /* @__PURE__ */ new Map();
+    const inflight = /* @__PURE__ */ new Map();
+    const queue = [];
+    let running = 0;
+    const pump = () => {
+      while (running < concurrency && queue.length) {
+        const job = queue.shift();
+        running++;
+        job().finally(() => {
+          running--;
+          pump();
+        });
+      }
+    };
+    const fetchRecord = async (userid) => {
+      if (!fetchImpl)
+        return void 0;
+      try {
+        const r = await fetchImpl(`${gateway}/getAddress/${encodeURIComponent(userid)}`);
+        if (r.status === 404)
+          return null;
+        if (!r.ok)
+          return void 0;
+        const j = await r.json();
+        if (!j || typeof j.name !== "string" || !j.name)
+          return null;
+        const owner = j.texts && j.texts.carrierUserId;
+        if (owner && owner !== userid)
+          return null;
+        return { name: j.name, displayName: j.texts && j.texts.displayName || null };
+      } catch (e) {
+        return void 0;
+      }
+    };
+    const peek = (userid) => {
+      const hit = userid ? cache.get(userid) : null;
+      return hit && hit.until > now() ? hit.value : void 0;
+    };
+    const lookup = (userid) => {
+      if (!userid)
+        return Promise.resolve(void 0);
+      const hit = cache.get(userid);
+      if (hit && hit.until > now())
+        return Promise.resolve(hit.value);
+      let p = inflight.get(userid);
+      if (p)
+        return p;
+      p = new Promise((resolve) => {
+        queue.push(() => fetchRecord(userid).then((value) => {
+          cache.set(userid, { value, until: now() + (value === void 0 ? failTtlMs : ttlMs) });
+          inflight.delete(userid);
+          resolve(value);
+        }));
+        pump();
+      });
+      inflight.set(userid, p);
+      return p;
+    };
+    return { lookup, peek };
+  }
+  var verifier = createEnsVerifier();
+  function useEnsRecord(userid) {
+    const [rec, setRec] = React.useState(() => verifier.peek(userid));
+    React.useEffect(() => {
+      let live = true;
+      setRec(verifier.peek(userid));
+      if (userid)
+        verifier.lookup(userid).then((r) => {
+          if (live)
+            setRec(r);
+        });
+      return () => {
+        live = false;
+      };
+    }, [userid]);
+    return rec;
+  }
+  function useEnsVerdict(userid, name) {
+    return ensVerdict(name, useEnsRecord(userid));
+  }
+  function DkEnsMark({ verdict, T, size = 12 }) {
+    if (verdict.mark) {
+      const title = verdict.claimed ? (T && T.ensVerifiedReplaced || "Registered beagles.eth name for this user. Their device shows {claimed}, which is not registered to them.").replace("{claimed}", verdict.claimed) : T && T.ensVerified || "Verified: this beagles.eth name is registered to this user.";
+      return /* @__PURE__ */ React.createElement("span", { title, "aria-label": title, style: { display: "inline-flex", flexShrink: 0, color: "var(--accent)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "check", size, stroke: 2.6, color: "var(--accent)" }));
+    }
+    if (verdict.hint === "self-claimed") {
+      const title = T && T.ensSelfClaimedTip || "Shown by their device. This beagles.eth name is not registered to this user.";
+      return /* @__PURE__ */ React.createElement("span", { title, style: {
+        flexShrink: 0,
+        fontFamily: "var(--ui)",
+        fontSize: 10,
+        color: "var(--faint)",
+        border: "1px solid var(--line)",
+        borderRadius: 4,
+        padding: "0 4px",
+        lineHeight: "14px",
+        whiteSpace: "nowrap"
+      } }, T && T.ensSelfClaimed || "self-claimed");
+    }
+    return null;
+  }
+  function DkVerifiedName({ userid, name, fallback, T, style, markSize }) {
+    const v = useEnsVerdict(userid, name);
+    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style, title: v.claimed ? v.claimed + " \u2192 " + v.label : void 0 }, v.label || fallback), /* @__PURE__ */ React.createElement(DkEnsMark, { verdict: v, T, size: markSize }));
+  }
+  var NATIVE_MEDIA_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    ".bmp": "image/bmp",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".caf": "audio/x-caf",
+    ".amr": "audio/amr",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/ogg",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".3gp": "video/3gpp",
+    ".webm": "video/webm"
+  };
+  var GROUP_TS_RE = /\n?\[(20\d{2}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}:\d{2})\]\s*$/;
+  function stripGroupTs(text) {
+    const m = GROUP_TS_RE.exec(text);
+    return m ? { body: text.slice(0, m.index), ts: m[1] } : { body: text, ts: null };
+  }
+  function splitGroupSender(text) {
+    const m = /^([^:\n]{1,48}):\s([\s\S]+)$/.exec(text);
+    return m ? { sender: m[1], body: m[2] } : null;
+  }
+  function nativeMediaKind(type, ext) {
+    const t = String(type || "").toLowerCase();
+    if (t === "image" || t === "photo" || t === "picture")
+      return "image";
+    if (t === "audio" || t === "voice")
+      return "audio";
+    if (t === "video")
+      return "video";
+    const mime = NATIVE_MEDIA_MIME[String(ext || "").toLowerCase()];
+    return mime ? mime.split("/")[0] : null;
+  }
+  function unwrapCGP1(text) {
+    if (!text.startsWith("CGP1 "))
+      return null;
+    let j = null;
+    try {
+      j = JSON.parse(text.slice(5));
+    } catch (e) {
+      return null;
+    }
+    if (!j || typeof j !== "object" || !j.message || typeof j.message.text !== "string")
+      return null;
+    const origin = j.origin || {};
+    const senderId = origin.userid || origin.friendid || null;
+    const sender = origin.nickname || origin.user_info && origin.user_info.name || (senderId ? senderId.slice(0, 10) : null);
+    return { text: j.message.text, sender, senderId };
+  }
+  var MEDIA_SHAPE_RE = /^\{[\s\S]*"(?:fileExtension|fileName)"\s*:[\s\S]*"data"\s*:\s*"|^\{[\s\S]*"data"\s*:\s*"[A-Za-z0-9+/\\]{64}/;
+  function nativeMediaFromText(input) {
+    let text = String(input == null ? "" : input).trim();
+    let sender = null;
+    let senderId = null;
+    const cgp = unwrapCGP1(text);
+    if (cgp) {
+      text = cgp.text;
+      sender = cgp.sender;
+      senderId = cgp.senderId;
+    }
+    let body = stripGroupTs(text).body.trim();
+    if (body.length < 32)
+      return null;
+    if (!body.startsWith("{")) {
+      const split = splitGroupSender(body);
+      if (!split || !split.body.trim().startsWith("{"))
+        return null;
+      sender = sender || split.sender;
+      body = split.body.trim();
+    }
+    if (!MEDIA_SHAPE_RE.test(body))
+      return null;
+    const extMatch = /"fileExtension"\s*:\s*"([^"]{0,16})"/.exec(body);
+    const nameMatch = /"fileName"\s*:\s*"([^"]{0,200})"/.exec(body);
+    const typeMatch = /"type"\s*:\s*"([^"]{0,32})"/.exec(body);
+    let j = null;
+    try {
+      j = body.endsWith("}") ? JSON.parse(body) : null;
+    } catch (e) {
+      j = null;
+    }
+    if (!j || typeof j !== "object" || typeof j.data !== "string" || j.data.length < 16) {
+      if (!extMatch && !nameMatch)
+        return null;
+      const ext2 = extMatch ? extMatch[1].toLowerCase() : "";
+      const kind2 = nativeMediaKind(typeMatch && typeMatch[1], ext2) || "file";
+      return { sender, senderId, kind: kind2, name: (nameMatch ? nameMatch[1] : "file") + ext2, broken: true };
+    }
+    const ext = String(j.fileExtension || "").toLowerCase();
+    const named = typeof j.fileName === "string" || typeof j.fileExtension === "string";
+    const typed = nativeMediaKind(j.type, "");
+    if (!named && !typed)
+      return null;
+    const kind = nativeMediaKind(j.type, ext) || "file";
+    const mime = NATIVE_MEDIA_MIME[ext] || (kind === "file" ? "application/octet-stream" : kind + "/*");
+    const name = String(j.fileName || "file") + ext;
+    return { sender, senderId, kind, name, url: "data:" + mime + ";base64," + j.data.replace(/\s+/g, "") };
+  }
+  function nativeMediaLabel(media) {
+    if (!media)
+      return "";
+    const word = media.kind === "image" ? "image" : media.kind === "audio" ? "voice" : media.kind === "video" ? "video" : "file";
+    return "[" + word + "] " + media.name;
+  }
   var DK_CMD_HIST_KEY = "beagle.assistant.history";
   var DK_CMD_HIST_MAX = 50;
   function RequestsBlock({ T, requests, onAct }) {
@@ -2315,7 +2566,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       fontFamily: "inherit",
       border: "1px solid " + (active ? "var(--line)" : "transparent"),
       background: active ? "var(--panel-2)" : "transparent"
-    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer, size: 32, radius: 7 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: {
+    } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer, size: 32, radius: 7 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(DkVerifiedName, { userid: peer.app ? null : peer.userId, name: peer.alias, fallback: shortKey(peer.userId, 8, 5), T, style: {
       fontFamily: peer.alias ? "var(--ui)" : "var(--mono)",
       fontSize: 13.5,
       fontWeight: 600,
@@ -2323,7 +2574,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis"
-    } }, peer.alias || shortKey(peer.userId, 8, 5)), peer.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 13, color: "var(--faint)", stroke: 2 }), peer.app && /* @__PURE__ */ React.createElement(Tag, { tone: "accent", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "APP"), muted && /* @__PURE__ */ React.createElement(Icon, { name: "bellOff", size: 12, color: "var(--faint)", stroke: 2, title: T && T.mutedTag || "sound muted" }), peer.wire === "64" && /* @__PURE__ */ React.createElement(Tag, { tone: "off", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "w64")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, peer.ip ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, peer.ip), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)", fontSize: 11 } }, "\xB7")) : null, /* @__PURE__ */ React.createElement("span", { style: {
+    } }), peer.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 13, color: "var(--faint)", stroke: 2 }), peer.app && /* @__PURE__ */ React.createElement(Tag, { tone: "accent", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "APP"), muted && /* @__PURE__ */ React.createElement(Icon, { name: "bellOff", size: 12, color: "var(--faint)", stroke: 2, title: T && T.mutedTag || "sound muted" }), peer.wire === "64" && /* @__PURE__ */ React.createElement(Tag, { tone: "off", style: { height: 15, fontSize: 9.5, padding: "0 4px" } }, "w64")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginTop: 2 } }, peer.ip ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)" } }, peer.ip), /* @__PURE__ */ React.createElement("span", { style: { color: "var(--line)", fontSize: 11 } }, "\xB7")) : null, /* @__PURE__ */ React.createElement("span", { style: {
       fontSize: 11,
       color: "var(--dim)",
       whiteSpace: "nowrap",
@@ -2554,6 +2805,9 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       return card;
     const s = String(text == null ? "" : text);
     const mine = /^you:\s*/i.test(s);
+    const media = nativeMediaFromText(s.replace(/^you:\s*/i, ""));
+    if (media)
+      return (mine ? "you: " : "") + (media.sender ? media.sender + ": " : "") + nativeMediaLabel(media);
     const cgp = dkParseCGP1(s.replace(/^you:\s*/i, ""));
     if (cgp)
       return (mine ? "you: " : "") + cgp.sender + ": " + (cgp.file ? fileLabel(cgp.file, T) : cgp.body.replace(/\s+/g, " "));
@@ -2661,31 +2915,6 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     }
     return html || dkHtmlEscape(src);
   }
-  var DK_NATIVE_MEDIA_MIME = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".heic": "image/heic",
-    ".m4a": "audio/mp4",
-    ".aac": "audio/aac",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".caf": "audio/x-caf",
-    ".mp4": "video/mp4",
-    ".mov": "video/quicktime",
-    ".m4v": "video/x-m4v"
-  };
-  var DK_GROUP_TS_RE = /\n?\[(20\d{2}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}:\d{2})\]\s*$/;
-  function dkStripGroupTs(text) {
-    const m = DK_GROUP_TS_RE.exec(text);
-    return m ? { body: text.slice(0, m.index), ts: m[1] } : { body: text, ts: null };
-  }
-  function dkSplitGroupSender(text) {
-    const m = /^([^:\n]{1,48}):\s([\s\S]+)$/.exec(text);
-    return m ? { sender: m[1], body: m[2] } : null;
-  }
   function dkParseCGP1(text) {
     const t = String(text || "").trim();
     if (!t.startsWith("CGP1 "))
@@ -2710,8 +2939,8 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     if (cgp)
       return cgp;
     const t = String(text || "");
-    const { body: noTs, ts } = dkStripGroupTs(t);
-    const split = dkSplitGroupSender(noTs.trim());
+    const { body: noTs, ts } = stripGroupTs(t);
+    const split = splitGroupSender(noTs.trim());
     if (!split)
       return null;
     return { sender: split.sender, senderId: null, body: split.body.trim(), ts, strong: !!ts };
@@ -2740,7 +2969,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
         title: grp.sender,
         style: { display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: 0, cursor: "pointer" }
       },
-      avatar ? /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: grp.senderId, name: grp.sender, fallbackSeed: seed, size: 24, radius: 6 }) : /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)" } }, grp.sender)
+      avatar ? /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: grp.senderId, name: grp.sender, fallbackSeed: seed, size: 24, radius: 6 }) : /* @__PURE__ */ React.createElement(DkVerifiedName, { userid: grp.senderId, name: grp.sender, T, markSize: 10, style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)" } })
     ), open && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { onClick: () => setOpen(false), style: { position: "fixed", inset: 0, zIndex: 40 } }), /* @__PURE__ */ React.createElement("span", { style: {
       position: "absolute",
       left: 0,
@@ -2755,7 +2984,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       display: "flex",
       flexDirection: "column",
       gap: 8
-    } }, /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: grp.senderId, name: grp.sender, fallbackSeed: seed, size: 34, radius: 8 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 700, color: "var(--text)", wordBreak: "break-all" } }, grp.sender)), grp.senderId ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Mono, { size: 10.5, dim: true, copy: grp.senderId, title: grp.senderId }, shortKey(grp.senderId, 12, 8)), /* @__PURE__ */ React.createElement(
+    } }, /* @__PURE__ */ React.createElement("span", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: grp.senderId, name: grp.sender, fallbackSeed: seed, size: 34, radius: 8 }), /* @__PURE__ */ React.createElement(DkVerifiedName, { userid: grp.senderId, name: grp.sender, T, style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 700, color: "var(--text)", wordBreak: "break-all" } })), grp.senderId ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Mono, { size: 10.5, dim: true, copy: grp.senderId, title: grp.senderId }, shortKey(grp.senderId, 12, 8)), /* @__PURE__ */ React.createElement(
       "button",
       {
         onClick: addFriend,
@@ -2796,36 +3025,6 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
   }
   function dkThreadIsGroup(thread) {
     return (thread || []).some((m) => !m.day && m.dir !== "out" && !m.file && (dkGroupParse(m.text) || {}).strong);
-  }
-  function dkNativeMediaFromText(text) {
-    let body = dkStripGroupTs(String(text || "")).body.trim();
-    if (body.length < 32)
-      return null;
-    let sender = null;
-    if (!body.startsWith("{")) {
-      const split = dkSplitGroupSender(body);
-      if (!split || !split.body.startsWith("{"))
-        return null;
-      sender = split.sender;
-      body = split.body.trim();
-    }
-    if (!body.startsWith("{") || !body.endsWith("}"))
-      return null;
-    let j = null;
-    try {
-      j = JSON.parse(body);
-    } catch (e) {
-      return null;
-    }
-    if (!j || typeof j !== "object" || typeof j.data !== "string" || j.data.length < 16)
-      return null;
-    const kind = j.type === "image" ? "image" : j.type === "audio" || j.type === "voice" ? "audio" : j.type === "video" ? "video" : null;
-    if (!kind)
-      return null;
-    const ext = String(j.fileExtension || "").toLowerCase();
-    const mime = DK_NATIVE_MEDIA_MIME[ext] || kind + "/*";
-    const name = String(j.fileName || "file") + ext;
-    return { sender, kind, name, url: "data:" + mime + ";base64," + j.data.replace(/\s+/g, "") };
   }
   function MarkdownText({ text, onNameCard }) {
     const onClick = (e) => {
@@ -3054,10 +3253,10 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
   }
   function DkMsgBody({ m, peer, T, lang, onTheater, onDelete, onCancel, onRetry, onRetryMsg, onReveal, onOpenFile, onCall, onFormSubmit, onNameCard, onAssistantRemove, onAssistantAdopt, answered, selMode, selected, onToggleSel, busy, isGroup }) {
     const mine = m.from === "me";
-    const nativeMedia = !m.file ? dkNativeMediaFromText(m.text) : null;
+    const nativeMedia = !m.file ? nativeMediaFromText(m.text) : null;
     const grp = isGroup && m.dir !== "out" && !m.file && !nativeMedia ? dkGroupParse(m.text) : null;
     const fileSender = !mine && m.file && m.origin && (m.origin.userid || m.origin.nickname) ? { sender: m.origin.nickname || (m.origin.userid || "").slice(0, 10), senderId: m.origin.userid || null } : null;
-    const grpSender = grp || fileSender || (nativeMedia && nativeMedia.sender ? { sender: nativeMedia.sender, senderId: null } : null);
+    const grpSender = grp || fileSender || (nativeMedia && nativeMedia.sender ? { sender: nativeMedia.sender, senderId: nativeMedia.senderId || null } : null);
     const read = window.ChatComponents ? window.ChatComponents.readMessage((grp ? grp.body : m.text) || "") : { text: grp ? grp.body : m.text, form: null, interaction: null };
     const submitted = read.form && answered ? answered.get(read.form.custom_id) : null;
     const rtcFile = !mine && !m.file ? dkRtcFileFromText(peer.userId || peer.id, m.text) : null;
@@ -3351,7 +3550,18 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
             )
           );
         })()
-      ) : nativeMedia ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxWidth: "min(420px, 88%)" } }, nativeMedia.sender && /* @__PURE__ */ React.createElement(DkGroupSender, { grp: { sender: nativeMedia.sender, senderId: null }, T }), nativeMedia.kind === "image" ? /* @__PURE__ */ React.createElement(
+      ) : nativeMedia ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, maxWidth: "min(420px, 88%)" } }, nativeMedia.sender && /* @__PURE__ */ React.createElement(DkGroupSender, { grp: { sender: nativeMedia.sender, senderId: nativeMedia.senderId || null }, T }), nativeMedia.broken ? (
+        // Cut short or malformed: say what it was, never show the base64.
+        /* @__PURE__ */ React.createElement("span", { style: {
+          padding: "9px 12px",
+          borderRadius: 12,
+          background: "var(--bub-them)",
+          border: "1px solid var(--line)",
+          fontFamily: "var(--ui)",
+          fontSize: 12.5,
+          color: "var(--faint)"
+        } }, "[" + (T && T["mediaKind_" + nativeMedia.kind] || nativeMedia.kind) + ", " + (T && T.mediaNotShown || "could not be shown") + "] " + nativeMedia.name)
+      ) : nativeMedia.kind === "image" ? /* @__PURE__ */ React.createElement(
         "img",
         {
           src: nativeMedia.url,
@@ -3366,7 +3576,28 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
             }
           }
         }
-      ) : nativeMedia.kind === "audio" ? /* @__PURE__ */ React.createElement("audio", { controls: true, src: nativeMedia.url, style: { maxWidth: "100%" } }) : /* @__PURE__ */ React.createElement("video", { controls: true, src: nativeMedia.url, style: { maxWidth: "100%", borderRadius: 12, border: "1px solid var(--line)" } })) : grp && grp.file ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(DkGroupSender, { grp, T }), /* @__PURE__ */ React.createElement(DkGroupFileCard, { file: grp.file, T, offline: m.via === "offline" })) : (() => {
+      ) : nativeMedia.kind === "audio" ? /* @__PURE__ */ React.createElement("audio", { controls: true, src: nativeMedia.url, style: { maxWidth: "100%" } }) : nativeMedia.kind === "video" ? /* @__PURE__ */ React.createElement("video", { controls: true, src: nativeMedia.url, style: { maxWidth: "100%", borderRadius: 12, border: "1px solid var(--line)" } }) : /* @__PURE__ */ React.createElement(
+        "a",
+        {
+          href: nativeMedia.url,
+          download: nativeMedia.name,
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "9px 12px",
+            borderRadius: 12,
+            background: "var(--bub-them)",
+            border: "1px solid var(--line)",
+            color: "var(--text)",
+            fontFamily: "var(--mono)",
+            fontSize: 12.5,
+            textDecoration: "none"
+          }
+        },
+        /* @__PURE__ */ React.createElement(Icon, { name: "download", size: 16, stroke: 2, color: "var(--accent)" }),
+        nativeMedia.name
+      )) : grp && grp.file ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(DkGroupSender, { grp, T }), /* @__PURE__ */ React.createElement(DkGroupFileCard, { file: grp.file, T, offline: m.via === "offline" })) : (() => {
         const contact = !read.form ? dkParseBeagleContact(read.text) : null;
         return /* @__PURE__ */ React.createElement(React.Fragment, null, grp && /* @__PURE__ */ React.createElement(DkGroupSender, { grp, T }), contact && (contact.address || contact.userid) ? /* @__PURE__ */ React.createElement(DkContactCardMsg, { card: contact, mine, T, onNameCard }) : /* @__PURE__ */ React.createElement("div", { style: {
           padding: "8px 12px",
@@ -3790,7 +4021,17 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
           style: { width: 40, height: 44, flexShrink: 0, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }
         },
         /* @__PURE__ */ React.createElement(Icon, { name: "chevronLeft", size: 26, stroke: 2.2, color: "var(--accent)" })
-      ), /* @__PURE__ */ React.createElement("div", { onClick: () => setPubProfile(true), title: T && T.pubOpen || "View public profile", style: { cursor: "pointer", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer, size: 34, radius: 8 })), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: phone ? 1 : void 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { onClick: () => setPubProfile(true), style: { fontFamily: peer.alias ? "var(--ui)" : "var(--mono)", fontSize: 15, fontWeight: 700, color: "var(--text)", cursor: "pointer", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 } }, peer.alias || shortKey(peer.userId, phone ? 6 : 10, phone ? 4 : 6)), peer.app && !phone && /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, "APP"), peer.agent && !phone && /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, "agent"), isGroup && !phone && /* @__PURE__ */ React.createElement(Tag, null, T && T.groupTag || "group"), !phone && !peer.app && /* @__PURE__ */ React.createElement(RouteTag, { peer })), peer.app ? (
+      ), /* @__PURE__ */ React.createElement("div", { onClick: () => setPubProfile(true), title: T && T.pubOpen || "View public profile", style: { cursor: "pointer", flexShrink: 0 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer, size: 34, radius: 8 })), /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: phone ? 1 : void 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { onClick: () => setPubProfile(true), style: { display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0, cursor: "pointer" } }, /* @__PURE__ */ React.createElement(
+        DkVerifiedName,
+        {
+          userid: peer.app ? null : peer.userId,
+          name: peer.alias,
+          fallback: shortKey(peer.userId, phone ? 6 : 10, phone ? 4 : 6),
+          T,
+          markSize: 14,
+          style: { fontFamily: peer.alias ? "var(--ui)" : "var(--mono)", fontSize: 15, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }
+        }
+      )), peer.app && !phone && /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, "APP"), peer.agent && !phone && /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, "agent"), isGroup && !phone && /* @__PURE__ */ React.createElement(Tag, null, T && T.groupTag || "group"), !phone && !peer.app && /* @__PURE__ */ React.createElement(RouteTag, { peer })), peer.app ? (
         // The internal id is not an address anyone can use and not a name
         // anyone chose; saying what this row IS is more use than showing it.
         /* @__PURE__ */ React.createElement("div", { style: { marginTop: 2, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--faint)" } }, T && T.assistantSub || "Local \xB7 APP")
@@ -4328,6 +4569,7 @@ ${peer.address}`
   function DkPublicProfile({ T, userid, fallbackName, onClose, isFriend, isMe, onMessage, card, friend }) {
     const view = card ? nameCardView(card, friend ? [friend] : []) : null;
     const [st, setSt] = React.useState({ loading: true });
+    const ensV = useEnsVerdict(userid, st.prof && st.prof.ens);
     const [addState, setAddState] = React.useState(null);
     const [recOpen, setRecOpen] = React.useState(false);
     const [recPeers, setRecPeers] = React.useState(null);
@@ -4377,7 +4619,7 @@ ${peer.address}`
     const links = prof ? Object.entries(prof.links || {}) : [];
     const lbl = { width: 110, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 };
     const rowS = { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid var(--line)" };
-    return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: 420, maxWidth: "94vw", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, prof && prof.avatarUrl ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: prof.avatarUrl, seed: userid, size: 56, radius: 14 }) : prof && prof.punkId != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: prof.punkId, size: 56, radius: 14, fallbackSeed: userid }) : friend ? /* @__PURE__ */ React.createElement(DkAvatar, { peer: friend, size: 56, radius: 14, dot: false }) : card && card.avatar ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: card.avatar, seed: userid, size: 56, radius: 14 }) : /* @__PURE__ */ React.createElement(DkIdenticon, { seed: userid, size: 56, radius: 14 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 17, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, prof && prof.displayName || fallbackName || shortKey(userid, 10, 6)), prof && prof.ens && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)", marginTop: 2 } }, prof.ens)), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), st.loading ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.dirLoading || "loading\u2026") : !prof && view ? /* @__PURE__ */ React.createElement(DkNameCardNoProfile, { T, view, card, onMessage, isMe }) : !prof ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.pubNone || "No public profile \u2014 this user has not registered a beagles.eth name.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column" } }, prof.description && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)", paddingBottom: 12, lineHeight: 1.5 } }, prof.description), links.length > 0 && // Label keeps its column; pills wrap inside their OWN container so
+    return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: 420, maxWidth: "94vw", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, prof && prof.avatarUrl ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: prof.avatarUrl, seed: userid, size: 56, radius: 14 }) : prof && prof.punkId != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: prof.punkId, size: 56, radius: 14, fallbackSeed: userid }) : friend ? /* @__PURE__ */ React.createElement(DkAvatar, { peer: friend, size: 56, radius: 14, dot: false }) : card && card.avatar ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: card.avatar, seed: userid, size: 56, radius: 14 }) : /* @__PURE__ */ React.createElement(DkIdenticon, { seed: userid, size: 56, radius: 14 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 17, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, prof && prof.displayName || fallbackName || shortKey(userid, 10, 6)), prof && prof.ens && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)", marginTop: 2 } }, prof.ens, /* @__PURE__ */ React.createElement(DkEnsMark, { verdict: ensV, T }))), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), st.loading ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.dirLoading || "loading\u2026") : !prof && view ? /* @__PURE__ */ React.createElement(DkNameCardNoProfile, { T, view, card, onMessage, isMe }) : !prof ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.pubNone || "No public profile \u2014 this user has not registered a beagles.eth name.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column" } }, prof.description && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)", paddingBottom: 12, lineHeight: 1.5 } }, prof.description), links.length > 0 && // Label keeps its column; pills wrap inside their OWN container so
     // an overflowing pill lands under the first pill, never under the label.
     /* @__PURE__ */ React.createElement("div", { style: { ...rowS, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("span", { style: { ...lbl, paddingTop: 5 } }, T.linksCard || "links"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap" } }, links.map(([k, h]) => /* @__PURE__ */ React.createElement(
       "a",
@@ -4426,7 +4668,7 @@ ${peer.address}`
         style: { display: "flex", alignItems: "center", gap: 9, padding: "6px 8px", borderRadius: 9, border: "none", background: "transparent", cursor: recState[p.id] ? "default" : "pointer", textAlign: "left" }
       },
       /* @__PURE__ */ React.createElement(DkAvatar, { peer: p, size: 26, radius: 7, dot: false }),
-      /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.alias || shortKey(p.userId, 8, 6)),
+      /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement(DkVerifiedName, { userid: p.userId, name: p.alias, fallback: shortKey(p.userId, 8, 6), T })),
       recState[p.id] === "sent" ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--online)" } }, T.pubRecSent || "sent \u2713") : recState[p.id] === "busy" ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, "\u2026") : recState[p.id] ? /* @__PURE__ */ React.createElement("span", { title: recState[p.id], style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--warn, #f59e0b)" } }, T.addFailed || "failed") : /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--accent)" } }, T.send || "Send")
     ))))));
   }
@@ -6787,7 +7029,7 @@ ${peer.address}`
     if (!peers.length)
       return null;
     if (phone) {
-      return /* @__PURE__ */ React.createElement("div", { style: { borderRadius: 11, border: "1px solid var(--line)", overflow: "hidden", background: "var(--panel)" } }, peers.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: p.id, onClick: () => onOpenChat(p.id), style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: "pointer", borderBottom: i < peers.length - 1 ? "1px solid var(--line)" : "none" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: p, size: 30, radius: 7 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: p.alias ? "var(--ui)" : "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 } }, p.alias || shortKey(p.userId, 8, 5)), p.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 12, color: "var(--faint)", stroke: 2 })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } }, /* @__PURE__ */ React.createElement(RouteTag, { peer: p }), p.ip ? /* @__PURE__ */ React.createElement(Mono, { size: 11.5, dim: true, copy: p.ip }, p.ip) : null)), /* @__PURE__ */ React.createElement(Icon, { name: "chevronRight", size: 16, color: "var(--faint)", stroke: 2 }))));
+      return /* @__PURE__ */ React.createElement("div", { style: { borderRadius: 11, border: "1px solid var(--line)", overflow: "hidden", background: "var(--panel)" } }, peers.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: p.id, onClick: () => onOpenChat(p.id), style: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", cursor: "pointer", borderBottom: i < peers.length - 1 ? "1px solid var(--line)" : "none" } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: p, size: 30, radius: 7 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } }, /* @__PURE__ */ React.createElement(DkVerifiedName, { userid: p.userId, name: p.alias, fallback: shortKey(p.userId, 8, 5), T, style: { fontFamily: p.alias ? "var(--ui)" : "var(--mono)", fontSize: 13.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 } }), p.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 12, color: "var(--faint)", stroke: 2 })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, minWidth: 0 } }, /* @__PURE__ */ React.createElement(RouteTag, { peer: p }), p.ip ? /* @__PURE__ */ React.createElement(Mono, { size: 11.5, dim: true, copy: p.ip }, p.ip) : null)), /* @__PURE__ */ React.createElement(Icon, { name: "chevronRight", size: 16, color: "var(--faint)", stroke: 2 }))));
     }
     return /* @__PURE__ */ React.createElement("div", { style: { borderRadius: 11, border: "1px solid var(--line)", overflow: "hidden", background: "var(--panel)" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1.4fr 1fr 1fr 0.8fr 90px", gap: 0, padding: "9px 16px", borderBottom: "1px solid var(--line)", background: "var(--panel-2)" } }, [T.colPeer, T.colVip, T.colPath, T.colWire, ""].map((h, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: { fontFamily: "var(--mono)", fontSize: 10.5, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: "var(--faint)", textAlign: i === 4 ? "right" : "left" } }, h))), peers.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: p.id, style: {
       display: "grid",
@@ -6796,7 +7038,7 @@ ${peer.address}`
       alignItems: "center",
       padding: "11px 16px",
       borderBottom: i < peers.length - 1 ? "1px solid var(--line)" : "none"
-    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: p, size: 26, radius: 6 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: p.alias ? "var(--ui)" : "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, p.alias || shortKey(p.userId, 8, 5)), p.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 12, color: "var(--faint)", stroke: 2 })), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, dim: true, copy: p.ip }, p.ip), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(RouteTag, { peer: p })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: p.wire === "64" ? "var(--warn)" : "var(--dim)" } }, p.wire === "64" ? "old\xB764" : "new\xB7163"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { icon: "message", size: "sm", title: T.openChat, onClick: () => onOpenChat(p.id) }), /* @__PURE__ */ React.createElement(Btn, { icon: "signal", size: "sm", title: T.ping })))));
+    } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 } }, /* @__PURE__ */ React.createElement(DkAvatar, { peer: p, size: 26, radius: 6 }), /* @__PURE__ */ React.createElement(DkVerifiedName, { userid: p.userId, name: p.alias, fallback: shortKey(p.userId, 8, 5), T, style: { fontFamily: p.alias ? "var(--ui)" : "var(--mono)", fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }), p.agent && /* @__PURE__ */ React.createElement(Icon, { name: "bot", size: 12, color: "var(--faint)", stroke: 2 })), /* @__PURE__ */ React.createElement(Mono, { size: 12.5, dim: true, copy: p.ip }, p.ip), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(RouteTag, { peer: p })), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 11.5, color: p.wire === "64" ? "var(--warn)" : "var(--dim)" } }, p.wire === "64" ? "old\xB764" : "new\xB7163"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 6 } }, /* @__PURE__ */ React.createElement(Btn, { icon: "message", size: "sm", title: T.openChat, onClick: () => onOpenChat(p.id) }), /* @__PURE__ */ React.createElement(Btn, { icon: "signal", size: "sm", title: T.ping })))));
   }
   function ReconnectBtn({ T, ip, onReconnect, label, icon = "refresh" }) {
     const [busy, setBusy] = React.useState(false);
@@ -7477,6 +7719,10 @@ ${peer.address}`
       joinGroup: "Join group",
       cardIsFriend: "Already in your chats.",
       cardNoEns: "No beagles.eth name registered.",
+      ensVerified: "Verified: this beagles.eth name is registered to this user.",
+      ensVerifiedReplaced: "Registered beagles.eth name for this user. Their device shows {claimed}, which is not registered to them.",
+      ensSelfClaimed: "self-claimed",
+      ensSelfClaimedTip: "Shown by their device. This beagles.eth name is not registered to this user.",
       voiceMessage: "Voice message",
       groupFileNotDelivered: "Not delivered to this device: the group sends agents only a description of files.",
       shareFailed: "Screen share failed",
@@ -7707,6 +7953,10 @@ ${peer.address}`
       joinGroup: "\u52A0\u5165\u7FA4",
       cardIsFriend: "\u5DF2\u5728\u4F60\u7684\u4F1A\u8BDD\u91CC\u3002",
       cardNoEns: "\u5BF9\u65B9\u8FD8\u6CA1\u6709\u6CE8\u518C beagles.eth \u540D\u5B57\u3002",
+      ensVerified: "\u5DF2\u9A8C\u8BC1:\u8FD9\u4E2A beagles.eth \u540D\u5B57\u6CE8\u518C\u5728\u6B64\u7528\u6237\u540D\u4E0B\u3002",
+      ensVerifiedReplaced: "\u6B64\u7528\u6237\u6CE8\u518C\u7684 beagles.eth \u540D\u5B57\u3002\u5BF9\u65B9\u8BBE\u5907\u663E\u793A\u7684\u662F {claimed},\u5B83\u5E76\u6CA1\u6709\u6CE8\u518C\u5728\u5BF9\u65B9\u540D\u4E0B\u3002",
+      ensSelfClaimed: "\u81EA\u79F0",
+      ensSelfClaimedTip: "\u8FD9\u662F\u5BF9\u65B9\u8BBE\u5907\u81EA\u5DF1\u586B\u5199\u7684\u540D\u5B57,\u8FD9\u4E2A beagles.eth \u540D\u5B57\u5E76\u6CA1\u6709\u6CE8\u518C\u5728\u6B64\u7528\u6237\u540D\u4E0B\u3002",
       voiceMessage: "\u8BED\u97F3\u6D88\u606F",
       groupFileNotDelivered: "\u672A\u9001\u8FBE\u672C\u8BBE\u5907\uFF1A\u7FA4\u7EC4\u53EA\u5411\u4EE3\u7406\u53D1\u9001\u6587\u4EF6\u8BF4\u660E\uFF0C\u4E0D\u542B\u6587\u4EF6\u5185\u5BB9\u3002",
       shareFailed: "\u5C4F\u5E55\u5171\u4EAB\u5931\u8D25",

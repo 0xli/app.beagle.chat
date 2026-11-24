@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.44","builtAt":"2026-11-23T05:23:27.558Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.46-rsp.0","builtAt":"2026-11-24T02:21:19.700Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -29957,7 +29957,7 @@ ${body2.length}`);
     const dir = ens?.byUserid.get(f.userid);
     const lm = f.lastMessage;
     const realName = f.name && f.name !== f.userid ? f.name : "";
-    const display = f.alias || dir?.name || realName || "";
+    const display = f.alias || realName || dir?.name || "";
     return {
       id: f.userid,
       userId: f.userid,
