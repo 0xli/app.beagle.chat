@@ -2253,6 +2253,11 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     }, [userid]);
     return rec;
   }
+  function verifiedLabel(userid, name) {
+    if (!name)
+      return name;
+    return ensVerdict(name, verifier.peek(userid)).label || name;
+  }
   function useEnsVerdict(userid, name) {
     return ensVerdict(name, useEnsRecord(userid));
   }
@@ -4191,7 +4196,7 @@ ${peer.address}`
                 e.preventDefault();
             }
           },
-          placeholder: phone ? `${T.message}\u2026` : `${T.message} ${peer.alias || shortKey(peer.userId, 6, 4)}\u2026`,
+          placeholder: phone ? `${T.message}\u2026` : `${T.message} ${verifiedLabel(peer.app ? null : peer.userId, peer.alias) || shortKey(peer.userId, 6, 4)}\u2026`,
           style: { flex: 1, height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--panel-2)", color: "var(--text)", fontFamily: "var(--ui)", fontSize: 13.5, padding: "0 14px", outline: "none", minWidth: 0 }
         }
       ), /* @__PURE__ */ React.createElement(Btn, { tone: "solid", icon: "arrowUp", title: T.send, onClick: sendDraft }))),
@@ -4242,7 +4247,7 @@ ${peer.address}`
           style: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 6 }
         }
       ))),
-      pubProfile && /* @__PURE__ */ React.createElement(DkPublicProfile, { T, userid: peer.userId, fallbackName: peer.alias, isFriend: true, onClose: () => setPubProfile(false) }),
+      pubProfile && /* @__PURE__ */ React.createElement(DkPublicProfile, { T, userid: peer.userId, fallbackName: verifiedLabel(peer.userId, peer.alias), isFriend: true, onClose: () => setPubProfile(false) }),
       nameCardProf && (() => {
         const cardFriend2 = cardFriend(nameCardProf, peers);
         return /* @__PURE__ */ React.createElement(
@@ -6395,7 +6400,7 @@ ${peer.address}`
     if (!inc)
       return null;
     const peer = (peers || []).find((p) => p.id === inc.peerId) || { id: inc.peerId };
-    const name = peer.alias || peer.name || shortKey(inc.peerId, 10, 6);
+    const name = verifiedLabel(inc.peerId, peer.alias) || peer.name || shortKey(inc.peerId, 10, 6);
     return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 80, background: "color-mix(in oklab, var(--bg), transparent 15%)", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 320, padding: 26, borderRadius: 18, background: "var(--panel)", border: "1px solid var(--line)", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", width: 96, height: 96, borderRadius: 999, border: "2px solid var(--accent)", animation: "dkpulse 2s ease-out infinite" } }), /* @__PURE__ */ React.createElement(DkIdenticon, { seed: inc.peerId, size: 72, radius: 18 })), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 17, fontWeight: 700, color: "var(--text)" } }, name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--faint)", marginTop: 4, display: "flex", gap: 6, alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: inc.video ? "video" : "phone", size: 14, stroke: 2 }), T && (inc.video ? T.incomingVideo : T.incomingAudio) || "Incoming " + (inc.video ? "video" : "audio") + " call"), (inc.via === "rsp" || inc.via === "rsp-doorbell") && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--faint)", fontSize: 12, marginTop: 6 } }, inc.via === "rsp-doorbell" ? "RSP \xB7 Doorbell" : "RSP"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, justifyContent: "center", marginTop: 22 } }, /* @__PURE__ */ React.createElement(CallBtn, { icon: "phone", label: T && T.decline || "Decline", danger: true, onClick: ctl.reject }), /* @__PURE__ */ React.createElement(CallBtn, { icon: inc.video ? "video" : "phone", label: T && T.accept || "Accept", active: true, onClick: ctl.accept }))));
   }
   function CallBtn({ icon, label, onClick, active, danger, wide }) {
@@ -6435,7 +6440,7 @@ ${peer.address}`
     if (!call)
       return null;
     const peer = (peers || []).find((p) => p.id === call.peerId) || { id: call.peerId };
-    const name = peer.alias || peer.name || shortKey(call.peerId, 10, 6);
+    const name = verifiedLabel(call.peerId, peer.alias) || peer.name || shortKey(call.peerId, 10, 6);
     const streamHasVideo = (s) => !!(s && s.getVideoTracks && s.getVideoTracks().length > 0);
     const video = call.video || ctl.sharing || streamHasVideo(ctl.remoteStream) || streamHasVideo(ctl.localStream);
     const mm = String(Math.floor(secs / 60)).padStart(2, "0");
@@ -7011,7 +7016,7 @@ ${peer.address}`
     const downloadLabel = T && T.downloadFile || "Download";
     return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", right: 72, bottom: 18, zIndex: 90, width: 360, maxWidth: "calc(100vw - 96px)", display: "flex", flexDirection: "column", gap: 10 } }, items.map((it) => {
       const peer = (peers || []).find((p) => p.id === it.peerId || p.userId === it.peerId) || {};
-      const who = peer.alias || peer.name || shortKey(it.peerId, 8, 5);
+      const who = verifiedLabel(peer.userId || it.peerId, peer.alias) || peer.name || shortKey(it.peerId, 8, 5);
       return /* @__PURE__ */ React.createElement("div", { key: it.id, style: { border: "1px solid var(--line)", background: "var(--panel)", borderRadius: 12, padding: 12, boxShadow: "0 14px 40px rgba(0,0,0,0.35)" } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12, color: "var(--faint)", marginBottom: 6 } }, T && T.receivedFile || "Received file", " \xB7 ", who), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 13, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, it.name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", marginTop: 3 } }, dkFileSize(it.size)), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10, paddingRight: 2 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => ctl.dismissIncoming(it.id), style: { height: 30, minWidth: 58, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", color: "var(--dim)", cursor: "pointer" } }, closeLabel), /* @__PURE__ */ React.createElement("a", { href: it.url, download: it.name, onClick: () => setTimeout(() => ctl.dismissIncoming(it.id), 500), style: { height: 30, minWidth: 76, textAlign: "center", borderRadius: 8, padding: "6px 10px", background: "var(--accent)", color: "#fff", textDecoration: "none", fontFamily: "var(--mono)", fontSize: 12 } }, downloadLabel)));
     }));
   }
