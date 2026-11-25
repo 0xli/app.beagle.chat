@@ -139,14 +139,14 @@ if (location.protocol === "http:" && !/^(localhost|127\.|10\.|192\.168\.|172\.(1
 <!-- QR encoder (Kazuhiko Arase, MIT) — exposes window.qrcode for the QR-code button. -->
 <script src="vendor/qrcode.js"></script>
 <!-- peer-webrtc call engine (bundled IIFE) — exposes window.PeerWebRTC. -->
-<script src="vendor/peer-webrtc.js"></script>
+<script src="vendor/peer-webrtc.js?v=3e1237b614"></script>
 <!-- chat form schema (bundled IIFE) — exposes window.ChatComponents. The only
      place the format is interpreted; the backend just carries the message. -->
 <script src="vendor/chat-components.js"></script>
 <!-- The UI: @decentnetwork/beagle-ui plus this platform's host (src/ui/). -->
 <!-- backend C: identity, storage, tab lock, /api interception. Must precede app.js. -->
 <script>globalThis.__BEAGLE_BRIDGE__ = "wss://bridge.beagle.chat/relay-ws,wss://im.beagle.chat/relay-ws";</script>
-<script src="beagle-web.js?v=66b56b9a0c"></script>
-<script src="app.js?v=fdbe183d86"></script>
+<script src="beagle-web.js?v=ebaefe2f27"></script>
+<script src="app.js?v=f3b7112a5a"></script>
 </body>
 </html>

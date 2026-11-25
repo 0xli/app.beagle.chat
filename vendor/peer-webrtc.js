@@ -3,6 +3,7 @@ var PeerWebRTC = (() => {
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
   var __export = (target, all) => {
     for (var name in all)
       __defProp(target, name, { get: all[name], enumerable: true });
@@ -16,6 +17,10 @@ var PeerWebRTC = (() => {
     return to;
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+  var __publicField = (obj, key, value) => {
+    __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+    return value;
+  };
   var __accessCheck = (obj, member, msg) => {
     if (!member.has(obj))
       throw TypeError("Cannot " + msg);
@@ -39,15 +44,16 @@ var PeerWebRTC = (() => {
     return method;
   };
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/index.js
-  var dist_exports = {};
-  __export(dist_exports, {
+  // src/ui/peer-webrtc-entry.js
+  var peer_webrtc_entry_exports = {};
+  __export(peer_webrtc_entry_exports, {
     BeaglePushClient: () => BeaglePushClient,
     BroadcastChannelSignaling: () => BroadcastChannelSignaling,
     CARRIER_MAX_INVITE_DATA_LEN: () => CARRIER_MAX_INVITE_DATA_LEN,
-    CallEngine: () => CallEngine,
+    CallEngine: () => CallEngine2,
     CarrierSignaling: () => CarrierSignaling,
     Emitter: () => Emitter,
+    RspTurnCredentials: () => RspTurnCredentials,
     SocketIoSignaling: () => SocketIoSignaling,
     byteLength: () => byteLength,
     decodeSignal: () => decodeSignal,
@@ -63,7 +69,7 @@ var PeerWebRTC = (() => {
     videoIsSending: () => videoIsSending
   });
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/emitter.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/emitter.js
   var _handlers;
   var Emitter = class {
     constructor() {
@@ -99,7 +105,7 @@ var PeerWebRTC = (() => {
   };
   _handlers = new WeakMap();
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/sdp.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/sdp.js
   var CARRIER_MAX_INVITE_DATA_LEN = 8192;
   function mediaSection(sdp, kind) {
     const norm = sdp.replace(/\r\n/g, "\n");
@@ -224,7 +230,7 @@ var PeerWebRTC = (() => {
     return kept.join(crlf ? "\r\n" : "\n");
   }
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signal.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/signal.js
   var SDP_TYPES = /* @__PURE__ */ new Set([
     "offer",
     "answer",
@@ -291,9 +297,10 @@ var PeerWebRTC = (() => {
     const signal = { type: obj.type, callId: obj.callId };
     if (typeof obj.sdp === "string")
       signal.sdp = obj.sdp;
-    if (Array.isArray(obj.candidates)) {
-      signal.candidates = obj.candidates.filter((c) => c && typeof c.sdp === "string").map((c) => ({
-        sdp: c.sdp,
+    const rawCandidates = Array.isArray(obj.candidates) ? obj.candidates : obj.candidate && typeof obj.candidate === "object" ? [obj.candidate] : void 0;
+    if (rawCandidates) {
+      signal.candidates = rawCandidates.map((x) => x && typeof x === "object" ? x : void 0).map((c) => ({ c, line: candidateLine(c) })).filter((e) => e.line !== void 0).map(({ c, line }) => ({
+        sdp: line,
         sdpMLineIndex: typeof c.sdpMLineIndex === "number" ? c.sdpMLineIndex : 0,
         sdpMid: typeof c.sdpMid === "string" ? c.sdpMid : null
       }));
@@ -309,24 +316,47 @@ var PeerWebRTC = (() => {
       signal.event = obj.event;
     return signal;
   }
+  function candidateLine(c) {
+    if (!c)
+      return void 0;
+    if (typeof c.sdp === "string")
+      return c.sdp;
+    if (typeof c.candidate === "string")
+      return c.candidate;
+    return void 0;
+  }
   function looksLikeSignal(input) {
     const text = (typeof input === "string" ? input : new TextDecoder().decode(input)).replace(/\0+$/u, "").trimStart();
     return text.startsWith("{") && text.includes('"callId"') && text.includes('"type"');
   }
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/call-engine.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/call-engine.js
   var DEFAULT_ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" }
   ];
   var LEAN_VIDEO_CODECS = /^video\/(H264|VP8|rtx|red|ulpfec)$/i;
   var ICE_RESTART_MAX = 3;
   var ICE_DISCONNECT_GRACE_MS = 4e3;
-  var ICE_FAILED_GRACE_MS = 12e4;
-  var _opts, _iceServers, _sessions, _restartOffersEnabled, _setOutgoingVideoTrack, setOutgoingVideoTrack_fn, _renegotiate, renegotiate_fn, _createOffer, createOffer_fn, _createAnswer, createAnswer_fn, _cleanOutbound, cleanOutbound_fn, _cleanInbound, cleanInbound_fn, _preferLeanVideoCodecs, preferLeanVideoCodecs_fn, _restartIce, restartIce_fn, _handleSignal, handleSignal_fn, _onOffer, onOffer_fn, _answerRenegotiation, answerRenegotiation_fn, _negotiationFailed, negotiationFailed_fn, _onAnswer, onAnswer_fn, _onCandidate, onCandidate_fn, _onBye, onBye_fn, _onAuxiliary, onAuxiliary_fn, _createSession, createSession_fn, _wirePeerConnection, wirePeerConnection_fn, _ensureRemoteStream, ensureRemoteStream_fn, _attachLocalMedia, attachLocalMedia_fn, _flushLocalCandidates, flushLocalCandidates_fn, _drainRemoteCandidates, drainRemoteCandidates_fn, _send, send_fn, _sendByeSafe, sendByeSafe_fn, _cleanup, cleanup_fn, _setState, setState_fn, _normId, normId_fn, _toInfo, _newCallId, newCallId_fn, _log, log_fn;
+  var ICE_MEDIA_LOSS_GRACE_MS = 12e4;
+  var DEFAULT_RING_TIMEOUT_MS = 6e4;
+  var ENDED_CALL_MEMORY_MS = 12e4;
+  var _opts, _iceServers, _sessions, _restartOffersEnabled, _endedCalls, _placeCall, placeCall_fn, _startRingTimer, startRingTimer_fn, _clearRingTimer, clearRingTimer_fn, _iceServersForCall, iceServersForCall_fn, _iceServersNow, iceServersNow_fn, _refreshIceServers, refreshIceServers_fn, _setOutgoingVideoTrack, setOutgoingVideoTrack_fn, _renegotiate, renegotiate_fn, _sendRenegotiationOffer, sendRenegotiationOffer_fn, _createOffer, createOffer_fn, _createAnswer, createAnswer_fn, _cleanOutbound, cleanOutbound_fn, _cleanInbound, cleanInbound_fn, _preferLeanVideoCodecs, preferLeanVideoCodecs_fn, _restartIce, restartIce_fn, _handleSignal, handleSignal_fn, _onOffer, onOffer_fn, _answerRenegotiation, answerRenegotiation_fn, _negotiationFailed, negotiationFailed_fn, _onAnswer, onAnswer_fn, _onCandidate, onCandidate_fn, _onBye, onBye_fn, _onAuxiliary, onAuxiliary_fn, _createSession, createSession_fn, _wirePeerConnection, wirePeerConnection_fn, _armMediaLoss, armMediaLoss_fn, _ensureRemoteStream, ensureRemoteStream_fn, _attachLocalMedia, attachLocalMedia_fn, _canTrickle, canTrickle_fn, _localSdpSent, localSdpSent_fn, _flushLocalCandidates, flushLocalCandidates_fn, _drainRemoteCandidates, drainRemoteCandidates_fn, _send, send_fn, _sendByeSafe, sendByeSafe_fn, _cleanup, cleanup_fn, _rememberEnded, rememberEnded_fn, _recentlyEnded, recentlyEnded_fn, _setState, setState_fn, _normId, normId_fn, _toInfo, _newCallId, newCallId_fn, _log, log_fn;
   var CallEngine = class extends Emitter {
     constructor(opts) {
       var _a, _b;
       super();
+      __privateAdd(this, _placeCall);
+      /** Start the caller's ring timer (see CallEngineOptions.ringTimeoutMs). */
+      __privateAdd(this, _startRingTimer);
+      __privateAdd(this, _clearRingTimer);
+      /** ICE servers for a call about to start: the configured ones plus TURN. */
+      __privateAdd(this, _iceServersForCall);
+      /** The same, without waiting: cached TURN credential or the fallback. */
+      __privateAdd(this, _iceServersNow);
+      /** Incoming call: its RTCPeerConnection was made when the offer arrived,
+       *  with whatever TURN credential was cached. Before the answer (so before
+       *  ICE gathering) give it a fresh one if that changed anything. */
+      __privateAdd(this, _refreshIceServers);
       /** Point the outgoing video sender at `track` (replaceTrack, no renegotiation
        *  needed if a sender exists), flip the transceiver to send, and refresh the
        *  local-preview stream. `track === null` removes the outgoing video. */
@@ -334,6 +364,7 @@ var PeerWebRTC = (() => {
       /** Create + send a fresh offer to renegotiate media (e.g. after adding a
        *  screen-share track). The peer applies it via #onOffer's renegotiation path. */
       __privateAdd(this, _renegotiate);
+      __privateAdd(this, _sendRenegotiationOffer);
       /** createOffer with the lean codec set applied (see #preferLeanVideoCodecs)
        *  and the result sanitized (see #cleanOutbound). Every offer — initial,
        *  screen-share re-offer, ICE restart — goes through here. */
@@ -388,13 +419,27 @@ var PeerWebRTC = (() => {
       __privateAdd(this, _onAuxiliary);
       __privateAdd(this, _createSession);
       __privateAdd(this, _wirePeerConnection);
+      __privateAdd(this, _armMediaLoss);
       __privateAdd(this, _ensureRemoteStream);
       __privateAdd(this, _attachLocalMedia);
+      /** May a local candidate go out now? Only once
+       *  - the remote SDP is applied (iOS parity: the native SDK's hasReceivedSdp —
+       *    the peer has a matching call), and
+       *  - every local offer/answer we applied has been SENT: a candidate must
+       *    never overtake the description it belongs to. */
+      __privateAdd(this, _canTrickle);
+      /** An offer/answer went out (or failed to): release the candidates held for it. */
+      __privateAdd(this, _localSdpSent);
+      /** Send queued local candidates, oldest first, one signal each (as before).
+       *  One flush at a time; a candidate gathered meanwhile joins the queue and
+       *  goes out in turn. A failed send is logged and the rest still go. */
       __privateAdd(this, _flushLocalCandidates);
       __privateAdd(this, _drainRemoteCandidates);
       __privateAdd(this, _send);
       __privateAdd(this, _sendByeSafe);
       __privateAdd(this, _cleanup);
+      __privateAdd(this, _rememberEnded);
+      __privateAdd(this, _recentlyEnded);
       __privateAdd(this, _setState);
       /** Canonical session key. callId is a UUID; iOS re-serializes it UPPERCASE
        *  (it parses our lowercase UUID into a `UUID` and echoes `.uuidString`), so
@@ -410,6 +455,8 @@ var PeerWebRTC = (() => {
       __privateAdd(this, _sessions, /* @__PURE__ */ new Map());
       /** See CallEngineOptions.iceRestartOffers — off by default for native-app safety. */
       __privateAdd(this, _restartOffersEnabled, void 0);
+      /** Normalized callId → time it ended (see ENDED_CALL_MEMORY_MS). */
+      __privateAdd(this, _endedCalls, /* @__PURE__ */ new Map());
       __privateAdd(this, _toInfo, (session) => ({
         callId: session.callId,
         peerId: session.peerId,
@@ -448,43 +495,24 @@ var PeerWebRTC = (() => {
      * "remoteStream"/"ended" as the call progresses.
      */
     async call(peerId, kinds = {}) {
-      var _a, _b, _c, _d, _e;
+      var _a, _b, _c;
       const audio = (_a = kinds.audio) != null ? _a : true;
       const video = (_b = kinds.video) != null ? _b : false;
       const data = (_c = kinds.data) != null ? _c : false;
       const callId = __privateMethod(this, _newCallId, newCallId_fn).call(this);
-      const session = __privateMethod(this, _createSession, createSession_fn).call(this, callId, peerId, "outgoing", { audio, video, data });
-      await __privateMethod(this, _attachLocalMedia, attachLocalMedia_fn).call(this, session);
-      if (audio && !((_d = session.localStream) == null ? void 0 : _d.getAudioTracks().length)) {
-        try {
-          session.pc.addTransceiver("audio", { direction: "recvonly" });
-        } catch {
+      const iceServers = await __privateMethod(this, _iceServersForCall, iceServersForCall_fn).call(this);
+      const session = __privateMethod(this, _createSession, createSession_fn).call(this, callId, peerId, "outgoing", { audio, video, data }, iceServers);
+      __privateMethod(this, _startRingTimer, startRingTimer_fn).call(this, session);
+      try {
+        await __privateMethod(this, _placeCall, placeCall_fn).call(this, session);
+      } catch (err) {
+        if (!session.closed) {
+          const unreachable = (err == null ? void 0 : err.sendFailed) === true;
+          __privateMethod(this, _setState, setState_fn).call(this, session, unreachable ? "unreachable" : "failed");
+          __privateMethod(this, _cleanup, cleanup_fn).call(this, session, "close", unreachable ? "unreachable" : "failed");
         }
+        throw err;
       }
-      if (video && !((_e = session.localStream) == null ? void 0 : _e.getVideoTracks().length)) {
-        try {
-          session.pc.addTransceiver("video", { direction: "recvonly" });
-        } catch {
-        }
-      }
-      const offer = await __privateMethod(this, _createOffer, createOffer_fn).call(this, session);
-      await session.pc.setLocalDescription(offer);
-      const options = [];
-      if (audio)
-        options.push("audio");
-      if (video)
-        options.push("video");
-      if (data)
-        options.push("data");
-      await __privateMethod(this, _send, send_fn).call(this, peerId, {
-        type: "offer",
-        sdp: offer.sdp,
-        options,
-        callId,
-        event: void 0
-      });
-      __privateMethod(this, _setState, setState_fn).call(this, session, "ringing");
-      __privateMethod(this, _log, log_fn).call(this, `call \u2192 ${peerId} callId=${callId} audio=${audio} video=${video}`);
       return callId;
     }
     /**
@@ -497,16 +525,22 @@ var PeerWebRTC = (() => {
         throw new Error(`accept: no pending incoming call ${callId}`);
       }
       await __privateMethod(this, _attachLocalMedia, attachLocalMedia_fn).call(this, session);
+      await __privateMethod(this, _refreshIceServers, refreshIceServers_fn).call(this, session);
       await session.pc.setRemoteDescription({ type: "offer", sdp: __privateMethod(this, _cleanInbound, cleanInbound_fn).call(this, session.pendingOffer, "offer") });
       session.hasReceivedSdp = true;
       session.pendingOffer = void 0;
       await __privateMethod(this, _drainRemoteCandidates, drainRemoteCandidates_fn).call(this, session);
       const answer = await __privateMethod(this, _createAnswer, createAnswer_fn).call(this, session);
-      await session.pc.setLocalDescription(answer);
-      await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "answer", sdp: answer.sdp, callId });
+      session.localSdpUnsent++;
       try {
-        await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "action", action: "accept", callId });
-      } catch {
+        await session.pc.setLocalDescription(answer);
+        await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "answer", sdp: answer.sdp, callId });
+        try {
+          await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "action", action: "accept", callId });
+        } catch {
+        }
+      } finally {
+        __privateMethod(this, _localSdpSent, localSdpSent_fn).call(this, session);
       }
       __privateMethod(this, _setState, setState_fn).call(this, session, "connecting");
       await __privateMethod(this, _flushLocalCandidates, flushLocalCandidates_fn).call(this, session);
@@ -621,6 +655,119 @@ var PeerWebRTC = (() => {
   _iceServers = new WeakMap();
   _sessions = new WeakMap();
   _restartOffersEnabled = new WeakMap();
+  _endedCalls = new WeakMap();
+  _placeCall = new WeakSet();
+  placeCall_fn = async function(session) {
+    var _a, _b;
+    const { callId, peerId, audio, video, data } = session;
+    await __privateMethod(this, _attachLocalMedia, attachLocalMedia_fn).call(this, session);
+    if (session.closed)
+      throw new Error(`call ${callId} ended before the offer was sent`);
+    if (audio && !((_a = session.localStream) == null ? void 0 : _a.getAudioTracks().length)) {
+      try {
+        session.pc.addTransceiver("audio", { direction: "recvonly" });
+      } catch {
+      }
+    }
+    if (video && !((_b = session.localStream) == null ? void 0 : _b.getVideoTracks().length)) {
+      try {
+        session.pc.addTransceiver("video", { direction: "recvonly" });
+      } catch {
+      }
+    }
+    const offer = await __privateMethod(this, _createOffer, createOffer_fn).call(this, session);
+    const options = [];
+    if (audio)
+      options.push("audio");
+    if (video)
+      options.push("video");
+    if (data)
+      options.push("data");
+    session.localSdpUnsent++;
+    try {
+      await session.pc.setLocalDescription(offer);
+      try {
+        await __privateMethod(this, _send, send_fn).call(this, peerId, {
+          type: "offer",
+          sdp: offer.sdp,
+          options,
+          callId,
+          event: void 0
+        });
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        e.sendFailed = true;
+        throw e;
+      }
+    } finally {
+      __privateMethod(this, _localSdpSent, localSdpSent_fn).call(this, session);
+    }
+    if (session.closed)
+      return;
+    if (!session.hasReceivedSdp)
+      __privateMethod(this, _setState, setState_fn).call(this, session, session.remoteRang ? "remoteRinging" : "ringing");
+    __privateMethod(this, _log, log_fn).call(this, `call \u2192 ${peerId} callId=${callId} audio=${audio} video=${video}`);
+  };
+  _startRingTimer = new WeakSet();
+  startRingTimer_fn = function(session) {
+    var _a, _b, _c;
+    const ms = (_a = __privateGet(this, _opts).ringTimeoutMs) != null ? _a : DEFAULT_RING_TIMEOUT_MS;
+    if (!(ms > 0))
+      return;
+    session.ringTimer = setTimeout(() => {
+      session.ringTimer = void 0;
+      if (session.closed || session.hasReceivedSdp)
+        return;
+      __privateMethod(this, _log, log_fn).call(this, `no answer from ${session.peerId} in ${ms}ms \u2014 ending call ${session.callId}`);
+      __privateMethod(this, _setState, setState_fn).call(this, session, "noAnswer");
+      void __privateMethod(this, _sendByeSafe, sendByeSafe_fn).call(this, session, "normal");
+      __privateMethod(this, _cleanup, cleanup_fn).call(this, session, "normal", "noAnswer");
+    }, ms);
+    (_c = (_b = session.ringTimer).unref) == null ? void 0 : _c.call(_b);
+  };
+  _clearRingTimer = new WeakSet();
+  clearRingTimer_fn = function(session) {
+    if (session.ringTimer) {
+      clearTimeout(session.ringTimer);
+      session.ringTimer = void 0;
+    }
+  };
+  _iceServersForCall = new WeakSet();
+  iceServersForCall_fn = async function() {
+    const turn = __privateGet(this, _opts).turnServers;
+    if (!turn)
+      return __privateGet(this, _iceServers);
+    let extra = [];
+    try {
+      extra = await turn.iceServers();
+    } catch {
+      extra = turn.currentIceServers();
+    }
+    return [...__privateGet(this, _iceServers), ...extra];
+  };
+  _iceServersNow = new WeakSet();
+  iceServersNow_fn = function() {
+    const turn = __privateGet(this, _opts).turnServers;
+    return turn ? [...__privateGet(this, _iceServers), ...turn.currentIceServers()] : __privateGet(this, _iceServers);
+  };
+  _refreshIceServers = new WeakSet();
+  refreshIceServers_fn = async function(session) {
+    var _a;
+    if (!__privateGet(this, _opts).turnServers)
+      return;
+    const iceServers = await __privateMethod(this, _iceServersForCall, iceServersForCall_fn).call(this);
+    const pc = session.pc;
+    if (typeof pc.setConfiguration !== "function")
+      return;
+    const current = typeof pc.getConfiguration === "function" ? pc.getConfiguration() : {};
+    if (sameIceServers((_a = current.iceServers) != null ? _a : [], iceServers))
+      return;
+    try {
+      pc.setConfiguration({ ...current, iceServers });
+    } catch (err) {
+      __privateMethod(this, _log, log_fn).call(this, `accept ${session.callId}: could not update ICE servers (${err.message}); keeping the cached/static ones`);
+    }
+  };
   _setOutgoingVideoTrack = new WeakSet();
   setOutgoingVideoTrack_fn = async function(session, track, stream) {
     var _a, _b, _c, _d;
@@ -667,9 +814,18 @@ var PeerWebRTC = (() => {
   };
   _renegotiate = new WeakSet();
   renegotiate_fn = async function(session) {
-    var _a, _b;
     const offer = await __privateMethod(this, _createOffer, createOffer_fn).call(this, session);
-    await session.pc.setLocalDescription(offer);
+    session.localSdpUnsent++;
+    try {
+      await session.pc.setLocalDescription(offer);
+      await __privateMethod(this, _sendRenegotiationOffer, sendRenegotiationOffer_fn).call(this, session, offer);
+    } finally {
+      __privateMethod(this, _localSdpSent, localSdpSent_fn).call(this, session);
+    }
+  };
+  _sendRenegotiationOffer = new WeakSet();
+  sendRenegotiationOffer_fn = async function(session, offer) {
+    var _a, _b;
     const options = [];
     if (session.audio)
       options.push("audio");
@@ -739,13 +895,18 @@ var PeerWebRTC = (() => {
     __privateMethod(this, _log, log_fn).call(this, `ICE restart ${session.restartAttempts}/${ICE_RESTART_MAX} for call ${session.callId}`);
     try {
       const offer = await __privateMethod(this, _createOffer, createOffer_fn).call(this, session, { iceRestart: true });
-      await session.pc.setLocalDescription(offer);
-      const options = [];
-      if (session.audio)
-        options.push("audio");
-      if (session.video || session.screenStream)
-        options.push("video");
-      await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "offer", sdp: offer.sdp, options, callId: session.callId });
+      session.localSdpUnsent++;
+      try {
+        await session.pc.setLocalDescription(offer);
+        const options = [];
+        if (session.audio)
+          options.push("audio");
+        if (session.video || session.screenStream)
+          options.push("video");
+        await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "offer", sdp: offer.sdp, options, callId: session.callId });
+      } finally {
+        __privateMethod(this, _localSdpSent, localSdpSent_fn).call(this, session);
+      }
     } catch (err) {
       __privateMethod(this, _log, log_fn).call(this, `ICE restart failed: ${err.message}`);
     }
@@ -787,11 +948,21 @@ var PeerWebRTC = (() => {
         existing.pendingOffer = signal.sdp;
       return;
     }
+    if (__privateMethod(this, _recentlyEnded, recentlyEnded_fn).call(this, signal.callId)) {
+      __privateMethod(this, _log, log_fn).call(this, `dropping offer for ended call ${signal.callId} from ${peerId}`);
+      return;
+    }
     const audio = signal.options ? signal.options.includes("audio") : true;
     const video = signal.options ? signal.options.includes("video") : false;
     const data = signal.options ? signal.options.includes("data") : false;
-    const session = __privateMethod(this, _createSession, createSession_fn).call(this, signal.callId, peerId, "incoming", { audio, video, data });
+    const session = __privateMethod(this, _createSession, createSession_fn).call(this, signal.callId, peerId, "incoming", { audio, video, data }, __privateMethod(this, _iceServersNow, iceServersNow_fn).call(this));
     session.pendingOffer = signal.sdp;
+    if (__privateGet(this, _opts).turnServers)
+      void __privateGet(this, _opts).turnServers.iceServers();
+    if (__privateGet(this, _opts).sendRinging !== false) {
+      void __privateMethod(this, _send, send_fn).call(this, peerId, { type: "event", event: "ringing", callId: signal.callId }).catch(() => {
+      });
+    }
     this.emit("incomingCall", __privateGet(this, _toInfo).call(this, session));
     __privateMethod(this, _log, log_fn).call(this, `incoming call from ${peerId} callId=${signal.callId} audio=${audio} video=${video}`);
   };
@@ -800,8 +971,13 @@ var PeerWebRTC = (() => {
     try {
       await session.pc.setRemoteDescription({ type: "offer", sdp: __privateMethod(this, _cleanInbound, cleanInbound_fn).call(this, sdp, "offer") });
       const answer = await __privateMethod(this, _createAnswer, createAnswer_fn).call(this, session);
-      await session.pc.setLocalDescription(answer);
-      await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "answer", sdp: answer.sdp, callId: session.callId });
+      session.localSdpUnsent++;
+      try {
+        await session.pc.setLocalDescription(answer);
+        await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "answer", sdp: answer.sdp, callId: session.callId });
+      } finally {
+        __privateMethod(this, _localSdpSent, localSdpSent_fn).call(this, session);
+      }
     } catch (err) {
       __privateMethod(this, _negotiationFailed, negotiationFailed_fn).call(this, session, "re-offer", err);
     }
@@ -823,6 +999,7 @@ var PeerWebRTC = (() => {
       try {
         await session.pc.setRemoteDescription({ type: "answer", sdp: __privateMethod(this, _cleanInbound, cleanInbound_fn).call(this, signal.sdp, "answer") });
         session.hasReceivedSdp = true;
+        __privateMethod(this, _clearRingTimer, clearRingTimer_fn).call(this, session);
         if (session.state !== "connected")
           __privateMethod(this, _setState, setState_fn).call(this, session, "connecting");
         await __privateMethod(this, _drainRemoteCandidates, drainRemoteCandidates_fn).call(this, session);
@@ -869,10 +1046,17 @@ var PeerWebRTC = (() => {
     if (!session)
       return;
     if (signal.type === "event") {
-      if (signal.event === "ringing")
-        __privateMethod(this, _setState, setState_fn).call(this, session, "remoteRinging");
-      else if (signal.event === "online")
-        __privateMethod(this, _setState, setState_fn).call(this, session, "remoteOnline");
+      const preAnswer = session.direction === "outgoing" && !session.hasReceivedSdp;
+      if (signal.event === "ringing") {
+        if (!preAnswer)
+          return;
+        session.remoteRang = true;
+        if (session.state === "ringing")
+          __privateMethod(this, _setState, setState_fn).call(this, session, "remoteRinging");
+      } else if (signal.event === "online") {
+        if (preAnswer && session.state === "ringing")
+          __privateMethod(this, _setState, setState_fn).call(this, session, "remoteOnline");
+      }
     } else if (signal.type === "action") {
       if (signal.action === "reject") {
         __privateMethod(this, _setState, setState_fn).call(this, session, "declined");
@@ -881,8 +1065,8 @@ var PeerWebRTC = (() => {
     }
   };
   _createSession = new WeakSet();
-  createSession_fn = function(callId, peerId, direction, kinds) {
-    const pc = __privateGet(this, _opts).createPeerConnection({ iceServers: __privateGet(this, _iceServers) });
+  createSession_fn = function(callId, peerId, direction, kinds, iceServers = __privateGet(this, _iceServers)) {
+    const pc = __privateGet(this, _opts).createPeerConnection({ iceServers });
     const session = {
       callId,
       peerId,
@@ -894,6 +1078,7 @@ var PeerWebRTC = (() => {
       state: "connecting",
       hasReceivedSdp: false,
       localCandidateQueue: [],
+      localSdpUnsent: 0,
       remoteCandidateQueue: [],
       restartAttempts: 0,
       closed: false
@@ -914,11 +1099,9 @@ var PeerWebRTC = (() => {
         sdpMLineIndex: (_a = ev.candidate.sdpMLineIndex) != null ? _a : 0,
         sdpMid: (_b = ev.candidate.sdpMid) != null ? _b : null
       };
-      if (session.hasReceivedSdp) {
-        void __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "candidate", candidates: [sig], callId: session.callId });
-      } else {
-        session.localCandidateQueue.push(sig);
-      }
+      session.localCandidateQueue.push(sig);
+      if (__privateMethod(this, _canTrickle, canTrickle_fn).call(this, session))
+        void __privateMethod(this, _flushLocalCandidates, flushLocalCandidates_fn).call(this, session);
     };
     pc.ontrack = (ev) => {
       __privateMethod(this, _ensureRemoteStream, ensureRemoteStream_fn).call(this, session, ev.track);
@@ -938,11 +1121,14 @@ var PeerWebRTC = (() => {
             clearTimeout(session.restartTimer);
             session.restartTimer = void 0;
           }
+          clearTimeout(session.mediaLossTimer);
+          session.mediaLossTimer = void 0;
           session.restartAttempts = 0;
           __privateMethod(this, _setState, setState_fn).call(this, session, "connected");
           break;
         case "disconnected":
           __privateMethod(this, _setState, setState_fn).call(this, session, "disconnected");
+          __privateMethod(this, _armMediaLoss, armMediaLoss_fn).call(this, session);
           if (__privateGet(this, _restartOffersEnabled) && session.direction === "outgoing" && !session.restartTimer && session.restartAttempts < ICE_RESTART_MAX) {
             session.restartTimer = setTimeout(() => {
               session.restartTimer = void 0;
@@ -957,15 +1143,7 @@ var PeerWebRTC = (() => {
             __privateMethod(this, _setState, setState_fn).call(this, session, "disconnected");
             if (__privateGet(this, _restartOffersEnabled) && session.direction === "outgoing")
               void __privateMethod(this, _restartIce, restartIce_fn).call(this, session);
-            if (session.restartTimer)
-              clearTimeout(session.restartTimer);
-            session.restartTimer = setTimeout(() => {
-              session.restartTimer = void 0;
-              if (!session.closed && pc.iceConnectionState === "failed") {
-                __privateMethod(this, _setState, setState_fn).call(this, session, "failed");
-                __privateMethod(this, _cleanup, cleanup_fn).call(this, session, "close", "failed");
-              }
-            }, ICE_FAILED_GRACE_MS);
+            __privateMethod(this, _armMediaLoss, armMediaLoss_fn).call(this, session);
           } else {
             __privateMethod(this, _setState, setState_fn).call(this, session, "failed");
             __privateMethod(this, _cleanup, cleanup_fn).call(this, session, "close", "failed");
@@ -979,6 +1157,22 @@ var PeerWebRTC = (() => {
           break;
       }
     };
+  };
+  _armMediaLoss = new WeakSet();
+  armMediaLoss_fn = function(session) {
+    if (session.mediaLossTimer)
+      return;
+    session.mediaLossTimer = setTimeout(() => {
+      var _a;
+      session.mediaLossTimer = void 0;
+      if (session.closed)
+        return;
+      const state = (_a = session.pc) == null ? void 0 : _a.iceConnectionState;
+      if (state === "connected" || state === "completed")
+        return;
+      __privateMethod(this, _setState, setState_fn).call(this, session, "failed");
+      __privateMethod(this, _cleanup, cleanup_fn).call(this, session, "close", "failed");
+    }, ICE_MEDIA_LOSS_GRACE_MS);
   };
   _ensureRemoteStream = new WeakSet();
   ensureRemoteStream_fn = function(session, track) {
@@ -1008,6 +1202,15 @@ var PeerWebRTC = (() => {
         }
       }
     }
+    if (stream && session.closed) {
+      for (const t of stream.getTracks()) {
+        try {
+          t.stop();
+        } catch {
+        }
+      }
+      return;
+    }
     if (!stream) {
       __privateMethod(this, _log, log_fn).call(this, `no local media for ${session.callId}; connecting receive-only`);
       return;
@@ -1018,13 +1221,31 @@ var PeerWebRTC = (() => {
     }
     this.emit("localStream", session.callId, stream);
   };
+  _canTrickle = new WeakSet();
+  canTrickle_fn = function(session) {
+    return session.hasReceivedSdp && session.localSdpUnsent === 0 && !session.closed;
+  };
+  _localSdpSent = new WeakSet();
+  localSdpSent_fn = function(session) {
+    session.localSdpUnsent--;
+    if (__privateMethod(this, _canTrickle, canTrickle_fn).call(this, session))
+      void __privateMethod(this, _flushLocalCandidates, flushLocalCandidates_fn).call(this, session);
+  };
   _flushLocalCandidates = new WeakSet();
   flushLocalCandidates_fn = async function(session) {
-    if (!session.hasReceivedSdp || session.localCandidateQueue.length === 0)
+    if (session.flushingLocal)
       return;
-    const queued = session.localCandidateQueue.splice(0);
-    for (const sig of queued) {
-      await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "candidate", candidates: [sig], callId: session.callId });
+    session.flushingLocal = true;
+    try {
+      while (__privateMethod(this, _canTrickle, canTrickle_fn).call(this, session) && session.localCandidateQueue.length > 0) {
+        const sig = session.localCandidateQueue.shift();
+        try {
+          await __privateMethod(this, _send, send_fn).call(this, session.peerId, { type: "candidate", candidates: [sig], callId: session.callId });
+        } catch {
+        }
+      }
+    } finally {
+      session.flushingLocal = false;
     }
   };
   _drainRemoteCandidates = new WeakSet();
@@ -1064,10 +1285,14 @@ var PeerWebRTC = (() => {
     if (session.closed)
       return;
     session.closed = true;
+    __privateMethod(this, _clearRingTimer, clearRingTimer_fn).call(this, session);
+    __privateMethod(this, _rememberEnded, rememberEnded_fn).call(this, session.callId);
     if (session.restartTimer) {
       clearTimeout(session.restartTimer);
       session.restartTimer = void 0;
     }
+    clearTimeout(session.mediaLossTimer);
+    session.mediaLossTimer = void 0;
     try {
       session.pc.onicecandidate = null;
       session.pc.ontrack = null;
@@ -1086,6 +1311,20 @@ var PeerWebRTC = (() => {
       session.state = endedReason === "failed" ? "failed" : "ended";
     }
     this.emit("ended", session.callId, endedReason != null ? endedReason : reason);
+  };
+  _rememberEnded = new WeakSet();
+  rememberEnded_fn = function(callId) {
+    const now = Date.now();
+    for (const [id, at] of __privateGet(this, _endedCalls)) {
+      if (now - at > ENDED_CALL_MEMORY_MS)
+        __privateGet(this, _endedCalls).delete(id);
+    }
+    __privateGet(this, _endedCalls).set(__privateMethod(this, _normId, normId_fn).call(this, callId), now);
+  };
+  _recentlyEnded = new WeakSet();
+  recentlyEnded_fn = function(callId) {
+    const at = __privateGet(this, _endedCalls).get(__privateMethod(this, _normId, normId_fn).call(this, callId));
+    return at !== void 0 && Date.now() - at <= ENDED_CALL_MEMORY_MS;
   };
   _setState = new WeakSet();
   setState_fn = function(session, state) {
@@ -1117,8 +1356,322 @@ var PeerWebRTC = (() => {
     var _a, _b;
     (_b = (_a = __privateGet(this, _opts)).logger) == null ? void 0 : _b.call(_a, `[peer-webrtc] ${msg}`);
   };
+  function sameIceServers(a, b) {
+    const key = (s) => {
+      var _a;
+      return `${[s.urls].flat().join(",")}|${(_a = s.username) != null ? _a : ""}`;
+    };
+    if (a.length !== b.length)
+      return false;
+    return a.every((s, i) => key(s) === key(b[i]));
+  }
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/broadcast.js
+  // node_modules/@decentnetwork/peer-webrtc/node_modules/@decentnetwork/rendezvous-protocol/src/index.js
+  var IDENTITY_METHODS = Object.freeze([
+    "carrier-x25519",
+    "ethereum-eip191",
+    "solana-ed25519"
+  ]);
+  var PROOF_TYPES = Object.freeze([
+    "carrier-x25519-hmac-sha256",
+    "ethereum-eip191",
+    "solana-ed25519"
+  ]);
+  var SIGNAL_TYPES = Object.freeze([
+    "call.ringing",
+    "call.accept",
+    "call.reject",
+    "call.cancel",
+    "call.connected",
+    "call.hangup",
+    "webrtc.offer",
+    "webrtc.answer",
+    "webrtc.candidate",
+    "webrtc.ice-restart"
+  ]);
+  var SIGNAL_ENCODINGS = Object.freeze(["json", "ciphertext.base64url"]);
+  var SAFE_FIELD = /^[^\r\n\0]{1,512}$/;
+  var CARRIER_ID = /^[1-9A-HJ-NP-Za-km-z]{32,52}$/;
+  var ETHEREUM_ID = /^eip155:([1-9][0-9]*):(0x[0-9a-fA-F]{40})$/;
+  var TURN_NONCE = /^[A-Za-z0-9_-]{16,128}$/;
+  var SOLANA_ID = /^solana:([A-Za-z0-9_-]{1,32}):([1-9A-HJ-NP-Za-km-z]{32,50})$/;
+  function safeField(value, name) {
+    if (typeof value !== "string" || !SAFE_FIELD.test(value))
+      throw new TypeError(`${name} is invalid`);
+    return value;
+  }
+  function validateIdentity(identity) {
+    if (!identity || typeof identity !== "object" || Array.isArray(identity))
+      throw new TypeError("identity must be an object");
+    const keys = Object.keys(identity).sort();
+    if (keys.length !== 2 || keys[0] !== "id" || keys[1] !== "method")
+      throw new TypeError("identity fields are invalid");
+    if (!IDENTITY_METHODS.includes(identity.method))
+      throw new TypeError("identity method is unsupported");
+    safeField(identity.id, "identity id");
+    if (identity.method === "carrier-x25519" && !CARRIER_ID.test(identity.id))
+      throw new TypeError("Carrier userid is invalid");
+    if (identity.method === "ethereum-eip191" && !ETHEREUM_ID.test(identity.id))
+      throw new TypeError("Ethereum account id is invalid");
+    if (identity.method === "solana-ed25519" && !SOLANA_ID.test(identity.id))
+      throw new TypeError("Solana account id is invalid");
+    return { method: identity.method, id: identity.id };
+  }
+  function canonicalIdentity(identity) {
+    const checked = validateIdentity(identity);
+    return `${checked.method}:${checked.id}`;
+  }
+  var TURN_AUTH_DOMAIN = "RSP-TURN/1";
+  function turnCredentialSigningText({ nodeUrl, carrierServerKey = "", self, timestamp, nonce }) {
+    if (!Number.isSafeInteger(timestamp) || timestamp < 0)
+      throw new TypeError("timestamp is invalid");
+    if (typeof nonce !== "string" || !TURN_NONCE.test(nonce))
+      throw new TypeError("nonce is invalid");
+    return [
+      TURN_AUTH_DOMAIN,
+      safeField(nodeUrl, "nodeUrl"),
+      carrierServerKey === "" ? "" : safeField(carrierServerKey, "carrierServerKey"),
+      canonicalIdentity(self),
+      String(timestamp),
+      nonce
+    ].join("\n");
+  }
+
+  // node_modules/@decentnetwork/peer-webrtc/dist/turn.js
+  var DEFAULT_MIN_VALIDITY_MS = 10 * 6e4;
+  var DEFAULT_TIMEOUT_MS = 8e3;
+  var DEFAULT_RETRY_AFTER_FAILURE_MS = 6e4;
+  var ROUTE = "/v1/turn-credentials";
+  var TurnFetchError = class extends Error {
+    constructor(reason, status, code, serverTime, retryAfterMs) {
+      super(reason);
+      __publicField(this, "reason");
+      __publicField(this, "status");
+      __publicField(this, "code");
+      __publicField(this, "serverTime");
+      __publicField(this, "retryAfterMs");
+      this.reason = reason;
+      this.status = status;
+      this.code = code;
+      this.serverTime = serverTime;
+      this.retryAfterMs = retryAfterMs;
+    }
+  };
+  var _opts2, _base, _minValidityMs, _cached, _inflight, _clockOffsetMs, _quietUntil, _mint, mint_fn, _discover, discover_fn, _post, post_fn, _fetch, fetch_fn, _now, now_fn, _log2, log_fn2;
+  var RspTurnCredentials = class {
+    constructor(opts) {
+      __privateAdd(this, _mint);
+      __privateAdd(this, _discover);
+      __privateAdd(this, _post);
+      __privateAdd(this, _fetch);
+      __privateAdd(this, _now);
+      __privateAdd(this, _log2);
+      __privateAdd(this, _opts2, void 0);
+      __privateAdd(this, _base, void 0);
+      __privateAdd(this, _minValidityMs, void 0);
+      __privateAdd(this, _cached, void 0);
+      __privateAdd(this, _inflight, void 0);
+      /** Our clock minus the node's, learned from a 401 invalid_timestamp. */
+      __privateAdd(this, _clockOffsetMs, 0);
+      /** No new fetch before this time (after a failure). */
+      __privateAdd(this, _quietUntil, 0);
+      var _a;
+      if (!(opts == null ? void 0 : opts.nodeUrl))
+        throw new TypeError("nodeUrl is required");
+      if (!opts.signer || typeof opts.signer.descriptor !== "function" || typeof opts.signer.signChallenge !== "function") {
+        throw new TypeError("signer must implement descriptor() and signChallenge()");
+      }
+      __privateSet(this, _opts2, opts);
+      __privateSet(this, _base, opts.nodeUrl.replace(/\/+$/, ""));
+      __privateSet(this, _minValidityMs, (_a = opts.minValidityMs) != null ? _a : DEFAULT_MIN_VALIDITY_MS);
+    }
+    currentIceServers() {
+      var _a;
+      const c = __privateGet(this, _cached);
+      if (c && c.expiresAt - __privateMethod(this, _now, now_fn).call(this) >= __privateGet(this, _minValidityMs))
+        return [toIceServer(c)];
+      return [...(_a = __privateGet(this, _opts2).fallback) != null ? _a : []];
+    }
+    async iceServers() {
+      var _a, _b, _c;
+      const c = __privateGet(this, _cached);
+      if (c && c.expiresAt - __privateMethod(this, _now, now_fn).call(this) >= __privateGet(this, _minValidityMs))
+        return [toIceServer(c)];
+      if (__privateMethod(this, _now, now_fn).call(this) < __privateGet(this, _quietUntil))
+        return [...(_a = __privateGet(this, _opts2).fallback) != null ? _a : []];
+      (_b = __privateGet(this, _inflight)) != null ? _b : __privateSet(this, _inflight, __privateMethod(this, _mint, mint_fn).call(this).then((fresh) => {
+        __privateSet(this, _cached, fresh);
+        return fresh;
+      }, (err) => {
+        var _a2, _b2, _c2, _d;
+        const reason = err instanceof TurnFetchError ? err.reason : `error: ${(_a2 = err == null ? void 0 : err.name) != null ? _a2 : "Error"}`;
+        const backoff = Math.max((_b2 = __privateGet(this, _opts2).retryAfterFailureMs) != null ? _b2 : DEFAULT_RETRY_AFTER_FAILURE_MS, err instanceof TurnFetchError ? (_c2 = err.retryAfterMs) != null ? _c2 : 0 : 0);
+        __privateSet(this, _quietUntil, __privateMethod(this, _now, now_fn).call(this) + backoff);
+        const fallback = (_d = __privateGet(this, _opts2).fallback) != null ? _d : [];
+        __privateMethod(this, _log2, log_fn2).call(this, `TURN credentials from ${__privateGet(this, _base)} unavailable (${reason}); ${fallback.length ? "using the static TURN entry" : "no fallback configured"}, next try in ${Math.round(backoff / 1e3)} s`);
+        throw err;
+      }).finally(() => {
+        __privateSet(this, _inflight, void 0);
+      }));
+      try {
+        return [toIceServer(await __privateGet(this, _inflight))];
+      } catch {
+        return [...(_c = __privateGet(this, _opts2).fallback) != null ? _c : []];
+      }
+    }
+    /** Forget the cached credential (e.g. after the user switched identity). */
+    clear() {
+      __privateSet(this, _cached, void 0);
+      __privateSet(this, _quietUntil, 0);
+    }
+  };
+  _opts2 = new WeakMap();
+  _base = new WeakMap();
+  _minValidityMs = new WeakMap();
+  _cached = new WeakMap();
+  _inflight = new WeakMap();
+  _clockOffsetMs = new WeakMap();
+  _quietUntil = new WeakMap();
+  _mint = new WeakSet();
+  mint_fn = async function() {
+    let staleRetried = false;
+    let clockRetried = false;
+    for (; ; ) {
+      const discovery = await __privateMethod(this, _discover, discover_fn).call(this);
+      try {
+        return await __privateMethod(this, _post, post_fn).call(this, discovery);
+      } catch (err) {
+        if (!(err instanceof TurnFetchError))
+          throw err;
+        if (err.code === "stale_server_key" && !staleRetried) {
+          staleRetried = true;
+          continue;
+        }
+        if (err.code === "invalid_timestamp" && !clockRetried && err.serverTime !== void 0) {
+          clockRetried = true;
+          __privateSet(this, _clockOffsetMs, __privateMethod(this, _now, now_fn).call(this) - err.serverTime);
+          __privateMethod(this, _log2, log_fn2).call(this, `TURN credentials: local clock off by ${Math.round(__privateGet(this, _clockOffsetMs) / 1e3)} s; retrying with the node's time`);
+          continue;
+        }
+        throw err;
+      }
+    }
+  };
+  _discover = new WeakSet();
+  discover_fn = async function() {
+    const res = await __privateMethod(this, _fetch, fetch_fn).call(this, `${__privateGet(this, _base)}${ROUTE}`, { method: "GET", headers: { accept: "application/json" } });
+    const body = await readJson(res);
+    if (!res.ok)
+      throw httpError("GET", res, body);
+    const nodeUrl = body == null ? void 0 : body.nodeUrl;
+    const carrierServerKey = body == null ? void 0 : body.carrierServerKey;
+    if (typeof nodeUrl !== "string" || !nodeUrl || typeof carrierServerKey !== "string") {
+      throw new TurnFetchError("GET: discovery reply is malformed", res.status);
+    }
+    return { nodeUrl, carrierServerKey };
+  };
+  _post = new WeakSet();
+  post_fn = async function(discovery) {
+    var _a, _b, _c;
+    const self = await __privateGet(this, _opts2).signer.descriptor();
+    const carrierServerKey = self.method === "carrier-x25519" ? discovery.carrierServerKey : "";
+    const timestamp = __privateMethod(this, _now, now_fn).call(this) - __privateGet(this, _clockOffsetMs);
+    const nonce = (_c = (_b = (_a = __privateGet(this, _opts2)).nonce) == null ? void 0 : _b.call(_a)) != null ? _c : randomNonce();
+    const message = turnCredentialSigningText({ nodeUrl: discovery.nodeUrl, carrierServerKey, self, timestamp, nonce });
+    const signed = await __privateGet(this, _opts2).signer.signChallenge({
+      message,
+      bytes: new TextEncoder().encode(message),
+      hello: { carrierServerKey: discovery.carrierServerKey, nodeUrl: discovery.nodeUrl },
+      request: { route: ROUTE }
+    });
+    if (!signed || typeof signed.type !== "string")
+      throw new TurnFetchError("signer returned no proof");
+    const proof = { type: signed.type, value: proofValue(signed.value) };
+    const body = { self, timestamp, nonce, proof };
+    if (carrierServerKey)
+      body.carrierServerKey = carrierServerKey;
+    const res = await __privateMethod(this, _fetch, fetch_fn).call(this, `${__privateGet(this, _base)}${ROUTE}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(body)
+    });
+    const reply = await readJson(res);
+    if (!res.ok)
+      throw httpError("POST", res, reply);
+    const { urls, username, credential, expiresAt } = reply != null ? reply : {};
+    if (!Array.isArray(urls) || urls.length === 0 || !urls.every((u) => typeof u === "string") || typeof username !== "string" || typeof credential !== "string" || !Number.isSafeInteger(expiresAt)) {
+      throw new TurnFetchError("POST: credential reply is malformed", res.status);
+    }
+    return { urls: [...urls], username, credential, expiresAt };
+  };
+  _fetch = new WeakSet();
+  fetch_fn = async function(url, init) {
+    var _a, _b, _c;
+    const f = (_a = __privateGet(this, _opts2).fetch) != null ? _a : globalThis.fetch;
+    if (typeof f !== "function")
+      throw new TurnFetchError("no fetch available");
+    const controller = typeof AbortController === "function" ? new AbortController() : void 0;
+    const timer = controller ? setTimeout(() => controller.abort(), (_b = __privateGet(this, _opts2).timeoutMs) != null ? _b : DEFAULT_TIMEOUT_MS) : void 0;
+    try {
+      return await f(url, { ...init, signal: controller == null ? void 0 : controller.signal, cache: "no-store" });
+    } catch (err) {
+      const aborted = (err == null ? void 0 : err.name) === "AbortError";
+      throw new TurnFetchError(`${init.method}: ${aborted ? "timed out" : `network error (${(_c = err == null ? void 0 : err.name) != null ? _c : "Error"})`}`);
+    } finally {
+      if (timer)
+        clearTimeout(timer);
+    }
+  };
+  _now = new WeakSet();
+  now_fn = function() {
+    var _a, _b, _c;
+    return (_c = (_b = (_a = __privateGet(this, _opts2)).now) == null ? void 0 : _b.call(_a)) != null ? _c : Date.now();
+  };
+  _log2 = new WeakSet();
+  log_fn2 = function(message) {
+    var _a, _b;
+    try {
+      (_b = (_a = __privateGet(this, _opts2)).log) == null ? void 0 : _b.call(_a, message);
+    } catch {
+    }
+  };
+  function toIceServer(c) {
+    return { urls: [...c.urls], username: c.username, credential: c.credential };
+  }
+  async function readJson(res) {
+    try {
+      return await res.json();
+    } catch {
+      return void 0;
+    }
+  }
+  function httpError(method, res, body) {
+    var _a, _b, _c, _d, _e;
+    const code = typeof ((_a = body == null ? void 0 : body.error) == null ? void 0 : _a.code) === "string" ? body.error.code : void 0;
+    const header = Number((_c = (_b = res.headers) == null ? void 0 : _b.get) == null ? void 0 : _c.call(_b, "x-server-time"));
+    const retryAfter = Number((_e = (_d = res.headers) == null ? void 0 : _d.get) == null ? void 0 : _e.call(_d, "retry-after"));
+    return new TurnFetchError(`${method}: HTTP ${res.status}${code ? ` ${code}` : ""}`, res.status, code, Number.isSafeInteger(header) && header > 0 ? header : void 0, Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 3600) * 1e3 : void 0);
+  }
+  function proofValue(value) {
+    if (typeof value === "string")
+      return value;
+    if (value instanceof Uint8Array)
+      return base64url(value);
+    throw new TurnFetchError("signer proof must be a string or Uint8Array");
+  }
+  function randomNonce() {
+    const bytes = new Uint8Array(24);
+    globalThis.crypto.getRandomValues(bytes);
+    return base64url(bytes);
+  }
+  function base64url(bytes) {
+    let s = "";
+    for (const b of bytes)
+      s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
+  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/broadcast.js
   var _selfId, _channel, _handler;
   var BroadcastChannelSignaling = class {
     constructor(selfId, channelName = "peer-webrtc-demo") {
@@ -1150,7 +1703,7 @@ var PeerWebRTC = (() => {
   _channel = new WeakMap();
   _handler = new WeakMap();
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/guard.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/guard.js
   function decodeSignalBytesGuard(input) {
     try {
       return decodeSignal(input);
@@ -1159,7 +1712,7 @@ var PeerWebRTC = (() => {
     }
   }
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/carrier.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/carrier.js
   var DEFAULT_EXT = "carrier";
   var _peer, _ext;
   var CarrierSignaling = class {
@@ -1188,7 +1741,7 @@ var PeerWebRTC = (() => {
   _peer = new WeakMap();
   _ext = new WeakMap();
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/socketio.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/socketio.js
   var _socket, _userId, _handler2, _rooms, _pending, _lastOffer, _wired, _roomKey, roomKey_fn, _ensureRoom, ensureRoom_fn, _emitMessage, emitMessage_fn, _wire, wire_fn;
   var SocketIoSignaling = class {
     constructor(socket, opts) {
@@ -1345,56 +1898,69 @@ var PeerWebRTC = (() => {
     return first && typeof first === "object" ? first : void 0;
   }
 
-  // ../../../../../private/tmp/claude-501/-Users-weili-devs-decent-hq/85b18f20-fe3c-4635-aca0-818badd9d272/scratchpad/pw217/package/dist/signaling/push.js
+  // node_modules/@decentnetwork/peer-webrtc/dist/signaling/push.js
   var DEFAULT_ENDPOINTS = [
     "https://pushapi.beagle.chat/push-api/push-message",
     "https://www.callpass.cn/push-api/push-message",
     "https://tokyo.fi.chat:3004/push-api/push-message"
   ];
-  var _appKey, _appName, _endpoints, _fetch;
+  var _appKey, _appName, _endpoints, _fetch2, _gateway, _env, _sendDirect, sendDirect_fn;
   var BeaglePushClient = class {
     constructor(opts) {
+      __privateAdd(this, _sendDirect);
       __privateAdd(this, _appKey, void 0);
       __privateAdd(this, _appName, void 0);
       __privateAdd(this, _endpoints, void 0);
-      __privateAdd(this, _fetch, void 0);
-      var _a, _b;
-      __privateSet(this, _appKey, opts.appKey);
+      __privateAdd(this, _fetch2, void 0);
+      __privateAdd(this, _gateway, void 0);
+      __privateAdd(this, _env, void 0);
+      var _a, _b, _c;
+      if (!opts.appKey && !opts.gateway)
+        throw new Error("BeaglePushClient: pass a gateway, an appKey, or both");
+      __privateSet(this, _appKey, opts.appKey || void 0);
       __privateSet(this, _appName, opts.appName);
       __privateSet(this, _endpoints, ((_a = opts.endpoints) == null ? void 0 : _a.length) ? opts.endpoints : DEFAULT_ENDPOINTS);
-      const f = (_b = opts.fetch) != null ? _b : globalThis.fetch;
-      if (!f)
+      __privateSet(this, _gateway, opts.gateway);
+      __privateSet(this, _env, (_b = opts.env) != null ? _b : "prod");
+      const f = (_c = opts.fetch) != null ? _c : globalThis.fetch;
+      if (!f && __privateGet(this, _appKey))
         throw new Error("BeaglePushClient: no fetch available \u2014 pass opts.fetch");
-      __privateSet(this, _fetch, f);
+      __privateSet(this, _fetch2, f);
     }
     /**
      * Ring an offline peer. `calleeUserId` is the destination (their Carrier user
-     * id); the payload describes the call. Tries each endpoint until one accepts.
-     * Resolves `true` on success, `false` if every endpoint failed.
+     * id); the payload describes the call. Resolves `true` on success.
      */
     async sendCallPush(calleeUserId, payload) {
+      return (await this.sendCall(calleeUserId, payload)).ok;
+    }
+    /**
+     * {@link sendCallPush} with the route it took. Through the gateway first when
+     * there is one: an answer from it is final (ok or not); only "not answered"
+     * (connect error, timeout, 502/503/504) falls back to the direct call, and
+     * only when this client has an appKey.
+     */
+    async sendCall(calleeUserId, payload) {
       var _a;
-      const params = new URLSearchParams({
-        account: calleeUserId,
-        payload: JSON.stringify(payload),
-        appKey: __privateGet(this, _appKey),
-        appName: __privateGet(this, _appName)
-      }).toString();
-      for (const endpoint of __privateGet(this, _endpoints)) {
+      let gateway;
+      if (__privateGet(this, _gateway)) {
         try {
-          const url = endpoint + (endpoint.includes("?") ? "&" : "?") + params;
-          const res = await __privateGet(this, _fetch).call(this, url, { method: "POST" });
-          if (!res.ok)
-            continue;
-          const json = await res.json().catch(() => ({}));
-          const code = json.code;
-          const ok = code === void 0 || code === 0 || code === "0" || ((_a = json.data) == null ? void 0 : _a.success) === true;
-          if (ok)
-            return true;
-        } catch {
+          gateway = await __privateGet(this, _gateway).send("call", [
+            ["env", __privateGet(this, _env)],
+            ["account", calleeUserId],
+            ["payload", JSON.stringify(payload)],
+            ["appName", __privateGet(this, _appName)]
+          ]);
+        } catch (err) {
+          gateway = { answered: false, reason: (_a = err == null ? void 0 : err.message) != null ? _a : String(err) };
         }
+        if (gateway.answered)
+          return { ok: gateway.ok, via: "gateway", gateway };
       }
-      return false;
+      if (!__privateGet(this, _appKey))
+        return { ok: false, via: "none", ...gateway ? { gateway } : {} };
+      const ok = await __privateMethod(this, _sendDirect, sendDirect_fn).call(this, calleeUserId, payload, __privateGet(this, _appKey));
+      return { ok, via: ok ? "direct" : "none", ...gateway ? { gateway } : {} };
     }
     /** Convenience: ring `calleeUserId` for a call over `channel`. */
     ring(calleeUserId, args) {
@@ -1424,6 +1990,48 @@ var PeerWebRTC = (() => {
   _appKey = new WeakMap();
   _appName = new WeakMap();
   _endpoints = new WeakMap();
-  _fetch = new WeakMap();
-  return __toCommonJS(dist_exports);
+  _fetch2 = new WeakMap();
+  _gateway = new WeakMap();
+  _env = new WeakMap();
+  _sendDirect = new WeakSet();
+  sendDirect_fn = async function(calleeUserId, payload, appKey) {
+    var _a;
+    const fetchFn = __privateGet(this, _fetch2);
+    if (!fetchFn)
+      return false;
+    const params = new URLSearchParams({
+      account: calleeUserId,
+      payload: JSON.stringify(payload),
+      appKey,
+      appName: __privateGet(this, _appName)
+    }).toString();
+    for (const endpoint of __privateGet(this, _endpoints)) {
+      try {
+        const url = endpoint + (endpoint.includes("?") ? "&" : "?") + params;
+        const res = await fetchFn(url, { method: "POST" });
+        if (!res.ok)
+          continue;
+        const json = await res.json().catch(() => ({}));
+        const code = json.code;
+        const ok = code === void 0 || code === 0 || code === "0" || ((_a = json.data) == null ? void 0 : _a.success) === true;
+        if (ok)
+          return true;
+      } catch {
+      }
+    }
+    return false;
+  };
+
+  // src/ui/peer-webrtc-entry.js
+  var isTurn = (s) => {
+    var _a, _b;
+    return [].concat((_b = (_a = s == null ? void 0 : s.urls) != null ? _a : s == null ? void 0 : s.url) != null ? _b : []).some((u) => /^turns?:/i.test(String(u)));
+  };
+  var CallEngine2 = class extends CallEngine {
+    constructor(opts) {
+      const turn = globalThis.__beagleTurnServers;
+      super(turn && opts && !opts.turnServers ? { ...opts, iceServers: (opts.iceServers || []).filter((s) => !isTurn(s)), turnServers: turn } : opts);
+    }
+  };
+  return __toCommonJS(peer_webrtc_entry_exports);
 })();

@@ -387,6 +387,203 @@
     const icon = file.media === "image" ? "\u{1F5BC} " : file.media === "video" ? "\u{1F3AC} " : "\u{1F4CE} ";
     return icon + file.name;
   }
+  var NATIVE_MEDIA_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    ".bmp": "image/bmp",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".caf": "audio/x-caf",
+    ".amr": "audio/amr",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/ogg",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".3gp": "video/3gpp",
+    ".webm": "video/webm"
+  };
+  var GROUP_TS_RE = /\n?\[(20\d{2}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}:\d{2})\]\s*$/;
+  function stripGroupTs(text) {
+    const m = GROUP_TS_RE.exec(text);
+    return m ? { body: text.slice(0, m.index), ts: m[1] } : { body: text, ts: null };
+  }
+  function splitGroupSender(text) {
+    const m = /^([^:\n]{1,48}):\s([\s\S]+)$/.exec(text);
+    return m ? { sender: m[1], body: m[2] } : null;
+  }
+  function nativeMediaKind(type, ext) {
+    const t = String(type || "").toLowerCase();
+    if (t === "image" || t === "photo" || t === "picture")
+      return "image";
+    if (t === "audio" || t === "voice")
+      return "audio";
+    if (t === "video")
+      return "video";
+    const mime = NATIVE_MEDIA_MIME[String(ext || "").toLowerCase()];
+    return mime ? mime.split("/")[0] : null;
+  }
+  function unwrapCGP1(text) {
+    if (!text.startsWith("CGP1 "))
+      return null;
+    let j = null;
+    try {
+      j = JSON.parse(text.slice(5));
+    } catch (e) {
+      return null;
+    }
+    if (!j || typeof j !== "object" || !j.message || typeof j.message.text !== "string")
+      return null;
+    const origin = j.origin || {};
+    const senderId = origin.userid || origin.friendid || null;
+    const sender = origin.nickname || origin.user_info && origin.user_info.name || (senderId ? senderId.slice(0, 10) : null);
+    return { text: j.message.text, sender, senderId };
+  }
+  var MEDIA_SHAPE_RE = /^\{[\s\S]*"(?:fileExtension|fileName)"\s*:[\s\S]*"data"\s*:\s*"|^\{[\s\S]*"data"\s*:\s*"[A-Za-z0-9+/\\]{64}/;
+  function nativeMediaFromText(input) {
+    let text = String(input == null ? "" : input).trim();
+    let sender = null;
+    let senderId = null;
+    const cgp = unwrapCGP1(text);
+    if (cgp) {
+      text = cgp.text;
+      sender = cgp.sender;
+      senderId = cgp.senderId;
+    }
+    let body = stripGroupTs(text).body.trim();
+    if (body.length < 32)
+      return null;
+    if (!body.startsWith("{")) {
+      const split = splitGroupSender(body);
+      if (!split || !split.body.trim().startsWith("{"))
+        return null;
+      sender = sender || split.sender;
+      body = split.body.trim();
+    }
+    if (!MEDIA_SHAPE_RE.test(body))
+      return null;
+    const extMatch = /"fileExtension"\s*:\s*"([^"]{0,16})"/.exec(body);
+    const nameMatch = /"fileName"\s*:\s*"([^"]{0,200})"/.exec(body);
+    const typeMatch = /"type"\s*:\s*"([^"]{0,32})"/.exec(body);
+    let j = null;
+    try {
+      j = body.endsWith("}") ? JSON.parse(body) : null;
+    } catch (e) {
+      j = null;
+    }
+    if (!j || typeof j !== "object" || typeof j.data !== "string" || j.data.length < 16) {
+      if (!extMatch && !nameMatch)
+        return null;
+      const ext2 = extMatch ? extMatch[1].toLowerCase() : "";
+      const kind2 = nativeMediaKind(typeMatch && typeMatch[1], ext2) || "file";
+      return { sender, senderId, kind: kind2, name: (nameMatch ? nameMatch[1] : "file") + ext2, broken: true };
+    }
+    const ext = String(j.fileExtension || "").toLowerCase();
+    const named = typeof j.fileName === "string" || typeof j.fileExtension === "string";
+    const typed = nativeMediaKind(j.type, "");
+    if (!named && !typed)
+      return null;
+    const kind = nativeMediaKind(j.type, ext) || "file";
+    const mime = NATIVE_MEDIA_MIME[ext] || (kind === "file" ? "application/octet-stream" : kind + "/*");
+    const name = String(j.fileName || "file") + ext;
+    return { sender, senderId, kind, name, url: "data:" + mime + ";base64," + j.data.replace(/\s+/g, "") };
+  }
+  function nativeMediaLabel(media) {
+    if (!media)
+      return "";
+    const word = media.kind === "image" ? "image" : media.kind === "audio" ? "voice" : media.kind === "video" ? "video" : "file";
+    return "[" + word + "] " + media.name;
+  }
+  var SENT_TIME_MIN_EARLY_MS = 2 * 6e4;
+  var UTC_MARKER_CUTOFF_MS = Date.UTC(2026, 10, 24, 20, 31, 0);
+  function parseMarkerUtc(s) {
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2}):(\d{2})$/.exec(String(s || "").trim());
+    if (!m)
+      return null;
+    const ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  function epochMs(x) {
+    const n = typeof x === "string" && /^\d+$/.test(x) ? Number(x) : x;
+    if (typeof n !== "number" || !Number.isFinite(n) || n <= 0)
+      return null;
+    if (n > 1e14)
+      return Math.floor(n / 1e3);
+    if (n > 1e11)
+      return Math.floor(n);
+    return Math.floor(n * 1e3);
+  }
+  function pickSentTime(arrivalMs, sentMs, notBeforeMs = -Infinity) {
+    if (!arrivalMs || sentMs == null)
+      return arrivalMs;
+    if (sentMs < notBeforeMs)
+      return arrivalMs;
+    const early = arrivalMs - sentMs;
+    if (early < SENT_TIME_MIN_EARLY_MS)
+      return arrivalMs;
+    return sentMs;
+  }
+  function groupSentTime(row) {
+    var _a, _b, _c;
+    const arrival = row && row.ts;
+    if (!row || row.dir === "out" || !arrival)
+      return { ts: arrival, key: null };
+    const text = typeof row.text === "string" ? row.text : "";
+    if (text.startsWith("CGP1 ")) {
+      let j = null;
+      try {
+        j = JSON.parse(text.slice(5));
+      } catch (e) {
+        j = null;
+      }
+      const msg = j && j.message;
+      if (msg && typeof msg === "object") {
+        const meta = (_a = msg.file && msg.file.sent_at_ms) != null ? _a : msg.sent_at_ms;
+        const raw = meta != null ? meta : msg.timestamp;
+        const sent2 = epochMs(raw);
+        const origin = j.origin && (j.origin.userid || j.origin.friendid || j.origin.nickname) || "";
+        const body = typeof msg.text === "string" ? msg.text : msg.file ? JSON.stringify(msg.file) : "";
+        const ts = pickSentTime(arrival, sent2, meta != null ? UTC_MARKER_CUTOFF_MS : -Infinity);
+        return { ts, key: sent2 != null ? `cgp1|${origin}|${raw}|${body}` : null };
+      }
+    }
+    if (row.file) {
+      const raw = (_c = (_b = row.sent_at_ms) != null ? _b : row.file.sent_at_ms) != null ? _c : row.origin && row.origin.sent_at_ms;
+      const sent2 = epochMs(raw);
+      if (sent2 != null) {
+        const who = row.origin && (row.origin.userid || row.origin.nickname) || "";
+        return { ts: pickSentTime(arrival, sent2, UTC_MARKER_CUTOFF_MS), key: `file|${who}|${raw}|${row.file.name}|${row.file.size}` };
+      }
+      return { ts: arrival, key: null };
+    }
+    const marker = stripGroupTs(text).ts;
+    const sent = marker ? parseMarkerUtc(marker) : null;
+    if (sent == null)
+      return { ts: arrival, key: null };
+    return { ts: pickSentTime(arrival, sent, UTC_MARKER_CUTOFF_MS), key: `relay|${text}` };
+  }
+  function datedThread(rows) {
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    const ordered = [...rows || []].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    for (const r of ordered) {
+      const { ts, key } = groupSentTime(r);
+      if (key) {
+        if (seen.has(key))
+          continue;
+        seen.add(key);
+      }
+      out.push(ts === r.ts ? r : Object.assign({}, r, { ts, arrivedTs: r.ts }));
+    }
+    return out.map((r, i) => ({ r, i })).sort((a, b) => (a.r.ts || 0) - (b.r.ts || 0) || a.i - b.i).map((x) => x.r);
+  }
   function dkHash(s) {
     let h = 2166136261;
     for (let i = 0; i < s.length; i++) {
@@ -747,7 +944,7 @@
       const c = cache.current[peerId];
       if (!c)
         return;
-      const arr = [...c.byId.values()].sort((a, b) => a.ts - b.ts);
+      const arr = datedThread([...c.byId.values()]);
       const withDay = [];
       let lastDay = null;
       for (const m of arr) {
@@ -2237,6 +2434,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     return { lookup, peek };
   }
   var verifier = createEnsVerifier();
+  var ensVerifier = verifier;
   function useEnsRecord(userid) {
     const [rec, setRec] = React.useState(() => verifier.peek(userid));
     React.useEffect(() => {
@@ -2286,119 +2484,465 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     const v = useEnsVerdict(userid, name);
     return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { style, title: v.claimed ? v.claimed + " \u2192 " + v.label : void 0 }, v.label || fallback), /* @__PURE__ */ React.createElement(DkEnsMark, { verdict: v, T, size: markSize }));
   }
-  var NATIVE_MEDIA_MIME = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".heic": "image/heic",
-    ".heif": "image/heif",
-    ".bmp": "image/bmp",
-    ".m4a": "audio/mp4",
-    ".aac": "audio/aac",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".caf": "audio/x-caf",
-    ".amr": "audio/amr",
-    ".ogg": "audio/ogg",
-    ".opus": "audio/ogg",
-    ".mp4": "video/mp4",
-    ".mov": "video/quicktime",
-    ".m4v": "video/x-m4v",
-    ".3gp": "video/3gpp",
-    ".webm": "video/webm"
-  };
-  var GROUP_TS_RE = /\n?\[(20\d{2}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}:\d{2})\]\s*$/;
-  function stripGroupTs(text) {
-    const m = GROUP_TS_RE.exec(text);
-    return m ? { body: text.slice(0, m.index), ts: m[1] } : { body: text, ts: null };
+  var AT = "[@\uFF20]";
+  var WORD = "\\p{L}\\p{N}_";
+  function escapeRe(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  function splitGroupSender(text) {
-    const m = /^([^:\n]{1,48}):\s([\s\S]+)$/.exec(text);
-    return m ? { sender: m[1], body: m[2] } : null;
+  function clean(s) {
+    return String(s == null ? "" : s).replace(/[\u0000-\u001f\u007f]+/g, "").trim();
   }
-  function nativeMediaKind(type, ext) {
-    const t = String(type || "").toLowerCase();
-    if (t === "image" || t === "photo" || t === "picture")
-      return "image";
-    if (t === "audio" || t === "voice")
-      return "audio";
-    if (t === "video")
-      return "video";
-    const mime = NATIVE_MEDIA_MIME[String(ext || "").toLowerCase()];
-    return mime ? mime.split("/")[0] : null;
+  function myMentionNames(me) {
+    const out = [];
+    const add = (s) => {
+      const v = clean(s);
+      if (v && !out.some((x) => x.toLowerCase() === v.toLowerCase()))
+        out.push(v);
+    };
+    const ens = clean(me && me.ens);
+    if (ens) {
+      add(/\.beagles\.eth$/i.test(ens) ? ens : ens + ".beagles.eth");
+      add(ens.replace(/\.beagles\.eth$/i, ""));
+    }
+    add(me && me.name);
+    return out;
   }
-  function unwrapCGP1(text) {
-    if (!text.startsWith("CGP1 "))
+  function groupMessageBody(text) {
+    const t = String(text == null ? "" : text);
+    if (t.startsWith("CGP1 ")) {
+      try {
+        const j = JSON.parse(t.slice(5));
+        const msg = j && j.message || {};
+        const o = j && j.origin || {};
+        const body = typeof msg.text === "string" ? msg.text : j.render && j.render.plain || "";
+        return {
+          body: stripGroupTs(body).body.trim(),
+          sender: clean(o.nickname || o.user_info && o.user_info.name || "") || null,
+          senderId: o.userid || o.friendid || null
+        };
+      } catch (e) {
+      }
+    }
+    const noTs = stripGroupTs(t).body.trim();
+    const split = splitGroupSender(noTs);
+    return split ? { body: split.body.trim(), sender: clean(split.sender), senderId: null } : { body: noTs, sender: null, senderId: null };
+  }
+  function looksLikeGroupText(text) {
+    const t = String(text == null ? "" : text);
+    if (t.startsWith("CGP1 "))
+      return true;
+    const { body, ts } = stripGroupTs(t);
+    return !!ts && !!splitGroupSender(body.trim());
+  }
+  function mentionsName(body, names) {
+    const text = String(body == null ? "" : body);
+    if (!/[@＠]/.test(text))
+      return false;
+    for (const n of names || []) {
+      const name = clean(n);
+      if (!name)
+        continue;
+      const re = new RegExp(
+        `(^|[^${WORD}.@\uFF20])${AT}${escapeRe(name)}(?:\\.beagles\\.eth)?(?=$|[^${WORD}\\-.]|\\.(?![${WORD}]))`,
+        "iu"
+      );
+      if (re.test(text))
+        return true;
+    }
+    return false;
+  }
+  function messageMentionsMe(text, names) {
+    if (!names || !names.length)
+      return false;
+    return mentionsName(groupMessageBody(text).body, names);
+  }
+  function mentionQuery(value, caret) {
+    const v = String(value == null ? "" : value);
+    const end = caret == null ? v.length : Math.min(caret, v.length);
+    const head = v.slice(0, end);
+    const m = /(^|\s)([@＠])([^\s@＠]*)$/u.exec(head);
+    if (!m)
       return null;
-    let j = null;
+    return { start: end - m[3].length - 1, end, query: m[3] };
+  }
+  function applyMention(value, q, name) {
+    const v = String(value == null ? "" : value);
+    const ins = "@" + clean(name) + " ";
+    const rest = v.slice(q.end).replace(/^\s+/, "");
+    return { value: v.slice(0, q.start) + ins + rest, caret: q.start + ins.length };
+  }
+  function memberCandidates(rows, { myUserId = "", myNames = [] } = {}) {
+    const mine = new Set(myNames.map((n) => n.toLowerCase()));
+    const seen = /* @__PURE__ */ new Map();
+    for (let i = (rows || []).length - 1; i >= 0; i--) {
+      const r = rows[i];
+      if (!r || r.day || r.from === "me" || r.dir === "out")
+        continue;
+      let sender = null, senderId = null;
+      if (r.file && r.origin) {
+        sender = clean(r.origin.nickname) || null;
+        senderId = r.origin.userid || null;
+      } else if (typeof r.text === "string") {
+        ({ sender, senderId } = groupMessageBody(r.text));
+      }
+      if (!sender && !senderId)
+        continue;
+      if (senderId && senderId === myUserId)
+        continue;
+      if (sender && mine.has(sender.toLowerCase()))
+        continue;
+      const key = senderId || "name:" + sender.toLowerCase();
+      if (!seen.has(key))
+        seen.set(key, { key, sender: sender || senderId.slice(0, 10), senderId });
+    }
+    return [...seen.values()];
+  }
+  function mentionInsertName(member, record) {
+    const reg = record && typeof record.name === "string" ? clean(record.name) : "";
+    if (reg)
+      return reg.replace(/\.beagles\.eth$/i, "");
+    return clean(member && member.sender);
+  }
+  function filterCandidates(cands, query) {
+    const q = String(query || "").toLowerCase();
+    if (!q)
+      return cands;
+    return cands.filter((c) => [c.insert, c.sender].some((s) => String(s || "").toLowerCase().includes(q)));
+  }
+  var dkAudioCtx = null;
+  function dkAudio() {
+    if (dkAudioCtx && dkAudioCtx.state !== "closed")
+      return dkAudioCtx;
     try {
-      j = JSON.parse(text.slice(5));
+      dkAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {
-      return null;
+      dkAudioCtx = null;
     }
-    if (!j || typeof j !== "object" || !j.message || typeof j.message.text !== "string")
-      return null;
-    const origin = j.origin || {};
-    const senderId = origin.userid || origin.friendid || null;
-    const sender = origin.nickname || origin.user_info && origin.user_info.name || (senderId ? senderId.slice(0, 10) : null);
-    return { text: j.message.text, sender, senderId };
+    return dkAudioCtx;
   }
-  var MEDIA_SHAPE_RE = /^\{[\s\S]*"(?:fileExtension|fileName)"\s*:[\s\S]*"data"\s*:\s*"|^\{[\s\S]*"data"\s*:\s*"[A-Za-z0-9+/\\]{64}/;
-  function nativeMediaFromText(input) {
-    let text = String(input == null ? "" : input).trim();
-    let sender = null;
-    let senderId = null;
-    const cgp = unwrapCGP1(text);
-    if (cgp) {
-      text = cgp.text;
-      sender = cgp.sender;
-      senderId = cgp.senderId;
+  function dkUnlockAudioOnGesture() {
+    const unlock = () => {
+      const c = dkAudio();
+      if (c && c.state === "suspended")
+        c.resume().catch(() => {
+        });
+    };
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }
+  function dkChime(kind) {
+    const c = dkAudio();
+    if (!c)
+      return;
+    if (c.state === "suspended")
+      c.resume().catch(() => {
+      });
+    const notes = kind === "request" ? [[660, 0], [880, 0.14]] : [[880, 0], [1175, 0.11]];
+    const t0 = c.currentTime;
+    for (const [freq, at] of notes) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      o.connect(g);
+      g.connect(c.destination);
+      const t = t0 + at;
+      g.gain.setValueAtTime(1e-4, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(1e-4, t + 0.17);
+      o.start(t);
+      o.stop(t + 0.2);
     }
-    let body = stripGroupTs(text).body.trim();
-    if (body.length < 32)
-      return null;
-    if (!body.startsWith("{")) {
-      const split = splitGroupSender(body);
-      if (!split || !split.body.trim().startsWith("{"))
-        return null;
-      sender = sender || split.sender;
-      body = split.body.trim();
+  }
+  var dkFlash = { timer: null, title: "", link: null, href: null, badged: null, on: false, n: 0, label: "" };
+  function dkBadgedIcon(href) {
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          if (!img.naturalWidth)
+            return rej(new Error("icon has no intrinsic size"));
+          const s = 64, cv = document.createElement("canvas");
+          cv.width = s;
+          cv.height = s;
+          const cx = cv.getContext("2d");
+          cx.drawImage(img, 0, 0, s, s);
+          cx.beginPath();
+          cx.arc(s - 14, 14, 12, 0, Math.PI * 2);
+          cx.fillStyle = "#e5484d";
+          cx.fill();
+          cx.lineWidth = 3;
+          cx.strokeStyle = "#fff";
+          cx.stroke();
+          res(cv.toDataURL("image/png"));
+        } catch (e) {
+          rej(e);
+        }
+      };
+      img.onerror = () => rej(new Error("icon failed to load"));
+      img.src = href;
+    });
+  }
+  function dkFlashTick() {
+    dkFlash.on = !dkFlash.on;
+    document.title = `(${dkFlash.n}) ${dkFlash.on ? dkFlash.label : dkFlash.title}`;
+  }
+  function dkFlashStart(label, count) {
+    dkFlash.n += count || 1;
+    dkFlash.label = label;
+    if (dkFlash.timer)
+      return;
+    dkFlash.title = document.title;
+    dkFlash.link = document.querySelector('link[rel~="icon"]');
+    dkFlash.href = dkFlash.link ? dkFlash.link.href : null;
+    dkFlash.badged = null;
+    dkFlash.on = false;
+    if (dkFlash.href) {
+      dkBadgedIcon(dkFlash.href).then((b) => {
+        dkFlash.badged = b;
+        if (dkFlash.timer && dkFlash.link)
+          dkFlash.link.href = b;
+      }).catch(() => {
+      });
     }
-    if (!MEDIA_SHAPE_RE.test(body))
-      return null;
-    const extMatch = /"fileExtension"\s*:\s*"([^"]{0,16})"/.exec(body);
-    const nameMatch = /"fileName"\s*:\s*"([^"]{0,200})"/.exec(body);
-    const typeMatch = /"type"\s*:\s*"([^"]{0,32})"/.exec(body);
-    let j = null;
+    dkFlashTick();
+    dkFlash.timer = setInterval(dkFlashTick, 1e3);
+  }
+  function dkFlashStop() {
+    if (!dkFlash.timer)
+      return;
+    clearInterval(dkFlash.timer);
+    dkFlash.timer = null;
+    dkFlash.n = 0;
+    document.title = dkFlash.title;
+    if (dkFlash.link && dkFlash.href)
+      dkFlash.link.href = dkFlash.href;
+  }
+  function dkLooking() {
+    return document.visibilityState === "visible" && document.hasFocus();
+  }
+  function useIncomingAlerts({ T, peers, requests, loaded, activeId, sound = true, flash = true, muted, isProtocol }) {
+    const prev = React.useRef(null);
+    const mutedRef = React.useRef(/* @__PURE__ */ new Set());
+    mutedRef.current = new Set(muted || []);
+    React.useEffect(() => dkUnlockAudioOnGesture(), []);
+    React.useEffect(() => {
+      if (!flash)
+        dkFlashStop();
+    }, [flash]);
+    React.useEffect(() => {
+      const seen = () => {
+        if (dkLooking())
+          dkFlashStop();
+      };
+      window.addEventListener("focus", seen);
+      window.addEventListener("pointerdown", seen, { passive: true });
+      document.addEventListener("visibilitychange", seen);
+      return () => {
+        window.removeEventListener("focus", seen);
+        window.removeEventListener("pointerdown", seen);
+        document.removeEventListener("visibilitychange", seen);
+        dkFlashStop();
+      };
+    }, []);
+    React.useEffect(() => {
+      if (!loaded)
+        return;
+      const byId = /* @__PURE__ */ new Map();
+      for (const p of peers || []) {
+        if (p && p.app)
+          continue;
+        const dir = p.lastDir || (String(p.lastMsg || "").startsWith("you: ") ? "out" : "in");
+        const quiet = typeof isProtocol === "function" && lastIsProtocol(p, isProtocol);
+        byId.set(p.id, { ts: p.lastTs || 0, dir, quiet });
+      }
+      const reqIds = new Set((requests || []).map((r) => r.id));
+      const was = prev.current;
+      prev.current = { byId, reqIds };
+      if (!was)
+        return;
+      let msgs = 0, elsewhere = 0, reqs = 0, loud = 0, loudElsewhere = 0;
+      for (const [id, cur] of byId) {
+        if (cur.dir !== "in" || !cur.ts)
+          continue;
+        if (cur.quiet)
+          continue;
+        const old = was.byId.get(id);
+        if (old ? cur.ts <= old.ts : Date.now() - cur.ts > 3e4)
+          continue;
+        msgs += 1;
+        if (id !== activeId)
+          elsewhere += 1;
+        if (!mutedRef.current.has(id)) {
+          loud += 1;
+          if (id !== activeId)
+            loudElsewhere += 1;
+        }
+      }
+      for (const id of reqIds)
+        if (!was.reqIds.has(id))
+          reqs += 1;
+      if (!msgs && !reqs)
+        return;
+      const looking = dkLooking();
+      if (sound && (reqs || loud) && !(looking && !reqs && !loudElsewhere))
+        dkChime(reqs && !loud ? "request" : "message");
+      if (flash && !looking) {
+        const label = msgs ? T && T.alertMsg || "New message" : T && T.alertReq || "New friend request";
+        dkFlashStart(label, msgs + reqs);
+      }
+    }, [peers, requests, loaded, activeId, T, sound, flash]);
+  }
+  var MW_FLAGS_KEY = "dk.mentions.v1";
+  var mwNames = [];
+  var mwUserId = "";
+  var mwFlags = mwLoadFlags();
+  var mwSubs = /* @__PURE__ */ new Set();
+  function mwLoadFlags() {
     try {
-      j = body.endsWith("}") ? JSON.parse(body) : null;
+      const raw = JSON.parse(localStorage.getItem(MW_FLAGS_KEY) || "{}");
+      return new Map(Object.entries(raw).filter(([, v]) => typeof v === "number"));
     } catch (e) {
-      j = null;
+      return /* @__PURE__ */ new Map();
     }
-    if (!j || typeof j !== "object" || typeof j.data !== "string" || j.data.length < 16) {
-      if (!extMatch && !nameMatch)
-        return null;
-      const ext2 = extMatch ? extMatch[1].toLowerCase() : "";
-      const kind2 = nativeMediaKind(typeMatch && typeMatch[1], ext2) || "file";
-      return { sender, senderId, kind: kind2, name: (nameMatch ? nameMatch[1] : "file") + ext2, broken: true };
-    }
-    const ext = String(j.fileExtension || "").toLowerCase();
-    const named = typeof j.fileName === "string" || typeof j.fileExtension === "string";
-    const typed = nativeMediaKind(j.type, "");
-    if (!named && !typed)
-      return null;
-    const kind = nativeMediaKind(j.type, ext) || "file";
-    const mime = NATIVE_MEDIA_MIME[ext] || (kind === "file" ? "application/octet-stream" : kind + "/*");
-    const name = String(j.fileName || "file") + ext;
-    return { sender, senderId, kind, name, url: "data:" + mime + ";base64," + j.data.replace(/\s+/g, "") };
   }
-  function nativeMediaLabel(media) {
-    if (!media)
-      return "";
-    const word = media.kind === "image" ? "image" : media.kind === "audio" ? "voice" : media.kind === "video" ? "video" : "file";
-    return "[" + word + "] " + media.name;
+  function mwSaveFlags() {
+    try {
+      localStorage.setItem(MW_FLAGS_KEY, JSON.stringify(Object.fromEntries(mwFlags)));
+    } catch (e) {
+    }
+  }
+  function mwChanged() {
+    for (const f of mwSubs)
+      f();
+  }
+  function setMentionIdentity(me) {
+    mwNames = myMentionNames(me);
+    mwUserId = me && me.userId || "";
+  }
+  function mentionNames() {
+    return mwNames;
+  }
+  function mentionUserId() {
+    return mwUserId;
+  }
+  function flagMention(peerId, ts) {
+    if (!peerId)
+      return;
+    mwFlags.set(peerId, Math.max(mwFlags.get(peerId) || 0, ts || Date.now()));
+    mwSaveFlags();
+    mwChanged();
+  }
+  function clearMention(peerId) {
+    if (!mwFlags.has(peerId))
+      return;
+    mwFlags.delete(peerId);
+    mwSaveFlags();
+    mwChanged();
+  }
+  function useMentionFlags() {
+    const [, bump] = React.useState(0);
+    React.useEffect(() => {
+      const f = () => bump((n) => n + 1);
+      mwSubs.add(f);
+      return () => {
+        mwSubs.delete(f);
+      };
+    }, []);
+    return mwFlags;
+  }
+  function mwNotify(T, groupName, sender, body, peerId) {
+    try {
+      if (typeof Notification === "undefined" || Notification.permission !== "granted")
+        return;
+      const title = (T && T.mentionNotifyTitle || "{sender} mentioned you in {group}").replace("{sender}", sender || "\u2026").replace("{group}", groupName || "");
+      const n = new Notification(title, { body: String(body || "").slice(0, 180), tag: "dk-mention-" + peerId });
+      n.onclick = () => {
+        try {
+          window.focus();
+        } catch (e) {
+        }
+        n.close();
+      };
+    } catch (e) {
+    }
+  }
+  function useGroupMentions({ T, me, peers, activeId, loaded, sound = true, muted }) {
+    React.useEffect(() => {
+      setMentionIdentity(me);
+    }, [me && me.name, me && me.ens, me && me.userId]);
+    const prev = React.useRef(null);
+    const groups = React.useRef(/* @__PURE__ */ new Set());
+    const inFlight = React.useRef(/* @__PURE__ */ new Set());
+    const Tref = React.useRef(T);
+    Tref.current = T;
+    const soundRef = React.useRef(sound);
+    soundRef.current = sound;
+    const mutedRef = React.useRef(/* @__PURE__ */ new Set());
+    mutedRef.current = new Set(muted || []);
+    React.useEffect(() => {
+      if (activeId)
+        clearMention(activeId);
+    }, [activeId]);
+    React.useEffect(() => {
+      try {
+        if (activeId && groups.current.has(activeId) && typeof Notification !== "undefined" && Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {
+          });
+        }
+      } catch (e) {
+      }
+    }, [activeId]);
+    React.useEffect(() => {
+      if (!loaded)
+        return;
+      const was = prev.current;
+      const now = /* @__PURE__ */ new Map();
+      for (const p of peers || []) {
+        if (!p || p.app)
+          continue;
+        now.set(p.id, p.lastTs || 0);
+        if (looksLikeGroupText(p.lastMsg))
+          groups.current.add(p.id);
+      }
+      prev.current = now;
+      if (!was || !mwNames.length)
+        return;
+      for (const p of peers || []) {
+        if (!p || p.app || !groups.current.has(p.id))
+          continue;
+        const since = was.get(p.id);
+        const ts = now.get(p.id);
+        if (since == null || !ts || ts <= since)
+          continue;
+        if (p.lastDir === "out")
+          continue;
+        if (inFlight.current.has(p.id))
+          continue;
+        inFlight.current.add(p.id);
+        dkGet("/api/chat-history?peer=" + encodeURIComponent(p.id) + "&limit=60").then((d) => {
+          const rows = (d && d.chats && d.chats[p.id] || []).filter((m) => m && m.dir !== "out" && (m.ts || 0) > since);
+          const hits = rows.filter((m) => !m.file && messageMentionsMe(m.text, mwNames));
+          if (!hits.length)
+            return;
+          const last = hits[hits.length - 1];
+          const reading = p.id === activeId && typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
+          if (!reading)
+            flagMention(p.id, last.ts);
+          const g = groupMessageBody(last.text);
+          if (!reading)
+            mwNotify(Tref.current, p.alias || "", g.sender, g.body, p.id);
+          if (soundRef.current && !reading && mutedRef.current.has(p.id))
+            dkChime("message");
+        }).catch(() => {
+        }).finally(() => {
+          inFlight.current.delete(p.id);
+        });
+      }
+    }, [peers, loaded, activeId]);
   }
   var DK_CMD_HIST_KEY = "beagle.assistant.history";
   var DK_CMD_HIST_MAX = 50;
@@ -2559,6 +3103,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
   function PeerRow({ peer, T, active, onClick, muted, isProtocol, fix }) {
     const name = peer.alias || peer.userId;
     const row = rosterRow(peer, isProtocol || (() => false), fix);
+    const mentioned = useMentionFlags().has(peer.id);
     return /* @__PURE__ */ React.createElement("button", { onClick, style: {
       display: "flex",
       alignItems: "center",
@@ -2587,7 +3132,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       textOverflow: "ellipsis",
       flex: 1,
       minWidth: 0
-    } }, dkRowPreview(row.preview, T)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)" } }, row.lastTime), peer.app ? null : row.unread ? /* @__PURE__ */ React.createElement(Unread, { n: row.unread }) : peer.pending ? /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 11, stroke: 2.2, color: "var(--warn, #d29922)", title: "friend request pending" }) : /* @__PURE__ */ React.createElement(StatusDot, { online: peer.online })));
+    } }, mentioned && /* @__PURE__ */ React.createElement("span", { style: { color: "var(--danger)", fontWeight: 700, marginRight: 4 } }, T && T.mentionYou || "[@ you]"), dkRowPreview(row.preview, T)))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--faint)" } }, row.lastTime), peer.app ? null : row.unread ? /* @__PURE__ */ React.createElement(Unread, { n: row.unread }) : peer.pending ? /* @__PURE__ */ React.createElement(Icon, { name: "clock", size: 11, stroke: 2.2, color: "var(--warn, #d29922)", title: "friend request pending" }) : /* @__PURE__ */ React.createElement(StatusDot, { online: peer.online })));
   }
   function dkActivityTs(p, isProtocol, fix) {
     const row = rosterRow(p, isProtocol || (() => false), fix);
@@ -3266,10 +3811,12 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     const submitted = read.form && answered ? answered.get(read.form.custom_id) : null;
     const rtcFile = !mine && !m.file ? dkRtcFileFromText(peer.userId || peer.id, m.text) : null;
     const callRec = !m.file ? dkCallFromText(m.text) : null;
+    const mentionsMe = isGroup && !mine && !m.file && typeof m.text === "string" && messageMentionsMe(m.text, mentionNames());
     return /* @__PURE__ */ React.createElement(
       "div",
       {
         onClick: selMode ? () => onToggleSel(m.id) : void 0,
+        "data-mention": mentionsMe ? "1" : void 0,
         style: {
           display: "flex",
           justifyContent: mine ? "flex-end" : "flex-start",
@@ -3278,8 +3825,10 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
           margin: "3px 0",
           cursor: selMode ? "pointer" : "default",
           borderRadius: 8,
-          background: selMode && selected ? "rgba(91,140,255,0.12)" : "transparent",
-          padding: selMode ? "2px 4px" : 0
+          // A group message that @mentions me stands out (feedback#23).
+          boxShadow: mentionsMe ? "inset 3px 0 0 var(--accent)" : void 0,
+          background: selMode && selected ? "rgba(91,140,255,0.12)" : mentionsMe ? "color-mix(in oklab, var(--accent), transparent 88%)" : "transparent",
+          padding: selMode ? "2px 4px" : mentionsMe ? "3px 4px 3px 8px" : 0
         }
       },
       selMode && /* @__PURE__ */ React.createElement("div", { style: {
@@ -3891,6 +4440,48 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       setSelMode(false);
     };
     const [draft, setDraft] = React.useState("");
+    const inputRef = React.useRef(null);
+    const [mq, setMq] = React.useState(null);
+    const [mSel, setMSel] = React.useState(0);
+    const [, bumpEns] = React.useState(0);
+    const members = React.useMemo(() => isGroup ? memberCandidates(threadProp || [], { myUserId: mentionUserId(), myNames: mentionNames() }) : [], [isGroup, threadProp]);
+    React.useEffect(() => {
+      if (!mq)
+        return void 0;
+      let live = true;
+      for (const mm of members) {
+        if (mm.senderId && ensVerifier.peek(mm.senderId) === void 0) {
+          ensVerifier.lookup(mm.senderId).then(() => {
+            if (live)
+              bumpEns((n) => n + 1);
+          });
+        }
+      }
+      return () => {
+        live = false;
+      };
+    }, [!!mq, members]);
+    const mCands = mq ? filterCandidates(members.map((mm) => ({ ...mm, insert: mentionInsertName(mm, mm.senderId ? ensVerifier.peek(mm.senderId) : null) })), mq.query).slice(0, 8) : [];
+    const pickMention = (c) => {
+      if (!mq || !c)
+        return;
+      const r = applyMention(draft, mq, c.insert);
+      setDraft(r.value);
+      setMq(null);
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (el) {
+          el.focus();
+          try {
+            el.setSelectionRange(r.caret, r.caret);
+          } catch (e) {
+          }
+        }
+      });
+    };
+    React.useEffect(() => {
+      setMq(null);
+    }, [peer.id]);
     const [hist, setHist] = React.useState([]);
     const histIdx = React.useRef(null);
     const histStash = React.useRef("");
@@ -4177,15 +4768,84 @@ ${peer.address}`
             e.target.value = "";
           }
         }
-      ), !peer.app && /* @__PURE__ */ React.createElement(Btn, { icon: "paperclip", title: T.sendFile, onClick: () => fileRef.current && fileRef.current.click() }), /* @__PURE__ */ React.createElement(
+      ), !peer.app && /* @__PURE__ */ React.createElement(Btn, { icon: "paperclip", title: T.sendFile, onClick: () => fileRef.current && fileRef.current.click() }), /* @__PURE__ */ React.createElement("div", { style: { position: "relative", flex: 1, minWidth: 0, display: "flex" } }, mq && mCands.length > 0 && /* @__PURE__ */ React.createElement("div", { "data-testid": "mention-picker", style: {
+        position: "absolute",
+        left: 0,
+        bottom: 44,
+        zIndex: 30,
+        width: "min(320px, 100%)",
+        maxHeight: 280,
+        overflowY: "auto",
+        background: "var(--panel-2)",
+        border: "1px solid var(--line)",
+        borderRadius: 10,
+        boxShadow: "0 14px 40px rgba(0,0,0,0.35)",
+        padding: 4
+      } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 10.5, color: "var(--faint)", padding: "4px 8px" } }, T && T.mentionPickerHint || "Mention someone who has written in this group"), mCands.map((c, i) => /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          key: c.key,
+          onMouseDown: (e) => {
+            e.preventDefault();
+            pickMention(c);
+          },
+          onMouseEnter: () => setMSel(i),
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            width: "100%",
+            textAlign: "left",
+            padding: "6px 8px",
+            borderRadius: 7,
+            border: "none",
+            cursor: "pointer",
+            background: i === mSel ? "var(--chip)" : "transparent",
+            color: "var(--text)",
+            fontFamily: "var(--ui)",
+            fontSize: 13
+          }
+        },
+        /* @__PURE__ */ React.createElement(DkEnsAvatar, { userid: c.senderId, name: c.sender, fallbackSeed: c.senderId || c.sender, size: 22, radius: 6 }),
+        /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, "@", c.insert),
+        c.insert !== c.sender && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "var(--faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, c.sender)
+      ))), /* @__PURE__ */ React.createElement(
         "input",
         {
+          ref: inputRef,
           value: draft,
           onChange: (e) => {
             histIdx.current = null;
             setDraft(e.target.value);
+            if (isGroup) {
+              setMq(mentionQuery(e.target.value, e.target.selectionStart));
+              setMSel(0);
+            }
           },
+          onBlur: () => setTimeout(() => setMq(null), 120),
           onKeyDown: (e) => {
+            if (mq && mCands.length) {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setMSel((mSel + 1) % mCands.length);
+                return;
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setMSel((mSel + mCands.length - 1) % mCands.length);
+                return;
+              }
+              if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                pickMention(mCands[Math.min(mSel, mCands.length - 1)]);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setMq(null);
+                return;
+              }
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               sendDraft();
@@ -4199,7 +4859,7 @@ ${peer.address}`
           placeholder: phone ? `${T.message}\u2026` : `${T.message} ${verifiedLabel(peer.app ? null : peer.userId, peer.alias) || shortKey(peer.userId, 6, 4)}\u2026`,
           style: { flex: 1, height: 38, borderRadius: 9, border: "1px solid var(--line)", background: "var(--panel-2)", color: "var(--text)", fontFamily: "var(--ui)", fontSize: 13.5, padding: "0 14px", outline: "none", minWidth: 0 }
         }
-      ), /* @__PURE__ */ React.createElement(Btn, { tone: "solid", icon: "arrowUp", title: T.send, onClick: sendDraft }))),
+      )), /* @__PURE__ */ React.createElement(Btn, { tone: "solid", icon: "arrowUp", title: T.send, onClick: sendDraft }))),
       theater && /* @__PURE__ */ React.createElement("div", { onClick: () => setTheater(null), style: {
         position: "absolute",
         inset: 0,
@@ -5592,9 +6252,7 @@ ${peer.address}`
     return !!a && !!b && norm(a) === norm(b);
   }
   var DK_FALLBACK_ICE_SERVERS = [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "turn:tokyo.fi.chat:3478", username: "allcom", credential: "allcompass" },
-    { urls: "turn:tokyo.fi.chat:3478?transport=tcp", username: "allcom", credential: "allcompass" }
+    { urls: "stun:stun.l.google.com:19302" }
   ];
   var DK_LIVE_ICE_SERVERS = [];
   var _dkIcePromise = null;
@@ -5662,12 +6320,26 @@ ${peer.address}`
       } catch (e) {
         console.warn("[rtc] call-ice-servers fetch failed", e);
       }
-      console.warn("[rtc] falling back to tokyo TURN \u2014 web\u2194Android online ICE may fail");
+      console.warn("[rtc] call-ice-servers unavailable \u2014 STUN only until the host answers");
       DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...DK_FALLBACK_ICE_SERVERS.map((s) => ({ ...s })));
       await dkWarmCallIce(DK_LIVE_ICE_SERVERS);
       return DK_LIVE_ICE_SERVERS;
     })();
     return _dkIcePromise;
+  }
+  async function dkFreshIceServers() {
+    try {
+      const r = await fetch("/api/call-ice-servers", { headers: { "cache-control": "no-cache" } });
+      const d = await r.json();
+      if (d && d.ok && Array.isArray(d.iceServers) && d.iceServers.length) {
+        DK_LIVE_ICE_SERVERS.splice(0, DK_LIVE_ICE_SERVERS.length, ...d.iceServers);
+        return d.iceServers;
+      }
+    } catch (e) {
+    }
+    if (DK_LIVE_ICE_SERVERS.length)
+      return DK_LIVE_ICE_SERVERS.slice();
+    return dkLoadCallIceServers();
   }
   function dkAwaitCallIceServers(ms) {
     const budget = typeof ms === "number" ? ms : 1e4;
@@ -5682,7 +6354,84 @@ ${peer.address}`
       }, budget))
     ]).then(() => DK_LIVE_ICE_SERVERS);
   }
-  dkLoadCallIceServers();
+  var dkIsTurn = (u) => /^turns?:/i.test(String(u || ""));
+  function dkTurnOnly(list) {
+    const out = [];
+    for (const e of list || []) {
+      const urls = (Array.isArray(e.urls) ? e.urls : [e.urls]).filter(dkIsTurn);
+      if (urls.length)
+        out.push(Object.assign({}, e, { urls: Array.isArray(e.urls) ? urls : urls[0] }));
+    }
+    return out;
+  }
+  function dkStunOnly(list) {
+    const out = [];
+    for (const e of list || []) {
+      const urls = (Array.isArray(e.urls) ? e.urls : [e.urls]).filter((u) => /^stuns?:/i.test(String(u || "")));
+      if (urls.length)
+        out.push({ urls: Array.isArray(e.urls) ? urls : urls[0] });
+    }
+    return out;
+  }
+  var DK_CALL_STUN_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
+  function dkRefreshCallStun() {
+    const seen = new Set(DK_CALL_STUN_SERVERS.map((e) => JSON.stringify(e.urls)));
+    for (const e of dkStunOnly(DK_LIVE_ICE_SERVERS)) {
+      if (!seen.has(JSON.stringify(e.urls))) {
+        DK_CALL_STUN_SERVERS.push(e);
+        seen.add(JSON.stringify(e.urls));
+      }
+    }
+  }
+  function dkStaticCallTurn() {
+    const live = dkTurnOnly(DK_LIVE_ICE_SERVERS);
+    return live.length ? live : dkTurnOnly(DK_FALLBACK_ICE_SERVERS);
+  }
+  var dkCallTurnSource = /* @__PURE__ */ (() => {
+    let current = [];
+    let lastSource = "";
+    return {
+      async iceServers() {
+        try {
+          const r = await fetch("/api/call-turn-servers", { headers: { "cache-control": "no-cache" } });
+          const d = await r.json();
+          if (d && d.ok && Array.isArray(d.iceServers) && d.iceServers.length) {
+            current = dkTurnOnly(d.iceServers);
+            if (current.length) {
+              if (d.source !== lastSource)
+                console.log("[rtc] call TURN from " + d.source + ":", current.map((s) => s.urls));
+              lastSource = d.source;
+              return current.map((e) => Object.assign({}, e));
+            }
+          }
+        } catch (e) {
+        }
+        await dkLoadCallIceServers().catch(() => {
+        });
+        current = dkStaticCallTurn();
+        if (lastSource !== "static")
+          console.log("[rtc] call TURN from today's entries:", current.map((s) => s.urls));
+        lastSource = "static";
+        return current.map((e) => Object.assign({}, e));
+      },
+      currentIceServers() {
+        return (current.length ? current : dkStaticCallTurn()).map((e) => Object.assign({}, e));
+      }
+    };
+  })();
+  function dkCallRelayOnly() {
+    try {
+      if (/[?&]relay=1(&|$)/.test(location.search))
+        return true;
+      return localStorage.getItem("dk.callRelayOnly") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+  dkLoadCallIceServers().then(dkRefreshCallStun, () => {
+  });
+  dkCallTurnSource.iceServers().catch(() => {
+  });
   function dkRtcParseEnvelope(data) {
     const text = String(data || "").replace(/\0+$/u, "").trim();
     if (!text)
@@ -5990,10 +6739,12 @@ ${peer.address}`
         const engine = new CallEngine({
           selfId,
           signaling,
-          createPeerConnection: (c) => new RTCPeerConnection(c),
+          // Debug only (dkCallRelayOnly): relay candidates only, to test TURN.
+          createPeerConnection: (c) => new RTCPeerConnection(dkCallRelayOnly() ? Object.assign({}, c, { iceTransportPolicy: "relay" }) : c),
           getLocalMedia: (k) => navigator.mediaDevices.getUserMedia({ audio: k.audio, video: k.video }),
           getDisplayMedia: (c) => navigator.mediaDevices.getDisplayMedia(c || { video: true, audio: false }),
-          iceServers: DK_LIVE_ICE_SERVERS,
+          iceServers: DK_CALL_STUN_SERVERS,
+          turnServers: dkCallTurnSource,
           logger: (m) => console.log(m)
         });
         if (cancelled) {
@@ -6050,7 +6801,7 @@ ${peer.address}`
           setSharing(false);
         });
         engineRef.current = engine;
-        console.log("[call] CallEngine ready with ICE:", DK_LIVE_ICE_SERVERS.map((s) => s.urls));
+        console.log("[call] CallEngine ready; STUN:", DK_CALL_STUN_SERVERS.map((s) => s.urls), "TURN: per call from the RSP node, else today's entries", dkCallRelayOnly() ? "(relay only \u2014 debug)" : "");
       })().catch((e) => console.warn("[call] engine init failed", e));
       return () => {
         cancelled = true;
@@ -6657,108 +7408,401 @@ ${peer.address}`
       }
     ));
   }
-  var DK_FILE_RTC_KIND = "file";
-  var DK_FILE_RTC_CHUNK = 16 * 1024;
-  var DK_FILE_RTC_OPEN_TIMEOUT_MS = 2e4;
-  var DK_FILE_RTC_SIGNAL_TTL_MS = 10 * 60 * 1e3;
-  var _dkFileIcePromise = null;
-  function dkFileIceServers() {
-    if (!_dkFileIcePromise)
-      _dkFileIcePromise = dkLoadCallIceServers();
-    return _dkFileIcePromise;
-  }
-  function dkFileRtcId() {
-    if (window.crypto && window.crypto.randomUUID)
-      return window.crypto.randomUUID();
-    return "frtc-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
-  }
-  function dkFileRtcEnvelope(fileId, type, extra) {
-    return Object.assign({ dkRtc: 1, kind: DK_FILE_RTC_KIND, fileId, type, ts: Date.now() }, extra || {});
-  }
-  function dkRtcState(pc) {
+  var FILE_RTC_KIND = "file";
+  var FILE_RTC_CHUNK = 16 * 1024;
+  var FILE_RTC_SIGNAL_TTL_MS = 10 * 60 * 1e3;
+  var DEFAULTS = {
+    openTimeoutMs: 2e4,
+    // DataChannel open
+    highWater: 4 * 1024 * 1024,
+    // in-flight bytes before the send loop waits
+    bufferWaitMs: 3e4,
+    // per wait below highWater
+    drainIdleMs: 3e4,
+    // drain to 0: give up after this long with no progress
+    ackTimeoutMs: 2e4,
+    // "got" after the drain
+    byeGraceMs: 3e4,
+    // receiver: bye before done
+    ackLingerMs: 5e3,
+    // receiver: close after "got" if the sender has not
+    closeDelayMs: 1500
+    // sender: close after its own bye
+  };
+  function rtcState(pc) {
     if (!pc)
       return "";
     return "ice=" + pc.iceConnectionState + " conn=" + pc.connectionState + " gather=" + pc.iceGatheringState;
   }
-  function dkWaitForOpen(dc, timeoutMs, describeState) {
+  function waitForOpen(dc, timeoutMs, describe) {
     if (dc.readyState === "open")
       return Promise.resolve();
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const fail = (what) => () => {
         cleanup();
-        const s = describeState ? describeState() : "";
-        reject(new Error("WebRTC data channel open timed out" + (s ? " (" + s + ")" : "")));
-      }, timeoutMs);
-      const cleanup = () => {
-        clearTimeout(timer);
-        dc.removeEventListener("open", onOpen);
-        dc.removeEventListener("error", onError);
-        dc.removeEventListener("close", onClose);
+        const s = describe();
+        reject(new Error("WebRTC data channel " + what + (s ? " (" + s + ")" : "")));
       };
       const onOpen = () => {
         cleanup();
         resolve();
       };
-      const onError = () => {
-        cleanup();
-        const s = describeState ? describeState() : "";
-        reject(new Error("WebRTC data channel failed" + (s ? " (" + s + ")" : "")));
-      };
-      const onClose = () => {
-        cleanup();
-        const s = describeState ? describeState() : "";
-        reject(new Error("WebRTC data channel closed before open" + (s ? " (" + s + ")" : "")));
-      };
+      const onError = fail("failed");
+      const onClose = fail("closed before open");
+      const timer = setTimeout(fail("open timed out"), timeoutMs);
+      function cleanup() {
+        clearTimeout(timer);
+        dc.removeEventListener("open", onOpen);
+        dc.removeEventListener("error", onError);
+        dc.removeEventListener("close", onClose);
+      }
       dc.addEventListener("open", onOpen);
       dc.addEventListener("error", onError);
       dc.addEventListener("close", onClose);
     });
   }
-  function dkWaitBufferedLow(dc, highWater) {
-    if (dc.bufferedAmount < highWater)
+  function waitBuffered(dc, limit, idleMs) {
+    if (dc.bufferedAmount < limit)
       return Promise.resolve();
     return new Promise((resolve, reject) => {
       const prev = dc.bufferedAmountLowThreshold;
-      dc.bufferedAmountLowThreshold = Math.floor(highWater / 2);
-      let poll = null;
-      let timer = null;
-      const done = () => {
-        cleanup();
-        resolve();
-      };
-      const cleanup = () => {
-        if (poll)
-          clearInterval(poll);
-        if (timer)
-          clearTimeout(timer);
-        dc.removeEventListener("bufferedamountlow", done);
-        dc.removeEventListener("close", onClose);
-        dc.removeEventListener("error", onError);
-        dc.bufferedAmountLowThreshold = prev;
-      };
+      dc.bufferedAmountLowThreshold = Math.max(0, Math.floor((limit - 1) / 2));
+      let last = dc.bufferedAmount;
+      let lastMoved = Date.now();
       const check = () => {
         if (dc.readyState !== "open")
-          return onClose();
-        if (dc.bufferedAmount < highWater)
-          done();
+          return finish(new Error("WebRTC data channel closed while draining"));
+        if (dc.bufferedAmount < limit)
+          return finish(null);
+        if (dc.bufferedAmount < last) {
+          last = dc.bufferedAmount;
+          lastMoved = Date.now();
+        } else if (Date.now() - lastMoved > idleMs)
+          finish(new Error("WebRTC data channel drain stalled buffered=" + dc.bufferedAmount));
       };
-      const onClose = () => {
-        cleanup();
-        reject(new Error("WebRTC data channel closed while draining"));
-      };
-      const onError = () => {
-        cleanup();
-        reject(new Error("WebRTC data channel failed while draining"));
-      };
-      dc.addEventListener("bufferedamountlow", done);
-      dc.addEventListener("close", onClose);
-      dc.addEventListener("error", onError);
-      poll = setInterval(check, 250);
-      timer = setTimeout(() => {
-        cleanup();
-        reject(new Error("WebRTC data channel drain timed out buffered=" + dc.bufferedAmount));
-      }, 3e4);
+      const onErr = () => finish(new Error("WebRTC data channel failed while draining"));
+      const poll = setInterval(check, 100);
+      function finish(err) {
+        clearInterval(poll);
+        dc.removeEventListener("bufferedamountlow", check);
+        dc.removeEventListener("close", check);
+        dc.removeEventListener("error", onErr);
+        dc.bufferedAmountLowThreshold = prev;
+        if (err)
+          reject(err);
+        else
+          resolve();
+      }
+      dc.addEventListener("bufferedamountlow", check);
+      dc.addEventListener("close", check);
+      dc.addEventListener("error", onErr);
     });
+  }
+  function createFileRtcEngine(o) {
+    const opt = Object.assign({}, DEFAULTS, o.options || {});
+    const log = o.log || (() => {
+    });
+    const newId = o.newId || (() => globalThis.crypto && globalThis.crypto.randomUUID ? globalThis.crypto.randomUUID() : "frtc-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2));
+    const PC = o.RTCPeerConnection;
+    const sessions = /* @__PURE__ */ new Map();
+    const finished = /* @__PURE__ */ new Map();
+    const envelope = (fileId, type, extra) => Object.assign({ dkRtc: 1, kind: FILE_RTC_KIND, fileId, type, ts: Date.now() }, extra || {});
+    const signal = (peerId, fileId, type, extra) => o.bus.send(peerId, envelope(fileId, type, extra));
+    let off = null;
+    const pruneFinished = () => {
+      const cut = Date.now() - FILE_RTC_SIGNAL_TTL_MS;
+      for (const [id, at] of finished)
+        if (at < cut)
+          finished.delete(id);
+    };
+    const closeRecv = (fileId) => {
+      const s = sessions.get(fileId);
+      if (!s)
+        return;
+      if (s.graceTimer)
+        clearTimeout(s.graceTimer);
+      if (s.lingerTimer)
+        clearTimeout(s.lingerTimer);
+      try {
+        s.dc && s.dc.close();
+      } catch (e) {
+      }
+      try {
+        s.pc && s.pc.close();
+      } catch (e) {
+      }
+      sessions.delete(fileId);
+    };
+    const attachChannel = (peerId, fileId, s, dc) => {
+      dc.binaryType = "arraybuffer";
+      s.dc = dc;
+      dc.onmessage = (ev) => {
+        if (typeof ev.data === "string") {
+          let msg = null;
+          try {
+            msg = JSON.parse(ev.data);
+          } catch (e) {
+          }
+          if (!msg)
+            return;
+          if (msg.type === "meta") {
+            s.meta = msg;
+            s.chunks = [];
+            s.received = 0;
+          } else if (msg.type === "done") {
+            if (s.completed)
+              return;
+            s.completed = true;
+            finished.set(fileId, Date.now());
+            if (s.graceTimer) {
+              clearTimeout(s.graceTimer);
+              s.graceTimer = null;
+            }
+            const meta = s.meta || {};
+            const blob = new Blob(s.chunks, { type: meta.mime || "application/octet-stream" });
+            try {
+              if (o.onReceived)
+                o.onReceived({ peerId, fileId, name: meta.name || "agentnet-file", mime: meta.mime, size: blob.size, blob });
+            } catch (e) {
+              log("[file-rtc] onReceived failed: " + (e && e.message || e));
+            }
+            try {
+              dc.send(JSON.stringify({ type: "got", bytes: s.received }));
+            } catch (e) {
+            }
+            s.lingerTimer = setTimeout(() => closeRecv(fileId), opt.ackLingerMs);
+          } else if (msg.type === "cancel") {
+            closeRecv(fileId);
+          }
+          return;
+        }
+        s.chunks.push(ev.data);
+        s.received += ev.data.byteLength || ev.data.size || 0;
+      };
+      dc.onclose = () => setTimeout(() => closeRecv(fileId), 1e3);
+      dc.onerror = () => closeRecv(fileId);
+    };
+    const onSignal = async (peerId, env) => {
+      if (!env || !env.fileId || !env.type)
+        return;
+      if (Date.now() - (env.ts || Date.now()) > FILE_RTC_SIGNAL_TTL_MS)
+        return;
+      const fileId = env.fileId;
+      const s = sessions.get(fileId);
+      try {
+        if (env.type === "offer") {
+          pruneFinished();
+          if (finished.has(fileId)) {
+            log("[file-rtc] offer for a finished transfer ignored " + fileId);
+            return;
+          }
+          if (s && s.pc && s.pc.signalingState !== "closed") {
+            log("[file-rtc] duplicate offer ignored for " + fileId);
+            return;
+          }
+          const sess = { peerId, pc: null, dc: null, meta: env.meta || null, chunks: [], received: 0, pendingCandidates: [], completed: false };
+          sessions.set(fileId, sess);
+          const pc = new PC({ iceServers: await o.iceServers() });
+          sess.pc = pc;
+          pc.oniceconnectionstatechange = () => log("[file-rtc] receiver ice=" + pc.iceConnectionState + " conn=" + pc.connectionState);
+          pc.onconnectionstatechange = () => log("[file-rtc] receiver conn=" + pc.connectionState + " ice=" + pc.iceConnectionState);
+          pc.onicecandidate = (ev) => {
+            if (ev.candidate)
+              signal(peerId, fileId, "candidate", { candidate: ev.candidate.toJSON ? ev.candidate.toJSON() : ev.candidate }).catch(() => {
+              });
+          };
+          pc.ondatachannel = (ev) => attachChannel(peerId, fileId, sess, ev.channel);
+          await pc.setRemoteDescription({ type: "offer", sdp: env.sdp });
+          for (const c of sess.pendingCandidates.splice(0)) {
+            try {
+              await pc.addIceCandidate(c);
+            } catch (e) {
+            }
+          }
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await signal(peerId, fileId, "answer", { sdp: answer.sdp });
+        } else if (env.type === "candidate" && s && env.candidate) {
+          if (s.pc && s.pc.remoteDescription) {
+            try {
+              await s.pc.addIceCandidate(env.candidate);
+            } catch (e) {
+            }
+          } else
+            (s.pendingCandidates = s.pendingCandidates || []).push(env.candidate);
+        } else if (env.type === "bye" && s) {
+          if (s.completed || env.reason === "fallback")
+            closeRecv(fileId);
+          else if (!s.graceTimer)
+            s.graceTimer = setTimeout(() => {
+              log("[file-rtc] no data after bye, closing " + fileId);
+              closeRecv(fileId);
+            }, opt.byeGraceMs);
+        } else if (env.type === "answer" || env.type === "candidate") {
+          await onSenderSignal(peerId, env);
+        }
+      } catch (e) {
+        log("[file-rtc] signal failed " + (e && e.message || e));
+        closeRecv(fileId);
+      }
+    };
+    const senders = /* @__PURE__ */ new Map();
+    const onSenderSignal = async (peerId, env) => {
+      const s = senders.get(env.fileId);
+      if (!s || s.peerId !== peerId)
+        return;
+      if (env.type === "answer") {
+        if (s.pc.signalingState !== "have-local-offer") {
+          log("[file-rtc] stale answer ignored for " + env.fileId + " state=" + s.pc.signalingState);
+          return;
+        }
+        await s.pc.setRemoteDescription({ type: "answer", sdp: env.sdp });
+        for (const c of s.pendingCandidates.splice(0)) {
+          try {
+            await s.pc.addIceCandidate(c);
+          } catch (e) {
+          }
+        }
+      } else if (env.type === "candidate" && env.candidate) {
+        if (s.pc.remoteDescription) {
+          try {
+            await s.pc.addIceCandidate(env.candidate);
+          } catch (e) {
+          }
+        } else
+          s.pendingCandidates.push(env.candidate);
+      }
+    };
+    async function sendFile(peerId, file, onProgress) {
+      const fileId = newId();
+      const pc = new PC({ iceServers: await o.iceServers() });
+      const dc = pc.createDataChannel("agentnet-file", { ordered: true });
+      const s = { peerId, pc, dc, pendingCandidates: [] };
+      senders.set(fileId, s);
+      let acked = null;
+      const ack = new Promise((resolve) => {
+        acked = resolve;
+      });
+      dc.addEventListener("message", (ev) => {
+        if (typeof ev.data !== "string")
+          return;
+        try {
+          const m = JSON.parse(ev.data);
+          if (m && m.type === "got")
+            acked(m);
+        } catch (e) {
+        }
+      });
+      const cleanup = () => {
+        try {
+          dc.close();
+        } catch (e) {
+        }
+        try {
+          pc.close();
+        } catch (e) {
+        }
+        senders.delete(fileId);
+      };
+      try {
+        pc.oniceconnectionstatechange = () => log("[file-rtc] sender ice=" + pc.iceConnectionState + " conn=" + pc.connectionState);
+        pc.onconnectionstatechange = () => log("[file-rtc] sender conn=" + pc.connectionState + " ice=" + pc.iceConnectionState);
+        pc.onicecandidate = (ev) => {
+          if (ev.candidate)
+            signal(peerId, fileId, "candidate", { candidate: ev.candidate.toJSON ? ev.candidate.toJSON() : ev.candidate }).catch(() => {
+            });
+        };
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        const mime = file.type || "application/octet-stream";
+        await signal(peerId, fileId, "offer", { sdp: offer.sdp, meta: { name: file.name, size: file.size, mime } });
+        await waitForOpen(dc, opt.openTimeoutMs, () => rtcState(pc));
+        dc.send(JSON.stringify({ type: "meta", name: file.name, size: file.size, mime }));
+        let sent = 0;
+        const startedAt = Date.now();
+        let lastProgressAt = 0;
+        const report = (force) => {
+          if (!onProgress)
+            return;
+          const t = Date.now();
+          if (!force && t - lastProgressAt < 250 && sent < file.size)
+            return;
+          lastProgressAt = t;
+          const elapsedMs = Math.max(1, t - startedAt);
+          onProgress({ sent, size: file.size, pct: file.size ? sent / file.size * 100 : 100, kbps: sent / 1024 / (elapsedMs / 1e3), elapsedMs, via: "webrtc" });
+        };
+        report(true);
+        while (sent < file.size) {
+          if (dc.readyState !== "open")
+            throw new Error("WebRTC data channel closed");
+          const end = Math.min(file.size, sent + FILE_RTC_CHUNK);
+          dc.send(await file.slice(sent, end).arrayBuffer());
+          sent = end;
+          report(false);
+          await waitBuffered(dc, opt.highWater, opt.bufferWaitMs);
+        }
+        dc.send(JSON.stringify({ type: "done" }));
+        await waitBuffered(dc, 1, opt.drainIdleMs);
+        const got = await Promise.race([
+          ack,
+          new Promise((_, rej) => {
+            if (dc.readyState !== "open") {
+              rej(new Error("receiver closed without acknowledging"));
+              return;
+            }
+            const t = setTimeout(() => rej(new Error("no acknowledgement from the receiver")), opt.ackTimeoutMs);
+            dc.addEventListener("close", () => {
+              clearTimeout(t);
+              rej(new Error("receiver closed without acknowledging"));
+            });
+          })
+        ]);
+        if (got.bytes != null && got.bytes !== file.size)
+          throw new Error("receiver got " + got.bytes + " of " + file.size + " bytes");
+        report(true);
+        await signal(peerId, fileId, "bye", { reason: "done" }).catch(() => {
+        });
+        setTimeout(cleanup, opt.closeDelayMs);
+        return { ok: true, via: "webrtc", fileId };
+      } catch (e) {
+        await signal(peerId, fileId, "bye", { reason: "fallback" }).catch(() => {
+        });
+        cleanup();
+        return { ok: false, fallback: true, error: e && e.message || String(e) };
+      }
+    }
+    return {
+      start() {
+        if (!off)
+          off = o.bus.on(FILE_RTC_KIND, (peerId, env) => onSignal(peerId, env));
+      },
+      stop() {
+        if (off) {
+          off();
+          off = null;
+        }
+        for (const id of Array.from(sessions.keys()))
+          closeRecv(id);
+        for (const s of senders.values()) {
+          try {
+            s.dc.close();
+          } catch (e) {
+          }
+          try {
+            s.pc.close();
+          } catch (e) {
+          }
+        }
+        senders.clear();
+      },
+      sendFile,
+      // for tests
+      _sessions: sessions,
+      _finished: finished
+    };
+  }
+  function dkFileIceServers() {
+    return dkFreshIceServers();
   }
   function dkFileDownload(blob, name) {
     const url = URL.createObjectURL(blob);
@@ -6777,226 +7821,43 @@ ${peer.address}`
   }
   function useRtcFileController(selfId, onReceivedFile) {
     const [incoming, setIncoming] = React.useState([]);
-    const peersRef = React.useRef(/* @__PURE__ */ new Map());
     const onReceivedFileRef = React.useRef(onReceivedFile);
     React.useEffect(() => {
       onReceivedFileRef.current = onReceivedFile;
     }, [onReceivedFile]);
+    const engineRef = React.useRef(null);
+    const engine = () => {
+      if (!engineRef.current && window.RTCPeerConnection && window.dkRtcSignalBus) {
+        engineRef.current = createFileRtcEngine({
+          bus: dkRtcSignalBus(),
+          RTCPeerConnection: window.RTCPeerConnection,
+          iceServers: dkFileIceServers,
+          log: (m) => console.warn(m),
+          onReceived: ({ peerId, fileId, name, size, blob }) => {
+            const dl = dkFileDownload(blob, name);
+            dkRememberRtcFile(peerId, fileId, dl.name, size, dl.url);
+            setIncoming((arr) => [{ id: fileId, peerId, name: dl.name, size, url: dl.url }].concat(arr).slice(0, 8));
+            if (onReceivedFileRef.current)
+              onReceivedFileRef.current(peerId, dl.name, blob);
+          }
+        });
+      }
+      return engineRef.current;
+    };
     React.useEffect(() => {
-      if (!selfId || !window.RTCPeerConnection || !window.dkRtcSignalBus)
-        return;
-      const bus = dkRtcSignalBus();
-      const cleanup = (fileId) => {
-        const sess = peersRef.current.get(fileId);
-        if (!sess)
-          return;
-        try {
-          sess.dc && sess.dc.close();
-        } catch (e) {
-        }
-        try {
-          sess.pc && sess.pc.close();
-        } catch (e) {
-        }
-        peersRef.current.delete(fileId);
-      };
-      const sendSignal = (peerId, fileId, type, extra) => bus.send(peerId, dkFileRtcEnvelope(fileId, type, extra));
-      const handleDataChannel = (peerId, fileId, pc, dc, initialMeta) => {
-        dc.binaryType = "arraybuffer";
-        const prev = peersRef.current.get(fileId);
-        const sess = Object.assign(prev || {}, { pc, dc, peerId, meta: initialMeta || null, chunks: [], received: 0 });
-        peersRef.current.set(fileId, sess);
-        dc.onmessage = (ev) => {
-          if (typeof ev.data === "string") {
-            let msg = null;
-            try {
-              msg = JSON.parse(ev.data);
-            } catch (e) {
-            }
-            if (!msg)
-              return;
-            if (msg.type === "meta") {
-              sess.meta = msg;
-              sess.chunks = [];
-              sess.received = 0;
-            } else if (msg.type === "done") {
-              const meta = sess.meta || {};
-              const blob = new Blob(sess.chunks, { type: meta.mime || "application/octet-stream" });
-              const dl = dkFileDownload(blob, meta.name || "agentnet-file");
-              dkRememberRtcFile(peerId, fileId, dl.name, blob.size, dl.url);
-              setIncoming((arr) => [{ id: fileId, peerId, name: dl.name, size: blob.size, url: dl.url }].concat(arr).slice(0, 8));
-              if (onReceivedFileRef.current)
-                onReceivedFileRef.current(peerId, dl.name, blob);
-              cleanup(fileId);
-            } else if (msg.type === "cancel") {
-              cleanup(fileId);
-            }
-            return;
-          }
-          sess.chunks.push(ev.data);
-          sess.received += ev.data.byteLength || ev.data.size || 0;
-        };
-        dc.onclose = () => setTimeout(() => cleanup(fileId), 1e3);
-        dc.onerror = () => cleanup(fileId);
-      };
-      const off = bus.on(DK_FILE_RTC_KIND, async (peerId, env) => {
-        if (!env || !env.fileId || !env.type)
-          return;
-        if (Date.now() - (env.ts || Date.now()) > DK_FILE_RTC_SIGNAL_TTL_MS)
-          return;
-        const fileId = env.fileId;
-        let sess = peersRef.current.get(fileId);
-        try {
-          if (env.type === "offer") {
-            if (sess && sess.pc && sess.pc.signalingState !== "closed") {
-              console.warn("[file-rtc] duplicate offer ignored for " + fileId);
-              return;
-            }
-            const pc = new RTCPeerConnection({ iceServers: await dkFileIceServers() });
-            pc.oniceconnectionstatechange = () => console.warn("[file-rtc] receiver ice=" + pc.iceConnectionState + " conn=" + pc.connectionState);
-            pc.onconnectionstatechange = () => console.warn("[file-rtc] receiver conn=" + pc.connectionState + " ice=" + pc.iceConnectionState);
-            pc.onicecandidate = (ev) => {
-              if (ev.candidate)
-                sendSignal(peerId, fileId, "candidate", { candidate: ev.candidate.toJSON() }).catch(() => {
-                });
-            };
-            pc.ondatachannel = (ev) => handleDataChannel(peerId, fileId, pc, ev.channel, env.meta || null);
-            peersRef.current.set(fileId, { pc, dc: null, peerId, chunks: [], meta: env.meta || null, pendingCandidates: [] });
-            await pc.setRemoteDescription({ type: "offer", sdp: env.sdp });
-            sess = peersRef.current.get(fileId);
-            if (sess && sess.pendingCandidates) {
-              for (const c of sess.pendingCandidates.splice(0)) {
-                try {
-                  await pc.addIceCandidate(c);
-                } catch (e) {
-                }
-              }
-            }
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            await sendSignal(peerId, fileId, "answer", { sdp: answer.sdp });
-          } else if (env.type === "answer" && sess) {
-            if (sess.pc.signalingState !== "have-local-offer") {
-              console.warn("[file-rtc] stale answer ignored for " + fileId + " state=" + sess.pc.signalingState);
-              return;
-            }
-            await sess.pc.setRemoteDescription({ type: "answer", sdp: env.sdp });
-            if (sess.pendingCandidates) {
-              for (const c of sess.pendingCandidates.splice(0)) {
-                try {
-                  await sess.pc.addIceCandidate(c);
-                } catch (e) {
-                }
-              }
-            }
-          } else if (env.type === "candidate" && sess && env.candidate) {
-            if (sess.pc.remoteDescription) {
-              try {
-                await sess.pc.addIceCandidate(env.candidate);
-              } catch (e) {
-              }
-            } else {
-              if (!sess.pendingCandidates)
-                sess.pendingCandidates = [];
-              sess.pendingCandidates.push(env.candidate);
-            }
-          } else if (env.type === "bye") {
-            cleanup(fileId);
-          }
-        } catch (e) {
-          console.warn("[file-rtc] signal failed", e);
-          cleanup(fileId);
-        }
-      });
-      return () => {
-        off();
-        for (const id of Array.from(peersRef.current.keys()))
-          cleanup(id);
-      };
+      if (!selfId)
+        return void 0;
+      const e = engine();
+      if (!e)
+        return void 0;
+      e.start();
+      return () => e.stop();
     }, [selfId]);
     const sendFile = React.useCallback(async (peerId, file, onProgress) => {
-      if (!peerId || !file || !window.RTCPeerConnection || !window.dkRtcSignalBus) {
+      const e = engine();
+      if (!peerId || !file || !e)
         return { ok: false, fallback: true, error: "WebRTC unavailable" };
-      }
-      const bus = dkRtcSignalBus();
-      const fileId = dkFileRtcId();
-      const pc = new RTCPeerConnection({ iceServers: await dkFileIceServers() });
-      const dc = pc.createDataChannel("agentnet-file", { ordered: true });
-      const sess = { pc, dc, peerId, chunks: [], meta: null, pendingCandidates: [] };
-      peersRef.current.set(fileId, sess);
-      const cleanup = () => {
-        try {
-          dc.close();
-        } catch (e) {
-        }
-        try {
-          pc.close();
-        } catch (e) {
-        }
-        peersRef.current.delete(fileId);
-      };
-      const sendSignal = (type, extra) => bus.send(peerId, dkFileRtcEnvelope(fileId, type, extra));
-      try {
-        pc.oniceconnectionstatechange = () => console.warn("[file-rtc] sender ice=" + pc.iceConnectionState + " conn=" + pc.connectionState);
-        pc.onconnectionstatechange = () => console.warn("[file-rtc] sender conn=" + pc.connectionState + " ice=" + pc.iceConnectionState);
-        pc.onicecandidate = (ev) => {
-          if (ev.candidate)
-            sendSignal("candidate", { candidate: ev.candidate.toJSON() }).catch(() => {
-            });
-        };
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await sendSignal("offer", {
-          sdp: offer.sdp,
-          meta: { name: file.name, size: file.size, mime: file.type || "application/octet-stream" }
-        });
-        await dkWaitForOpen(dc, DK_FILE_RTC_OPEN_TIMEOUT_MS, () => dkRtcState(pc));
-        dc.send(JSON.stringify({ type: "meta", name: file.name, size: file.size, mime: file.type || "application/octet-stream" }));
-        let sent = 0;
-        const startedAt = Date.now();
-        let lastProgressAt = 0;
-        const highWater = 4 * 1024 * 1024;
-        const reportProgress = (force) => {
-          if (!onProgress)
-            return;
-          const now = Date.now();
-          if (!force && now - lastProgressAt < 250 && sent < file.size)
-            return;
-          lastProgressAt = now;
-          const elapsedMs = Math.max(1, now - startedAt);
-          const kbps = sent / 1024 / (elapsedMs / 1e3);
-          onProgress({
-            sent,
-            size: file.size,
-            pct: file.size ? sent / file.size * 100 : 100,
-            kbps,
-            elapsedMs,
-            via: "webrtc"
-          });
-        };
-        reportProgress(true);
-        while (sent < file.size) {
-          if (dc.readyState !== "open")
-            throw new Error("WebRTC data channel closed");
-          const end = Math.min(file.size, sent + DK_FILE_RTC_CHUNK);
-          const buf = await file.slice(sent, end).arrayBuffer();
-          dc.send(buf);
-          sent = end;
-          reportProgress(false);
-          await dkWaitBufferedLow(dc, highWater);
-        }
-        reportProgress(true);
-        dc.send(JSON.stringify({ type: "done" }));
-        await sendSignal("bye", { reason: "done" }).catch(() => {
-        });
-        setTimeout(cleanup, 1500);
-        return { ok: true, via: "webrtc", fileId };
-      } catch (e) {
-        await sendSignal("bye", { reason: "fallback" }).catch(() => {
-        });
-        cleanup();
-        return { ok: false, fallback: true, error: e && e.message || String(e) };
-      }
+      return e.sendFile(peerId, file, onProgress);
     }, []);
     const dismissIncoming = React.useCallback((id) => {
       setIncoming((arr) => {
@@ -7193,193 +8054,6 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, overflow: "auto", background: "var(--bg)" } }, /* @__PURE__ */ React.createElement("div", { className: "dk-page", style: { maxWidth: 1040, margin: "0 auto", padding: "24px 28px 60px", display: "flex", flexDirection: "column", gap: 26 } }, /* @__PURE__ */ React.createElement(MyNode, { T, me, activeExit, peers, reqCount }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.peerRouting, count: peers.length }), /* @__PURE__ */ React.createElement(PeerTable, { T, peers, onOpenChat }), !peers.length && /* @__PURE__ */ React.createElement("div", { style: { padding: "14px 16px", borderRadius: 11, border: "1px dashed var(--line)", fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.noPeersYet || "No friends yet \u2014 add one from Chat and it shows up here with its route.")), lanless ? null : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 12 } }, /* @__PURE__ */ React.createElement(Section, { label: T.exitNodes, trailing: /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6 } }, ctl.refresh && onRefreshExits && /* @__PURE__ */ React.createElement(ReconnectBtn, { T, ip: null, onReconnect: () => onRefreshExits(), label: T.exitRefresh || "Refresh" }), ctl.reconnectAll && onReconnectExit && /* @__PURE__ */ React.createElement(ReconnectBtn, { T, ip: null, onReconnect: onReconnectExit, label: T.exitReconnectAll || "Reconnect all" }), /* @__PURE__ */ React.createElement(Btn, { icon: "plus", size: "sm" }, T.addExit)) }), ctl.noExitNotice && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, padding: "11px 14px", borderRadius: 10, background: "var(--panel-2)", border: "1px dashed var(--line)" } }, /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, fontWeight: 700, color: "var(--text)" } }, T.noExitAvailable || "No exit available \u2014 routing and proxy are off."), anyFailed && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 12, color: "var(--dim)" } }, T.noExitHint || "Every exit failed 3 times and is no longer checked automatically. Press Reconnect to try one again.")), ctl.fallbackNotice && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, background: "color-mix(in oklab, var(--warn), transparent 90%)", border: "1px solid color-mix(in oklab, var(--warn), transparent 70%)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 17, color: "var(--warn)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, T.routeFellBack || "Routing fell back to direct: every exit it used failed. Reconnect one to route through it again.")), activeExit && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: 10, background: "color-mix(in oklab, var(--warn), transparent 90%)", border: "1px solid color-mix(in oklab, var(--warn), transparent 70%)" } }, /* @__PURE__ */ React.createElement(Icon, { name: "route", size: 17, color: "var(--warn)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--text)" } }, T.egressVia), /* @__PURE__ */ React.createElement(Mono, { size: 13, copy: activeExit }, activeExit), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ React.createElement(Btn, { tone: "danger", icon: "unlink", size: "sm", onClick: () => onSetExit(null) }, T.stopRouting)), /* @__PURE__ */ React.createElement("div", { className: "dk-grid1", style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, exits.map((r) => /* @__PURE__ */ React.createElement(ExitCard, { key: r.region, T, region: r, activeExit, onSetExit, onReconnect: ctl.reconnect ? onReconnectExit : null, featureOn }))))));
   }
   Object.assign(window, { NetworkTab });
-  var dkAudioCtx = null;
-  function dkAudio() {
-    if (dkAudioCtx && dkAudioCtx.state !== "closed")
-      return dkAudioCtx;
-    try {
-      dkAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) {
-      dkAudioCtx = null;
-    }
-    return dkAudioCtx;
-  }
-  function dkUnlockAudioOnGesture() {
-    const unlock = () => {
-      const c = dkAudio();
-      if (c && c.state === "suspended")
-        c.resume().catch(() => {
-        });
-    };
-    window.addEventListener("pointerdown", unlock, { passive: true });
-    window.addEventListener("keydown", unlock, { passive: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-    };
-  }
-  function dkChime(kind) {
-    const c = dkAudio();
-    if (!c)
-      return;
-    if (c.state === "suspended")
-      c.resume().catch(() => {
-      });
-    const notes = kind === "request" ? [[660, 0], [880, 0.14]] : [[880, 0], [1175, 0.11]];
-    const t0 = c.currentTime;
-    for (const [freq, at] of notes) {
-      const o = c.createOscillator(), g = c.createGain();
-      o.type = "sine";
-      o.frequency.value = freq;
-      o.connect(g);
-      g.connect(c.destination);
-      const t = t0 + at;
-      g.gain.setValueAtTime(1e-4, t);
-      g.gain.exponentialRampToValueAtTime(0.18, t + 0.015);
-      g.gain.exponentialRampToValueAtTime(1e-4, t + 0.17);
-      o.start(t);
-      o.stop(t + 0.2);
-    }
-  }
-  var dkFlash = { timer: null, title: "", link: null, href: null, badged: null, on: false, n: 0, label: "" };
-  function dkBadgedIcon(href) {
-    return new Promise((res, rej) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          if (!img.naturalWidth)
-            return rej(new Error("icon has no intrinsic size"));
-          const s = 64, cv = document.createElement("canvas");
-          cv.width = s;
-          cv.height = s;
-          const cx = cv.getContext("2d");
-          cx.drawImage(img, 0, 0, s, s);
-          cx.beginPath();
-          cx.arc(s - 14, 14, 12, 0, Math.PI * 2);
-          cx.fillStyle = "#e5484d";
-          cx.fill();
-          cx.lineWidth = 3;
-          cx.strokeStyle = "#fff";
-          cx.stroke();
-          res(cv.toDataURL("image/png"));
-        } catch (e) {
-          rej(e);
-        }
-      };
-      img.onerror = () => rej(new Error("icon failed to load"));
-      img.src = href;
-    });
-  }
-  function dkFlashTick() {
-    dkFlash.on = !dkFlash.on;
-    document.title = `(${dkFlash.n}) ${dkFlash.on ? dkFlash.label : dkFlash.title}`;
-  }
-  function dkFlashStart(label, count) {
-    dkFlash.n += count || 1;
-    dkFlash.label = label;
-    if (dkFlash.timer)
-      return;
-    dkFlash.title = document.title;
-    dkFlash.link = document.querySelector('link[rel~="icon"]');
-    dkFlash.href = dkFlash.link ? dkFlash.link.href : null;
-    dkFlash.badged = null;
-    dkFlash.on = false;
-    if (dkFlash.href) {
-      dkBadgedIcon(dkFlash.href).then((b) => {
-        dkFlash.badged = b;
-        if (dkFlash.timer && dkFlash.link)
-          dkFlash.link.href = b;
-      }).catch(() => {
-      });
-    }
-    dkFlashTick();
-    dkFlash.timer = setInterval(dkFlashTick, 1e3);
-  }
-  function dkFlashStop() {
-    if (!dkFlash.timer)
-      return;
-    clearInterval(dkFlash.timer);
-    dkFlash.timer = null;
-    dkFlash.n = 0;
-    document.title = dkFlash.title;
-    if (dkFlash.link && dkFlash.href)
-      dkFlash.link.href = dkFlash.href;
-  }
-  function dkLooking() {
-    return document.visibilityState === "visible" && document.hasFocus();
-  }
-  function useIncomingAlerts({ T, peers, requests, loaded, activeId, sound = true, flash = true, muted, isProtocol }) {
-    const prev = React.useRef(null);
-    const mutedRef = React.useRef(/* @__PURE__ */ new Set());
-    mutedRef.current = new Set(muted || []);
-    React.useEffect(() => dkUnlockAudioOnGesture(), []);
-    React.useEffect(() => {
-      if (!flash)
-        dkFlashStop();
-    }, [flash]);
-    React.useEffect(() => {
-      const seen = () => {
-        if (dkLooking())
-          dkFlashStop();
-      };
-      window.addEventListener("focus", seen);
-      window.addEventListener("pointerdown", seen, { passive: true });
-      document.addEventListener("visibilitychange", seen);
-      return () => {
-        window.removeEventListener("focus", seen);
-        window.removeEventListener("pointerdown", seen);
-        document.removeEventListener("visibilitychange", seen);
-        dkFlashStop();
-      };
-    }, []);
-    React.useEffect(() => {
-      if (!loaded)
-        return;
-      const byId = /* @__PURE__ */ new Map();
-      for (const p of peers || []) {
-        if (p && p.app)
-          continue;
-        const dir = p.lastDir || (String(p.lastMsg || "").startsWith("you: ") ? "out" : "in");
-        const quiet = typeof isProtocol === "function" && lastIsProtocol(p, isProtocol);
-        byId.set(p.id, { ts: p.lastTs || 0, dir, quiet });
-      }
-      const reqIds = new Set((requests || []).map((r) => r.id));
-      const was = prev.current;
-      prev.current = { byId, reqIds };
-      if (!was)
-        return;
-      let msgs = 0, elsewhere = 0, reqs = 0, loud = 0, loudElsewhere = 0;
-      for (const [id, cur] of byId) {
-        if (cur.dir !== "in" || !cur.ts)
-          continue;
-        if (cur.quiet)
-          continue;
-        const old = was.byId.get(id);
-        if (old ? cur.ts <= old.ts : Date.now() - cur.ts > 3e4)
-          continue;
-        msgs += 1;
-        if (id !== activeId)
-          elsewhere += 1;
-        if (!mutedRef.current.has(id)) {
-          loud += 1;
-          if (id !== activeId)
-            loudElsewhere += 1;
-        }
-      }
-      for (const id of reqIds)
-        if (!was.reqIds.has(id))
-          reqs += 1;
-      if (!msgs && !reqs)
-        return;
-      const looking = dkLooking();
-      if (sound && (reqs || loud) && !(looking && !reqs && !loudElsewhere))
-        dkChime(reqs && !loud ? "request" : "message");
-      if (flash && !looking) {
-        const label = msgs ? T && T.alertMsg || "New message" : T && T.alertReq || "New friend request";
-        dkFlashStart(label, msgs + reqs);
-      }
-    }, [peers, requests, loaded, activeId, T, sound, flash]);
-  }
   var TWEAKS_STORAGE_KEY = "decentlan.tweaks";
   function useTweaks(defaults) {
     const [values, setValues] = React.useState(() => {
@@ -7724,6 +8398,9 @@ ${peer.address}`
       joinGroup: "Join group",
       cardIsFriend: "Already in your chats.",
       cardNoEns: "No beagles.eth name registered.",
+      mentionYou: "[@ you]",
+      mentionNotifyTitle: "{sender} mentioned you in {group}",
+      mentionPickerHint: "Mention someone who has written in this group",
       ensVerified: "Verified: this beagles.eth name is registered to this user.",
       ensVerifiedReplaced: "Registered beagles.eth name for this user. Their device shows {claimed}, which is not registered to them.",
       ensSelfClaimed: "self-claimed",
@@ -7958,6 +8635,9 @@ ${peer.address}`
       joinGroup: "\u52A0\u5165\u7FA4",
       cardIsFriend: "\u5DF2\u5728\u4F60\u7684\u4F1A\u8BDD\u91CC\u3002",
       cardNoEns: "\u5BF9\u65B9\u8FD8\u6CA1\u6709\u6CE8\u518C beagles.eth \u540D\u5B57\u3002",
+      mentionYou: "[\u6709\u4EBA@\u4F60]",
+      mentionNotifyTitle: "{sender} \u5728 {group} \u4E2D@\u4E86\u4F60",
+      mentionPickerHint: "@ \u5728\u8FD9\u4E2A\u7FA4\u91CC\u53D1\u8FC7\u8A00\u7684\u4EBA",
       ensVerified: "\u5DF2\u9A8C\u8BC1:\u8FD9\u4E2A beagles.eth \u540D\u5B57\u6CE8\u518C\u5728\u6B64\u7528\u6237\u540D\u4E0B\u3002",
       ensVerifiedReplaced: "\u6B64\u7528\u6237\u6CE8\u518C\u7684 beagles.eth \u540D\u5B57\u3002\u5BF9\u65B9\u8BBE\u5907\u663E\u793A\u7684\u662F {claimed},\u5B83\u5E76\u6CA1\u6709\u6CE8\u518C\u5728\u5BF9\u65B9\u540D\u4E0B\u3002",
       ensSelfClaimed: "\u81EA\u79F0",
@@ -8292,6 +8972,7 @@ ${peer.address}`
       muted: mutedIds,
       isProtocol
     });
+    useGroupMentions({ T, me, peers, activeId, loaded: data.loaded, sound: t.alertSound !== false, muted: mutedIds });
     const assistant = useAssistant({
       lang: t.lang,
       T,

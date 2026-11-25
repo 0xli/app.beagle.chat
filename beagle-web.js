@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.47-rsp.0","builtAt":"2026-11-24T02:31:53.134Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.53","builtAt":"2026-11-25T18:54:20.045Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -24685,9 +24685,373 @@ ${ts}`);
   init_process_global();
   init_worker_timers();
 
+  // node_modules/@decentnetwork/peer-webrtc/dist/turn.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+
+  // node_modules/@decentnetwork/peer-webrtc/node_modules/@decentnetwork/rendezvous-protocol/src/index.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  var IDENTITY_METHODS2 = Object.freeze([
+    "carrier-x25519",
+    "ethereum-eip191",
+    "solana-ed25519"
+  ]);
+  var PROOF_TYPES2 = Object.freeze([
+    "carrier-x25519-hmac-sha256",
+    "ethereum-eip191",
+    "solana-ed25519"
+  ]);
+  var SIGNAL_TYPES2 = Object.freeze([
+    "call.ringing",
+    "call.accept",
+    "call.reject",
+    "call.cancel",
+    "call.connected",
+    "call.hangup",
+    "webrtc.offer",
+    "webrtc.answer",
+    "webrtc.candidate",
+    "webrtc.ice-restart"
+  ]);
+  var SIGNAL_ENCODINGS2 = Object.freeze(["json", "ciphertext.base64url"]);
+  var SAFE_FIELD2 = /^[^\r\n\0]{1,512}$/;
+  var CARRIER_ID2 = /^[1-9A-HJ-NP-Za-km-z]{32,52}$/;
+  var ETHEREUM_ID2 = /^eip155:([1-9][0-9]*):(0x[0-9a-fA-F]{40})$/;
+  var TURN_NONCE = /^[A-Za-z0-9_-]{16,128}$/;
+  var SOLANA_ID2 = /^solana:([A-Za-z0-9_-]{1,32}):([1-9A-HJ-NP-Za-km-z]{32,50})$/;
+  function safeField2(value2, name) {
+    if (typeof value2 !== "string" || !SAFE_FIELD2.test(value2))
+      throw new TypeError(`${name} is invalid`);
+    return value2;
+  }
+  function validateIdentity2(identity) {
+    if (!identity || typeof identity !== "object" || Array.isArray(identity))
+      throw new TypeError("identity must be an object");
+    const keys = Object.keys(identity).sort();
+    if (keys.length !== 2 || keys[0] !== "id" || keys[1] !== "method")
+      throw new TypeError("identity fields are invalid");
+    if (!IDENTITY_METHODS2.includes(identity.method))
+      throw new TypeError("identity method is unsupported");
+    safeField2(identity.id, "identity id");
+    if (identity.method === "carrier-x25519" && !CARRIER_ID2.test(identity.id))
+      throw new TypeError("Carrier userid is invalid");
+    if (identity.method === "ethereum-eip191" && !ETHEREUM_ID2.test(identity.id))
+      throw new TypeError("Ethereum account id is invalid");
+    if (identity.method === "solana-ed25519" && !SOLANA_ID2.test(identity.id))
+      throw new TypeError("Solana account id is invalid");
+    return { method: identity.method, id: identity.id };
+  }
+  function canonicalIdentity2(identity) {
+    const checked = validateIdentity2(identity);
+    return `${checked.method}:${checked.id}`;
+  }
+  var TURN_AUTH_DOMAIN = "RSP-TURN/1";
+  function turnCredentialSigningText({ nodeUrl, carrierServerKey = "", self: self2, timestamp, nonce }) {
+    if (!Number.isSafeInteger(timestamp) || timestamp < 0)
+      throw new TypeError("timestamp is invalid");
+    if (typeof nonce !== "string" || !TURN_NONCE.test(nonce))
+      throw new TypeError("nonce is invalid");
+    return [
+      TURN_AUTH_DOMAIN,
+      safeField2(nodeUrl, "nodeUrl"),
+      carrierServerKey === "" ? "" : safeField2(carrierServerKey, "carrierServerKey"),
+      canonicalIdentity2(self2),
+      String(timestamp),
+      nonce
+    ].join("\n");
+  }
+
+  // node_modules/@decentnetwork/peer-webrtc/dist/turn.js
+  var DEFAULT_MIN_VALIDITY_MS = 10 * 6e4;
+  var DEFAULT_TIMEOUT_MS = 8e3;
+  var DEFAULT_RETRY_AFTER_FAILURE_MS = 6e4;
+  var ROUTE = "/v1/turn-credentials";
+  var TurnFetchError = class extends Error {
+    constructor(reason, status, code, serverTime, retryAfterMs) {
+      super(reason);
+      __publicField(this, "reason");
+      __publicField(this, "status");
+      __publicField(this, "code");
+      __publicField(this, "serverTime");
+      __publicField(this, "retryAfterMs");
+      this.reason = reason;
+      this.status = status;
+      this.code = code;
+      this.serverTime = serverTime;
+      this.retryAfterMs = retryAfterMs;
+    }
+  };
+  var _opts4, _base, _minValidityMs, _cached, _inflight2, _clockOffsetMs, _quietUntil, _mint, mint_fn, _discover, discover_fn, _post, post_fn, _fetch3, fetch_fn, _now2, now_fn, _log3, log_fn3;
+  var RspTurnCredentials = class {
+    constructor(opts) {
+      __privateAdd(this, _mint);
+      __privateAdd(this, _discover);
+      __privateAdd(this, _post);
+      __privateAdd(this, _fetch3);
+      __privateAdd(this, _now2);
+      __privateAdd(this, _log3);
+      __privateAdd(this, _opts4, void 0);
+      __privateAdd(this, _base, void 0);
+      __privateAdd(this, _minValidityMs, void 0);
+      __privateAdd(this, _cached, void 0);
+      __privateAdd(this, _inflight2, void 0);
+      /** Our clock minus the node's, learned from a 401 invalid_timestamp. */
+      __privateAdd(this, _clockOffsetMs, 0);
+      /** No new fetch before this time (after a failure). */
+      __privateAdd(this, _quietUntil, 0);
+      if (!opts?.nodeUrl)
+        throw new TypeError("nodeUrl is required");
+      if (!opts.signer || typeof opts.signer.descriptor !== "function" || typeof opts.signer.signChallenge !== "function") {
+        throw new TypeError("signer must implement descriptor() and signChallenge()");
+      }
+      __privateSet(this, _opts4, opts);
+      __privateSet(this, _base, opts.nodeUrl.replace(/\/+$/, ""));
+      __privateSet(this, _minValidityMs, opts.minValidityMs ?? DEFAULT_MIN_VALIDITY_MS);
+    }
+    currentIceServers() {
+      const c = __privateGet(this, _cached);
+      if (c && c.expiresAt - __privateMethod(this, _now2, now_fn).call(this) >= __privateGet(this, _minValidityMs))
+        return [toIceServer(c)];
+      return [...__privateGet(this, _opts4).fallback ?? []];
+    }
+    async iceServers() {
+      const c = __privateGet(this, _cached);
+      if (c && c.expiresAt - __privateMethod(this, _now2, now_fn).call(this) >= __privateGet(this, _minValidityMs))
+        return [toIceServer(c)];
+      if (__privateMethod(this, _now2, now_fn).call(this) < __privateGet(this, _quietUntil))
+        return [...__privateGet(this, _opts4).fallback ?? []];
+      __privateGet(this, _inflight2) ?? __privateSet(this, _inflight2, __privateMethod(this, _mint, mint_fn).call(this).then((fresh) => {
+        __privateSet(this, _cached, fresh);
+        return fresh;
+      }, (err) => {
+        const reason = err instanceof TurnFetchError ? err.reason : `error: ${err?.name ?? "Error"}`;
+        const backoff = Math.max(__privateGet(this, _opts4).retryAfterFailureMs ?? DEFAULT_RETRY_AFTER_FAILURE_MS, err instanceof TurnFetchError ? err.retryAfterMs ?? 0 : 0);
+        __privateSet(this, _quietUntil, __privateMethod(this, _now2, now_fn).call(this) + backoff);
+        const fallback = __privateGet(this, _opts4).fallback ?? [];
+        __privateMethod(this, _log3, log_fn3).call(this, `TURN credentials from ${__privateGet(this, _base)} unavailable (${reason}); ${fallback.length ? "using the static TURN entry" : "no fallback configured"}, next try in ${Math.round(backoff / 1e3)} s`);
+        throw err;
+      }).finally(() => {
+        __privateSet(this, _inflight2, void 0);
+      }));
+      try {
+        return [toIceServer(await __privateGet(this, _inflight2))];
+      } catch {
+        return [...__privateGet(this, _opts4).fallback ?? []];
+      }
+    }
+    /** Forget the cached credential (e.g. after the user switched identity). */
+    clear() {
+      __privateSet(this, _cached, void 0);
+      __privateSet(this, _quietUntil, 0);
+    }
+  };
+  _opts4 = new WeakMap();
+  _base = new WeakMap();
+  _minValidityMs = new WeakMap();
+  _cached = new WeakMap();
+  _inflight2 = new WeakMap();
+  _clockOffsetMs = new WeakMap();
+  _quietUntil = new WeakMap();
+  _mint = new WeakSet();
+  mint_fn = async function() {
+    let staleRetried = false;
+    let clockRetried = false;
+    for (; ; ) {
+      const discovery = await __privateMethod(this, _discover, discover_fn).call(this);
+      try {
+        return await __privateMethod(this, _post, post_fn).call(this, discovery);
+      } catch (err) {
+        if (!(err instanceof TurnFetchError))
+          throw err;
+        if (err.code === "stale_server_key" && !staleRetried) {
+          staleRetried = true;
+          continue;
+        }
+        if (err.code === "invalid_timestamp" && !clockRetried && err.serverTime !== void 0) {
+          clockRetried = true;
+          __privateSet(this, _clockOffsetMs, __privateMethod(this, _now2, now_fn).call(this) - err.serverTime);
+          __privateMethod(this, _log3, log_fn3).call(this, `TURN credentials: local clock off by ${Math.round(__privateGet(this, _clockOffsetMs) / 1e3)} s; retrying with the node's time`);
+          continue;
+        }
+        throw err;
+      }
+    }
+  };
+  _discover = new WeakSet();
+  discover_fn = async function() {
+    const res = await __privateMethod(this, _fetch3, fetch_fn).call(this, `${__privateGet(this, _base)}${ROUTE}`, { method: "GET", headers: { accept: "application/json" } });
+    const body2 = await readJson(res);
+    if (!res.ok)
+      throw httpError("GET", res, body2);
+    const nodeUrl = body2?.nodeUrl;
+    const carrierServerKey = body2?.carrierServerKey;
+    if (typeof nodeUrl !== "string" || !nodeUrl || typeof carrierServerKey !== "string") {
+      throw new TurnFetchError("GET: discovery reply is malformed", res.status);
+    }
+    return { nodeUrl, carrierServerKey };
+  };
+  _post = new WeakSet();
+  post_fn = async function(discovery) {
+    const self2 = await __privateGet(this, _opts4).signer.descriptor();
+    const carrierServerKey = self2.method === "carrier-x25519" ? discovery.carrierServerKey : "";
+    const timestamp = __privateMethod(this, _now2, now_fn).call(this) - __privateGet(this, _clockOffsetMs);
+    const nonce = __privateGet(this, _opts4).nonce?.() ?? randomNonce();
+    const message = turnCredentialSigningText({ nodeUrl: discovery.nodeUrl, carrierServerKey, self: self2, timestamp, nonce });
+    const signed = await __privateGet(this, _opts4).signer.signChallenge({
+      message,
+      bytes: new TextEncoder().encode(message),
+      hello: { carrierServerKey: discovery.carrierServerKey, nodeUrl: discovery.nodeUrl },
+      request: { route: ROUTE }
+    });
+    if (!signed || typeof signed.type !== "string")
+      throw new TurnFetchError("signer returned no proof");
+    const proof = { type: signed.type, value: proofValue2(signed.value) };
+    const body2 = { self: self2, timestamp, nonce, proof };
+    if (carrierServerKey)
+      body2.carrierServerKey = carrierServerKey;
+    const res = await __privateMethod(this, _fetch3, fetch_fn).call(this, `${__privateGet(this, _base)}${ROUTE}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(body2)
+    });
+    const reply = await readJson(res);
+    if (!res.ok)
+      throw httpError("POST", res, reply);
+    const { urls, username, credential, expiresAt } = reply ?? {};
+    if (!Array.isArray(urls) || urls.length === 0 || !urls.every((u) => typeof u === "string") || typeof username !== "string" || typeof credential !== "string" || !Number.isSafeInteger(expiresAt)) {
+      throw new TurnFetchError("POST: credential reply is malformed", res.status);
+    }
+    return { urls: [...urls], username, credential, expiresAt };
+  };
+  _fetch3 = new WeakSet();
+  fetch_fn = async function(url2, init) {
+    const f = __privateGet(this, _opts4).fetch ?? globalThis.fetch;
+    if (typeof f !== "function")
+      throw new TurnFetchError("no fetch available");
+    const controller = typeof AbortController === "function" ? new AbortController() : void 0;
+    const timer = controller ? setTimeout(() => controller.abort(), __privateGet(this, _opts4).timeoutMs ?? DEFAULT_TIMEOUT_MS) : void 0;
+    try {
+      return await f(url2, { ...init, signal: controller?.signal, cache: "no-store" });
+    } catch (err) {
+      const aborted = err?.name === "AbortError";
+      throw new TurnFetchError(`${init.method}: ${aborted ? "timed out" : `network error (${err?.name ?? "Error"})`}`);
+    } finally {
+      if (timer)
+        clearTimeout(timer);
+    }
+  };
+  _now2 = new WeakSet();
+  now_fn = function() {
+    return __privateGet(this, _opts4).now?.() ?? Date.now();
+  };
+  _log3 = new WeakSet();
+  log_fn3 = function(message) {
+    try {
+      __privateGet(this, _opts4).log?.(message);
+    } catch {
+    }
+  };
+  function toIceServer(c) {
+    return { urls: [...c.urls], username: c.username, credential: c.credential };
+  }
+  async function readJson(res) {
+    try {
+      return await res.json();
+    } catch {
+      return void 0;
+    }
+  }
+  function httpError(method, res, body2) {
+    const code = typeof body2?.error?.code === "string" ? body2.error.code : void 0;
+    const header = Number(res.headers?.get?.("x-server-time"));
+    const retryAfter = Number(res.headers?.get?.("retry-after"));
+    return new TurnFetchError(`${method}: HTTP ${res.status}${code ? ` ${code}` : ""}`, res.status, code, Number.isSafeInteger(header) && header > 0 ? header : void 0, Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 3600) * 1e3 : void 0);
+  }
+  function proofValue2(value2) {
+    if (typeof value2 === "string")
+      return value2;
+    if (value2 instanceof Uint8Array)
+      return base64url3(value2);
+    throw new TurnFetchError("signer proof must be a string or Uint8Array");
+  }
+  function randomNonce() {
+    const bytes = new Uint8Array(24);
+    globalThis.crypto.getRandomValues(bytes);
+    return base64url3(bytes);
+  }
+  function base64url3(bytes) {
+    let s = "";
+    for (const b of bytes)
+      s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+
   // src/rsp-browser.js
   init_doorbell();
   init_base58();
+
+  // src/ice.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  var RSP_TURN_NODE_URL = "https://rsp.beagle.chat";
+  function isTurnServer(server) {
+    const urls = [].concat(server?.urls ?? server?.url ?? []);
+    return urls.some((u) => /^turns?:/i.test(String(u)));
+  }
+  function splitIceServers(list) {
+    const stun = [], turn = [];
+    for (const s of list ?? [])
+      (isTurnServer(s) ? turn : stun).push(s);
+    return { stun, turn };
+  }
+  var _iceCache = null;
+  async function loadIceServers() {
+    if (_iceCache)
+      return _iceCache;
+    try {
+      const cfg = await fetchJsonWithTimeout("https://beagle.chat/assets/bgservers.json");
+      _iceCache = (cfg.iceServers ?? []).map((s) => ({
+        urls: s.urls || s.url,
+        ...s.username ? { username: s.username } : {},
+        ...s.credential ? { credential: s.credential } : {}
+      })).filter((s) => s.urls);
+    } catch {
+      _iceCache = [{ urls: "stun:stun.l.google.com:19302" }];
+    }
+    return _iceCache;
+  }
+  var sameServer = (a, b) => JSON.stringify([a?.urls ?? a?.url, a?.username ?? "", a?.credential ?? ""]) === JSON.stringify([b?.urls ?? b?.url, b?.username ?? "", b?.credential ?? ""]);
+  async function callTurnServers(turnSource = globalThis.__beagleTurnServers) {
+    const { turn: fallback } = splitIceServers(await loadIceServers());
+    if (!turnSource)
+      return { source: "fallback", iceServers: fallback };
+    let list;
+    try {
+      list = await turnSource.iceServers();
+    } catch {
+      list = [];
+    }
+    const minted = list.filter((s) => !fallback.some((f) => sameServer(f, s)));
+    return minted.length ? { source: "rsp", iceServers: minted } : { source: "fallback", iceServers: fallback };
+  }
+  async function callIceServers(turnSource = globalThis.__beagleTurnServers) {
+    const { stun, turn } = splitIceServers(await loadIceServers());
+    let minted = turn;
+    if (turnSource) {
+      try {
+        minted = await turnSource.iceServers();
+      } catch {
+        minted = turn;
+      }
+    }
+    return [...stun, ...minted];
+  }
+
+  // src/rsp-browser.js
   var RSP_NODE_URL = "https://rio.beagle.chat";
   var RSP_PROFILE = JSON.stringify({ rsp: { protocol: PROTOCOL, nodeUrl: RSP_NODE_URL } });
   function isRspCapable(extra) {
@@ -24708,12 +25072,19 @@ ${ts}`);
       if (s?.callId && (s.type === "bye" || s.type === "action" && s.action === "reject"))
         live.delete(s.callId);
     };
+    const signer = carrierSigner({
+      userid,
+      createProof: ({ serverPublicKey, transcript }) => createCarrierRendezvousAuthProofWebCrypto(secretKey, base58ToBytes(serverPublicKey), transcript)
+    });
+    const turnFallback = [];
+    void loadIceServers().then((list) => {
+      turnFallback.push(...splitIceServers(list).turn);
+    }).catch(() => {
+    });
+    const turn = new RspTurnCredentials({ nodeUrl: RSP_TURN_NODE_URL, signer, fallback: turnFallback, log });
     const rsp = new RspCallBridge({
       self: userid,
-      signer: carrierSigner({
-        userid,
-        createProof: ({ serverPublicKey, transcript }) => createCarrierRendezvousAuthProofWebCrypto(secretKey, base58ToBytes(serverPublicKey), transcript)
-      }),
+      signer,
       nodeUrl: RSP_NODE_URL,
       isFriend: (id) => !!friend(id),
       advertisement: (id) => isRspCapable(friend(id)?.extra) ? { rsp: true, nodeUrl: RSP_NODE_URL } : void 0,
@@ -24785,6 +25156,9 @@ ${ts}`);
     return {
       start() {
         rsp.start();
+        globalThis.__beagleTurnServers = turn;
+        void turn.iceServers().catch(() => {
+        });
         try {
           globalThis.addEventListener?.("beforeunload", onPageHide);
           globalThis.addEventListener?.("pagehide", onPageHide);
@@ -24792,6 +25166,9 @@ ${ts}`);
         }
       },
       close() {
+        if (globalThis.__beagleTurnServers === turn)
+          delete globalThis.__beagleTurnServers;
+        turn.clear();
         try {
           globalThis.removeEventListener?.("beforeunload", onPageHide);
           globalThis.removeEventListener?.("pagehide", onPageHide);
@@ -29729,22 +30106,6 @@ ${body2.length}`);
     status,
     headers: { "content-type": "application/json" }
   });
-  var _iceCache = null;
-  async function iceServers() {
-    if (_iceCache)
-      return _iceCache;
-    try {
-      const cfg = await fetchJsonWithTimeout("https://beagle.chat/assets/bgservers.json");
-      _iceCache = (cfg.iceServers ?? []).map((s) => ({
-        urls: s.urls || s.url,
-        ...s.username ? { username: s.username } : {},
-        ...s.credential ? { credential: s.credential } : {}
-      })).filter((s) => s.urls);
-    } catch {
-      _iceCache = [{ urls: "stun:stun.l.google.com:19302" }];
-    }
-    return _iceCache;
-  }
   var _ensCache = null;
   var _ensAt = 0;
   var ENS_TTL_MS = 5 * 6e4;
@@ -29996,6 +30357,13 @@ ${body2.length}`);
       lastTs: lm?.ts ?? 0
     };
   }
+  async function iceBeforePeer(pathname) {
+    if (pathname === "/api/call-ice-servers")
+      return json({ ok: true, iceServers: await callIceServers(null) });
+    if (pathname === "/api/call-turn-servers")
+      return json({ ok: true, ...await callTurnServers(null) });
+    return null;
+  }
   function createEarlyRouter({ getIdentity, profile, persist, createIdentity: createIdentity2, storageOk, host }) {
     return async function route(path, init) {
       const method = (init?.method || "GET").toUpperCase();
@@ -30013,6 +30381,9 @@ ${body2.length}`);
         }
       }
       switch (`${method} ${p}`) {
+        case "GET /api/call-ice-servers":
+        case "GET /api/call-turn-servers":
+          return iceBeforePeer(p);
         case "GET /api/backend":
           return json({ ok: true, kind: "browser", hasVirtualLan: false, state: "starting", switchable: false, releaseSecondsLeft: 0, command: "" });
         case "GET /api/desktop":
@@ -30106,6 +30477,7 @@ ${body2.length}`);
     "/api/call-signal",
     "/api/call-poll",
     "/api/call-ice-servers",
+    "/api/call-turn-servers",
     "/api/webrtc-file-save",
     "/api/identity-import",
     "/api/create-identity"
@@ -30509,7 +30881,9 @@ ${body2.length}`);
           }
         }
         case "GET /api/call-ice-servers":
-          return json({ ok: true, iceServers: await iceServers() });
+          return json({ ok: true, iceServers: await callIceServers() });
+        case "GET /api/call-turn-servers":
+          return json({ ok: true, ...await callTurnServers() });
         case "GET /api/call-poll": {
           const since = url2.searchParams.get("since");
           const r = await call2("call-poll", { since });
@@ -30565,6 +30939,46 @@ ${body2.length}`);
     };
   }
 
+  // src/turn-pc.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  function withCurrentTurn(config, source) {
+    if (!source || !config || !Array.isArray(config.iceServers))
+      return config;
+    const { stun, turn } = splitIceServers(config.iceServers);
+    if (!turn.length)
+      return config;
+    let now = [];
+    try {
+      now = source.currentIceServers() || [];
+    } catch {
+      now = [];
+    }
+    try {
+      Promise.resolve(source.iceServers()).catch(() => {
+      });
+    } catch {
+    }
+    return { ...config, iceServers: [...stun, ...now.length ? now : turn] };
+  }
+  function installTurnRefresh(win = globalThis, sourceOf = () => win.__beagleTurnServers) {
+    const Native = win.RTCPeerConnection;
+    if (typeof Native !== "function" || Native.beagleTurnRefresh)
+      return false;
+    class RTCPeerConnection extends Native {
+      constructor(config, ...rest) {
+        super(withCurrentTurn(config, sourceOf()), ...rest);
+      }
+      setConfiguration(config) {
+        return super.setConfiguration(withCurrentTurn(config, sourceOf()));
+      }
+    }
+    Object.defineProperty(RTCPeerConnection, "beagleTurnRefresh", { value: true });
+    win.RTCPeerConnection = RTCPeerConnection;
+    return true;
+  }
+
   // src/web-entry.js
   var IDENTITY_KEY = "identity";
   var PROFILE_KEY2 = "profile";
@@ -30579,6 +30993,7 @@ ${body2.length}`);
   });
   var relayHosts = /* @__PURE__ */ new Set();
   installFetchPatch(ready, relayHosts);
+  installTurnRefresh();
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("sw register failed", err));
   }
@@ -30674,6 +31089,9 @@ ${body2.length}`);
         const r = this.routers.full || this.routers.early;
         if (r)
           return r(path, init);
+        const pathname = new URL(path, location.origin).pathname;
+        if (pathname === "/api/call-ice-servers" || pathname === "/api/call-turn-servers")
+          return iceBeforePeer(pathname);
         const locked = this.lockState && this.lockState.held === false;
         return new Response(
           JSON.stringify(locked ? { ok: false, locked: true, error: "another tab owns this identity" } : { ok: false, starting: true, error: "still starting" }),
