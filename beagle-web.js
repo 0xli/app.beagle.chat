@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"peer":"0.1.174","ui":"0.2.53","builtAt":"2026-11-25T18:54:20.045Z"};
+globalThis.__BEAGLE_BUILD__={"peer":"0.1.185","ui":"0.2.53","builtAt":"2026-11-25T23:48:52.054Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -5428,26 +5428,54 @@ onmessage = (e) => {
   });
 
   // node_modules/@decentnetwork/peer/dist/compat/inline-file.js
-  function decodeAndroidFileEnvelope(bytes) {
-    if (bytes.length < 6 || bytes[0] !== 0 || bytes[1] !== 0)
+  function sha256Hex(bytes) {
+    return createHash("sha256").update(bytes).digest("hex");
+  }
+  function unpackOfflineFile(bytes) {
+    if (bytes.length < 5)
       return void 0;
-    const metaLen = (bytes[2] << 8 | bytes[3]) >>> 0;
-    if (metaLen < 2 || metaLen > MAX_META_LEN || 4 + metaLen > bytes.length)
+    const metaLen = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, false);
+    if (metaLen < 1 || metaLen > OFFLINE_FILE_MAX_META_BYTES || 4 + metaLen > bytes.length)
       return void 0;
+    let meta;
     try {
       const json2 = new TextDecoder("utf-8", { fatal: true }).decode(bytes.subarray(4, 4 + metaLen));
-      const meta = JSON.parse(json2);
-      if (meta.type !== "file" || typeof meta.filename !== "string" || meta.filename.length === 0)
+      const parsed = JSON.parse(json2);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
         return void 0;
-      return {
-        name: meta.filename,
-        contentType: typeof meta.contentType === "string" ? meta.contentType : "application/octet-stream",
-        data: bytes.slice(4 + metaLen),
-        declaredSize: typeof meta.size === "number" ? meta.size : void 0
-      };
+      meta = parsed;
     } catch {
       return void 0;
     }
+    if (meta.type !== "file" || typeof meta.filename !== "string" || meta.filename.length === 0)
+      return void 0;
+    const start = 4 + metaLen;
+    let end = bytes.length;
+    let declaredSize;
+    if (meta.size !== void 0 && meta.size !== null) {
+      if (typeof meta.size !== "number" || !Number.isSafeInteger(meta.size) || meta.size < 0)
+        return void 0;
+      declaredSize = meta.size;
+      if (start + declaredSize > bytes.length) {
+        return { kind: "truncated", name: meta.filename, declaredSize, available: bytes.length - start };
+      }
+      end = start + declaredSize;
+    }
+    return {
+      kind: "file",
+      name: meta.filename,
+      contentType: typeof meta.contentType === "string" && meta.contentType ? meta.contentType : "application/octet-stream",
+      data: bytes.slice(start, end),
+      ...declaredSize !== void 0 ? { declaredSize } : {}
+    };
+  }
+  function encodeAndroidFileEnvelope(name, data, contentType = "application/octet-stream") {
+    const meta = new TextEncoder().encode(JSON.stringify({ type: "file", filename: name, contentType, size: data.length }));
+    const out = new Uint8Array(4 + meta.length + data.length);
+    new DataView(out.buffer).setUint32(0, meta.length, false);
+    out.set(meta, 4);
+    out.set(data, 4 + meta.length);
+    return out;
   }
   function inlineFileTypeFor(name, contentType) {
     const mime = (contentType ?? "").toLowerCase();
@@ -5467,13 +5495,43 @@ onmessage = (e) => {
       return "text";
     return "unknown";
   }
-  var MAX_META_LEN;
+  function contentTypeForFileName(name) {
+    const dot = name.lastIndexOf(".");
+    const ext = dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
+    const map = {
+      m4a: "audio/mp4",
+      mp3: "audio/mpeg",
+      aac: "audio/aac",
+      wav: "audio/wav",
+      ogg: "audio/ogg",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      heic: "image/heic",
+      heif: "image/heif",
+      bmp: "image/bmp",
+      mp4: "video/mp4",
+      mov: "video/quicktime",
+      txt: "text/plain",
+      md: "text/markdown",
+      log: "text/plain",
+      pdf: "application/pdf",
+      json: "application/json",
+      zip: "application/zip"
+    };
+    return map[ext] ?? "application/octet-stream";
+  }
+  var OFFLINE_FILE_MAX_MESSAGE_BYTES, OFFLINE_FILE_MAX_META_BYTES;
   var init_inline_file = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/inline-file.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
-      MAX_META_LEN = 4096;
+      init_node_crypto();
+      OFFLINE_FILE_MAX_MESSAGE_BYTES = 5242880;
+      OFFLINE_FILE_MAX_META_BYTES = 4096;
     }
   });
 
@@ -6431,79 +6489,79 @@ onmessage = (e) => {
     const packet = { bb, bb_pos: root };
     const type2 = readUint8Field(packet, 0);
     const bodyType = readUint8Field(packet, 1);
-    const body2 = readTableField(packet, 2);
-    if (!body2) {
+    const body = readTableField(packet, 2);
+    if (!body) {
       throw new Error("carrier packet body is missing");
     }
     if (type2 === PACKET_TYPE_USERINFO && bodyType === ANYBODY_USERINFO) {
       return {
         type: type2,
-        avatar: readBoolField(body2, 0),
-        name: readStringField(body2, 1) ?? "",
-        descr: readStringField(body2, 2) ?? "",
-        phone: readStringField(body2, 3) ?? "",
-        gender: readStringField(body2, 4) ?? "",
-        email: readStringField(body2, 5) ?? "",
-        region: readStringField(body2, 6) ?? "",
+        avatar: readBoolField(body, 0),
+        name: readStringField(body, 1) ?? "",
+        descr: readStringField(body, 2) ?? "",
+        phone: readStringField(body, 3) ?? "",
+        gender: readStringField(body, 4) ?? "",
+        email: readStringField(body, 5) ?? "",
+        region: readStringField(body, 6) ?? "",
         // Appended AgentNet fields — absent (default) from legacy peers.
-        protoVersion: readUint32Field(body2, 7),
-        platform: readStringField(body2, 8) ?? "",
-        osVersion: readStringField(body2, 9) ?? "",
-        appVersion: readStringField(body2, 10) ?? "",
+        protoVersion: readUint32Field(body, 7),
+        platform: readStringField(body, 8) ?? "",
+        osVersion: readStringField(body, 9) ?? "",
+        appVersion: readStringField(body, 10) ?? "",
         // Profile extension (fields 11-14) — absent from peers before proto v2.
-        avatarUrl: readStringField(body2, 11) ?? "",
-        url: readStringField(body2, 12) ?? "",
-        ens: readStringField(body2, 13) ?? "",
-        extra: readStringField(body2, 14) ?? ""
+        avatarUrl: readStringField(body, 11) ?? "",
+        url: readStringField(body, 12) ?? "",
+        ens: readStringField(body, 13) ?? "",
+        extra: readStringField(body, 14) ?? ""
       };
     }
     if (type2 === PACKET_TYPE_FRIEND_REQUEST && bodyType === ANYBODY_FRIENDREQ) {
       return {
         type: type2,
-        name: readStringField(body2, 0) ?? "",
-        descr: readStringField(body2, 1) ?? "",
-        hello: readStringField(body2, 2) ?? "",
+        name: readStringField(body, 0) ?? "",
+        descr: readStringField(body, 1) ?? "",
+        hello: readStringField(body, 2) ?? "",
         // Appended fields 3-4 — absent from old 3-field senders.
-        gender: readStringField(body2, 3) ?? "",
-        avatarUrl: readStringField(body2, 4) ?? ""
+        gender: readStringField(body, 3) ?? "",
+        avatarUrl: readStringField(body, 4) ?? ""
       };
     }
     if (type2 === PACKET_TYPE_MESSAGE && bodyType === ANYBODY_FRIENDMSG) {
       return {
         type: type2,
-        ext: readStringField(body2, 0) ?? void 0,
-        data: readByteVectorField(body2, 1) ?? new Uint8Array()
+        ext: readStringField(body, 0) ?? void 0,
+        data: readByteVectorField(body, 1) ?? new Uint8Array()
       };
     }
     if (type2 === PACKET_TYPE_BULKMSG && bodyType === ANYBODY_BULKMSG) {
       return {
         type: type2,
-        ext: readStringField(body2, 0) ?? void 0,
-        totalsz: readUint32Field(body2, 1),
-        tid: readInt64Field(body2, 2),
-        data: readByteVectorField(body2, 3) ?? new Uint8Array()
+        ext: readStringField(body, 0) ?? void 0,
+        totalsz: readUint32Field(body, 1),
+        tid: readInt64Field(body, 2),
+        data: readByteVectorField(body, 3) ?? new Uint8Array()
       };
     }
     if (type2 === PACKET_TYPE_INVITE_REQUEST && bodyType === ANYBODY_INVITEREQ) {
       return {
         type: type2,
-        ext: readStringField(body2, 0) ?? void 0,
-        tid: readInt64Field(body2, 1),
-        bundle: readStringField(body2, 2) ?? void 0,
-        totalsz: readUint32Field(body2, 3),
-        data: readByteVectorField(body2, 4) ?? new Uint8Array()
+        ext: readStringField(body, 0) ?? void 0,
+        tid: readInt64Field(body, 1),
+        bundle: readStringField(body, 2) ?? void 0,
+        totalsz: readUint32Field(body, 3),
+        data: readByteVectorField(body, 4) ?? new Uint8Array()
       };
     }
     if (type2 === PACKET_TYPE_INVITE_RESPONSE && bodyType === ANYBODY_INVITERSP) {
       return {
         type: type2,
-        ext: readStringField(body2, 0) ?? void 0,
-        tid: readInt64Field(body2, 1),
-        bundle: readStringField(body2, 2) ?? void 0,
-        totalsz: readUint32Field(body2, 3),
-        status: readInt32Field(body2, 4),
-        reason: readStringField(body2, 5) ?? void 0,
-        data: readByteVectorField(body2, 6) ?? new Uint8Array()
+        ext: readStringField(body, 0) ?? void 0,
+        tid: readInt64Field(body, 1),
+        bundle: readStringField(body, 2) ?? void 0,
+        totalsz: readUint32Field(body, 3),
+        status: readInt32Field(body, 4),
+        reason: readStringField(body, 5) ?? void 0,
+        data: readByteVectorField(body, 6) ?? new Uint8Array()
       };
     }
     throw new Error(`unsupported carrier packet type/body: ${type2}/${bodyType}`);
@@ -7296,7 +7354,7 @@ onmessage = (e) => {
       return void 0;
     return { fileNumber: p[0], offset: readU32be(p, 1), data: p.slice(5) };
   }
-  var PACKET_ID_FILE_SENDREQUEST, PACKET_ID_FILE_CONTROL, PACKET_ID_FILE_DATA, PACKET_ID_FILE_FEC, FILE_ID_LENGTH, MAX_FILENAME_LENGTH, MAX_CONCURRENT_FILE_PIPES, MAX_FILE_DATA_SIZE, FEC_K, FEC_M_MIN, FEC_M_MAX, FEC_MARGIN, FEC_SAFETY, FEC_ACTIVE_WINDOW_MS, FILECONTROL, FILEKIND, WINDOW_CHUNKS, CWND_INIT_CHUNKS, CWND_MIN_CHUNKS, PACE_CYCLE_GAINS, PACE_BW_WINDOW, PACE_SAMPLE_MS, PACE_INIT_BPS, LAN_PACE_INIT_BPS, PACE_BURST_MS, LAN_SAMPLE_MAX_GAIN, LAN_STARTUP_MAX_GAIN, LAN_STARTUP_DELIVERY_GAIN, LAN_STARTUP_QUEUE_MS, LAN_STARTUP_HARD_QUEUE_MS, LAN_STARTUP_QUEUE_ROUNDS, LAN_STARTUP_KEEPUP, LAN_RECOVERY_GAIN, LAN_RECOVERY_QUEUE_MS, LAN_STARTUP_SLOW_ROUNDS, LAN_BDP_RTT_FLOOR_MS, LAN_CWND_INIT_CHUNKS, WATCHDOG_MS, WATCHDOG_MAX_MS, STALL_PROBE_THRESHOLD, FAST_RT_MIN_MS, ACK_THROTTLE_MS, REACK_MS, FINAL_ACK_GRACE_MS, SEND_GIVEUP_MS, PERSIST_INTERVAL_BYTES, enc, dec, hex, nowMs, chunkCount, _sending, _receiving, _resumeDir, _partPath, partPath_fn, _map, map_fn, _freeNumber, freeNumber_fn, _onSendRequest, onSendRequest_fn, _onControl, onControl_fn, _onData, onData_fn, _advanceContiguous, advanceContiguous_fn, _finishOrAck, finishOrAck_fn, _onFec, onFec_fn, _tryRecoverBlock, tryRecoverBlock_fn, _persistPartial, persistPartial_fn, _finishRecv, finishRecv_fn, _scheduleAck, scheduleAck_fn, _measureLoss, measureLoss_fn, _sendAck, sendAck_fn, _onAck, onAck_fn, _rewindRetransmit, rewindRetransmit_fn, _sendProbeChunk, sendProbeChunk_fn, _pump, pump_fn, _schedulePace, schedulePace_fn, _emitParity, emitParity_fn, _completeSend, completeSend_fn, _endSend, endSend_fn, _endRecv, endRecv_fn, FileTransferManager;
+  var PACKET_ID_FILE_SENDREQUEST, PACKET_ID_FILE_CONTROL, PACKET_ID_FILE_DATA, PACKET_ID_FILE_FEC, FILE_ID_LENGTH, MAX_FILENAME_LENGTH, MAX_CONCURRENT_FILE_PIPES, MAX_FILE_DATA_SIZE, FEC_K, FEC_M_MIN, FEC_M_MAX, FEC_MARGIN, FEC_SAFETY, FEC_ACTIVE_WINDOW_MS, FILECONTROL, FILEKIND, WINDOW_CHUNKS, CWND_INIT_CHUNKS, CWND_MIN_CHUNKS, PACE_CYCLE_GAINS, PACE_BW_WINDOW, PACE_SAMPLE_MS, PACE_INIT_BPS, LAN_PACE_INIT_BPS, PACE_BURST_MS, LAN_SAMPLE_MAX_GAIN, LAN_STARTUP_MAX_GAIN, LAN_STARTUP_DELIVERY_GAIN, LAN_STARTUP_QUEUE_MS, LAN_STARTUP_HARD_QUEUE_MS, LAN_STARTUP_QUEUE_ROUNDS, LAN_STARTUP_KEEPUP, LAN_RECOVERY_GAIN, LAN_RECOVERY_QUEUE_MS, LAN_STARTUP_SLOW_ROUNDS, LAN_BDP_RTT_FLOOR_MS, LAN_CWND_INIT_CHUNKS, WATCHDOG_MS, WATCHDOG_MAX_MS, STALL_PROBE_THRESHOLD, FAST_RT_MIN_MS, ACK_THROTTLE_MS, REACK_MS, FINAL_ACK_GRACE_MS, SEND_GIVEUP_MS, RECV_GIVEUP_MS, PERSIST_INTERVAL_BYTES, enc, dec, hex, nowMs, chunkCount, _sending, _receiving, _resumeDir, _partPath, partPath_fn, _map, map_fn, _freeNumber, freeNumber_fn, _onSendRequest, onSendRequest_fn, _onControl, onControl_fn, _onData, onData_fn, _advanceContiguous, advanceContiguous_fn, _finishOrAck, finishOrAck_fn, _onFec, onFec_fn, _tryRecoverBlock, tryRecoverBlock_fn, _persistPartial, persistPartial_fn, _finishRecv, finishRecv_fn, _scheduleAck, scheduleAck_fn, _measureLoss, measureLoss_fn, _sendAck, sendAck_fn, _onAck, onAck_fn, _rewindRetransmit, rewindRetransmit_fn, _sendProbeChunk, sendProbeChunk_fn, _pump, pump_fn, _schedulePace, schedulePace_fn, _emitParity, emitParity_fn, _completeSend, completeSend_fn, _endSend, endSend_fn, _endRecv, endRecv_fn, _giveUpRecv, giveUpRecv_fn, FileTransferManager;
   var init_filetransfer = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/filetransfer.js"() {
       init_buffer_global();
@@ -7352,6 +7410,7 @@ onmessage = (e) => {
       REACK_MS = 200;
       FINAL_ACK_GRACE_MS = 1e4;
       SEND_GIVEUP_MS = 6e4;
+      RECV_GIVEUP_MS = 6e4;
       PERSIST_INTERVAL_BYTES = 1024 * 1024;
       enc = new TextEncoder();
       dec = new TextDecoder();
@@ -7424,6 +7483,11 @@ onmessage = (e) => {
           __privateAdd(this, _completeSend);
           __privateAdd(this, _endSend);
           __privateAdd(this, _endRecv);
+          /** End an incoming transfer that stopped: flush the contiguous prefix to
+           *  the resume file (kept, so a re-offer of the same fileId resumes from it),
+           *  tell a sender that may still be there (one best-effort KILL), drop the
+           *  state, and emit one file-cancel {sending:false, reason}. */
+          __privateAdd(this, _giveUpRecv);
           __publicField(this, "send");
           __publicField(this, "emit");
           __publicField(this, "isLanPath");
@@ -7471,6 +7535,7 @@ onmessage = (e) => {
             startMs: nowMs(),
             lastProgressAcked: 0,
             lastAckAdvanceMs: nowMs(),
+            lastProgressMs: nowMs(),
             lastResendMs: 0,
             cwnd: lanPath ? LAN_CWND_INIT_CHUNKS : CWND_INIT_CHUNKS,
             stalls: 0,
@@ -7532,6 +7597,7 @@ onmessage = (e) => {
           if (!st || st.done)
             return;
           void this.send(friendId, PACKET_ID_FILE_CONTROL, encodeFileControl(1, fileNumber, FILECONTROL.ACCEPT)).catch(() => void 0);
+          st.lastDataMs = nowMs();
           __privateMethod(this, _sendAck, sendAck_fn).call(this, friendId, st);
           if (!st.reackTimer) {
             st.reackTimer = setInterval(() => {
@@ -7540,6 +7606,10 @@ onmessage = (e) => {
                 if (st.reackTimer)
                   clearInterval(st.reackTimer);
                 st.reackTimer = void 0;
+                return;
+              }
+              if (nowMs() - (cur.lastDataMs ?? nowMs()) >= RECV_GIVEUP_MS) {
+                __privateMethod(this, _giveUpRecv, giveUpRecv_fn).call(this, friendId, cur, "timeout");
                 return;
               }
               __privateMethod(this, _sendAck, sendAck_fn).call(this, friendId, cur);
@@ -7611,18 +7681,26 @@ onmessage = (e) => {
           }
           return false;
         }
-        clearFriend(friendId) {
-          for (const st of __privateMethod(this, _map, map_fn).call(this, __privateGet(this, _sending), friendId).values()) {
-            if (st.timer)
-              clearInterval(st.timer);
-            if (st.offerTimer)
-              clearInterval(st.offerTimer);
+        /**
+         * End every live transfer with this friend, in both directions — the friend
+         * went offline (its session was torn down), so none of them can progress.
+         * Emits one file-cancel per transfer with `reason` ("peer-offline"):
+         * sends still offering or in flight → {sending:true}; receives in progress
+         * (accepted or still offered) → {sending:false}, their contiguous prefix
+         * flushed to the resume file so a re-offer resumes. Completed receives'
+         * done-markers are dropped silently.
+         */
+        clearFriend(friendId, reason = "peer-offline") {
+          for (const st of [...__privateMethod(this, _map, map_fn).call(this, __privateGet(this, _sending), friendId).values()]) {
+            __privateMethod(this, _endSend, endSend_fn).call(this, friendId, st.fileNumber);
+            this.emit("file-cancel", { friendId, fileId: hex(st.fileId), sending: true, reason });
           }
-          for (const st of __privateMethod(this, _map, map_fn).call(this, __privateGet(this, _receiving), friendId).values()) {
-            if (st.ackTimer)
-              clearTimeout(st.ackTimer);
-            if (st.reackTimer)
-              clearInterval(st.reackTimer);
+          for (const st of [...__privateMethod(this, _map, map_fn).call(this, __privateGet(this, _receiving), friendId).values()]) {
+            if (st.done) {
+              __privateMethod(this, _endRecv, endRecv_fn).call(this, friendId, st.fileNumber);
+              continue;
+            }
+            __privateMethod(this, _giveUpRecv, giveUpRecv_fn).call(this, friendId, st, reason);
           }
           __privateGet(this, _sending).delete(friendId);
           __privateGet(this, _receiving).delete(friendId);
@@ -7724,6 +7802,7 @@ onmessage = (e) => {
           if (c.controlType === FILECONTROL.ACCEPT || c.controlType === FILECONTROL.ACK) {
             if (!st.started) {
               st.started = true;
+              st.lastProgressMs = nowMs();
               if (st.offerTimer) {
                 clearInterval(st.offerTimer);
                 st.offerTimer = void 0;
@@ -7766,6 +7845,7 @@ onmessage = (e) => {
         const idx = Math.floor(offset / MAX_FILE_DATA_SIZE);
         if (offset % MAX_FILE_DATA_SIZE !== 0 || idx >= st.got.length)
           return;
+        st.lastDataMs = nowMs();
         if (offset + data.length > st.maxByte)
           st.maxByte = offset + data.length;
         st.netGot[idx] = 1;
@@ -7809,6 +7889,7 @@ onmessage = (e) => {
           return;
         if (f.parity.length !== MAX_FILE_DATA_SIZE || f.parityIndex >= FEC_M_MAX)
           return;
+        st.lastDataMs = nowMs();
         let arr = st.fecParity.get(f.blockIndex);
         if (!arr) {
           arr = new Array(FEC_M_MAX).fill(void 0);
@@ -7965,11 +8046,11 @@ onmessage = (e) => {
       _sendAck = new WeakSet();
       sendAck_fn = function(friendId, st) {
         st.ackDirty = false;
-        const body2 = new Uint8Array(9);
-        body2.set(u32be(st.contiguous), 0);
-        body2.set(u32be(st.maxByte), 4);
-        body2[8] = __privateMethod(this, _measureLoss, measureLoss_fn).call(this, st);
-        void this.send(friendId, PACKET_ID_FILE_CONTROL, encodeFileControl(1, st.fileNumber, FILECONTROL.ACK, body2)).catch(() => void 0);
+        const body = new Uint8Array(9);
+        body.set(u32be(st.contiguous), 0);
+        body.set(u32be(st.maxByte), 4);
+        body[8] = __privateMethod(this, _measureLoss, measureLoss_fn).call(this, st);
+        void this.send(friendId, PACKET_ID_FILE_CONTROL, encodeFileControl(1, st.fileNumber, FILECONTROL.ACK, body)).catch(() => void 0);
       };
       _onAck = new WeakSet();
       onAck_fn = function(friendId, st, data) {
@@ -7986,6 +8067,7 @@ onmessage = (e) => {
           const resumedPrefix = st.acked === 0 && ackedOffset > st.nextSend;
           st.acked = Math.min(ackedOffset, st.size);
           st.lastAckAdvanceMs = nowT;
+          st.lastProgressMs = nowT;
           st.stalls = 0;
           if (st.deadPathTripped)
             this.onDeadPath(friendId);
@@ -8171,7 +8253,6 @@ onmessage = (e) => {
       _pump = new WeakSet();
       pump_fn = async function(friendId, st) {
         if (!st.timer) {
-          let stalledSinceMs = nowMs();
           st.timer = setInterval(() => {
             const cur = __privateMethod(this, _map, map_fn).call(this, __privateGet(this, _sending), friendId).get(st.fileNumber);
             if (!cur) {
@@ -8182,17 +8263,15 @@ onmessage = (e) => {
             }
             if (st.acked >= st.size)
               return;
-            const rttFloor = st.srttMs > 0 ? st.srttMs * 3 : WATCHDOG_MS;
-            const patience = Math.min(WATCHDOG_MAX_MS, Math.max(WATCHDOG_MS << Math.min(st.stalls, 4), rttFloor));
-            if (nowMs() - st.lastAckAdvanceMs < patience) {
-              stalledSinceMs = nowMs();
-              return;
-            }
-            if (nowMs() - stalledSinceMs >= SEND_GIVEUP_MS) {
+            if (nowMs() - st.lastProgressMs >= SEND_GIVEUP_MS) {
               __privateMethod(this, _endSend, endSend_fn).call(this, friendId, st.fileNumber);
               this.emit("file-cancel", { friendId, fileId: hex(st.fileId), sending: true, reason: "timeout" });
               return;
             }
+            const rttFloor = st.srttMs > 0 ? st.srttMs * 3 : WATCHDOG_MS;
+            const patience = Math.min(WATCHDOG_MAX_MS, Math.max(WATCHDOG_MS << Math.min(st.stalls, 4), rttFloor));
+            if (nowMs() - st.lastAckAdvanceMs < patience)
+              return;
             st.stalls++;
             st.cwnd = Math.max(CWND_MIN_CHUNKS, Math.floor(st.cwnd / 2));
             st.lastAckAdvanceMs = nowMs();
@@ -8335,6 +8414,23 @@ onmessage = (e) => {
           st.reackTimer = void 0;
         }
         __privateMethod(this, _map, map_fn).call(this, __privateGet(this, _receiving), friendId).delete(fileNumber);
+      };
+      _giveUpRecv = new WeakSet();
+      giveUpRecv_fn = function(friendId, st, reason) {
+        __privateMethod(this, _persistPartial, persistPartial_fn).call(this, st, true);
+        if (reason === "timeout") {
+          void this.send(friendId, PACKET_ID_FILE_CONTROL, encodeFileControl(1, st.fileNumber, FILECONTROL.KILL)).catch(() => void 0);
+        }
+        __privateMethod(this, _endRecv, endRecv_fn).call(this, friendId, st.fileNumber);
+        this.emit("file-cancel", {
+          friendId,
+          fileId: hex(st.fileId),
+          sending: false,
+          reason,
+          received: st.contiguous,
+          total: st.size,
+          resumable: st.partPath !== void 0 && st.persisted > 0
+        });
       };
     }
   });
@@ -8490,7 +8586,7 @@ onmessage = (e) => {
       echo: readUint64Le(plain, COOKIE_DATA_LENGTH)
     };
   }
-  function createCookieResponse(opts) {
+  function createCookieResponseWithCookie(opts) {
     const cookie = createCookie({
       symmetricKey: opts.receiverCookieSymmetricKey,
       realPublicKey: opts.request.senderRealPublicKey,
@@ -8500,7 +8596,7 @@ onmessage = (e) => {
     const nonce = randomBytes2(NONCE_SIZE5);
     const sharedKey2 = sharedKey(opts.request.senderDhtPublicKey, opts.receiverDhtSecretKey);
     const cipher = import_tweetnacl9.default.secretbox(plain, nonce, sharedKey2);
-    return concatBytes([Uint8Array.of(NET_PACKET_COOKIE_RESPONSE), nonce, cipher]);
+    return { packet: concatBytes([Uint8Array.of(NET_PACKET_COOKIE_RESPONSE), nonce, cipher]), cookie };
   }
   function openCookieResponse(packet, opts) {
     if (packet.length !== COOKIE_RESPONSE_LENGTH || packet[0] !== NET_PACKET_COOKIE_RESPONSE) {
@@ -8891,7 +8987,7 @@ onmessage = (e) => {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
-      import_tweetnacl11 = __toESM(require_nacl_fast());
+      import_tweetnacl11 = __toESM(require_nacl_fast(), 1);
       init_rendezvous();
       init_base58();
       DOORBELL_TRANSCRIPT_TAG = "DOORBELL/1";
@@ -9341,20 +9437,20 @@ onmessage = (e) => {
     const cipher = encrypted.slice(NONCE_SIZE6);
     return import_tweetnacl12.default.secretbox.open(cipher, nonce, key2) ?? void 0;
   }
-  function parseExpressResponseFrames(body2) {
+  function parseExpressResponseFrames(body) {
     const out = [];
     let offset = 0;
-    while (offset + 8 <= body2.length) {
-      const magic = readUint32Be2(body2, offset);
-      const len = readUint32Be2(body2, offset + 4);
+    while (offset + 8 <= body.length) {
+      const magic = readUint32Be2(body, offset);
+      const len = readUint32Be2(body, offset + 4);
       offset += 8;
       if (magic !== EXPRESS_MAGIC) {
         break;
       }
-      if (len === 0 || offset + len > body2.length) {
+      if (len === 0 || offset + len > body.length) {
         break;
       }
-      out.push(body2.slice(offset, offset + len));
+      out.push(body.slice(offset, offset + len));
       offset += len;
     }
     return out;
@@ -9419,14 +9515,14 @@ onmessage = (e) => {
     const length = table.bb.__vector_len(table.bb_pos + offset);
     return table.bb.bytes().slice(vector, vector + length);
   }
-  var import_tweetnacl12, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, DEFAULT_DOORBELL_SAFETY_PULL_MS, KNOWN_EXPRESS_DOORBELLS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _health, _callbacks, _debug, _doorbellOpts, _safetyPullMs, _bells, _lastPullMs, _inflight, _again, _pullCount, _pullNodeCoalesced, pullNodeCoalesced_fn, _pullNode, pullNode_fn, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
+  var import_tweetnacl12, EXPRESS_MAGIC, NONCE_SIZE6, HTTP_TIMEOUT_MS, HTTP_BODY_TIMEOUT_MS, DEFAULT_DOORBELL_SAFETY_PULL_MS, KNOWN_EXPRESS_DOORBELLS, _nodes2, _selfKeyPair, _selfUserId, _selfAddress, _currNode, _health, _callbacks, _debug, _doorbellOpts, _safetyPullMs, _bells, _lastPullMs, _inflight, _again, _pullCount, _pullNodeCoalesced, pullNodeCoalesced_fn, _pullNode, pullNode_fn, _postEncrypted, postEncrypted_fn, _deleteUntilOn, deleteUntilOn_fn, _withAnyNode, withAnyNode_fn, _http, http_fn, _debugLog, debugLog_fn, LegacyExpressClient;
   var init_express = __esm({
     "node_modules/@decentnetwork/peer/dist/compat/express.js"() {
       init_buffer_global();
       init_process_global();
       init_worker_timers();
       init_flatbuffers();
-      import_tweetnacl12 = __toESM(require_nacl_fast());
+      import_tweetnacl12 = __toESM(require_nacl_fast(), 1);
       init_base58();
       init_bytes();
       init_shared_key();
@@ -9434,6 +9530,7 @@ onmessage = (e) => {
       EXPRESS_MAGIC = 3396265365;
       NONCE_SIZE6 = 24;
       HTTP_TIMEOUT_MS = 15e3;
+      HTTP_BODY_TIMEOUT_MS = 12e4;
       DEFAULT_DOORBELL_SAFETY_PULL_MS = 5 * 6e4;
       KNOWN_EXPRESS_DOORBELLS = Object.freeze({
         "lens.beagle.chat:443": "https://lens.beagle.chat"
@@ -9672,9 +9769,9 @@ onmessage = (e) => {
           if (h.fails > 0 && now < h.nextTryMs && reason !== "ring" && reason !== "ready")
             return;
           __privateMethod(this, _debugLog, debugLog_fn).call(this, `pull ${id} (${reason})`);
-          let body2;
+          let body;
           try {
-            body2 = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
+            body = await __privateMethod(this, _http, http_fn).call(this, node, "GET", encodeURIComponent(__privateGet(this, _selfUserId)));
           } catch (error) {
             const msg = error?.message ?? String(error);
             h.fails += 1;
@@ -9692,9 +9789,9 @@ onmessage = (e) => {
             __privateGet(this, _callbacks).onNodeRecovered?.(id, h.fails);
           }
           __privateGet(this, _health).set(id, { fails: 0, lastError: "", lastOkMs: now, nextTryMs: 0 });
-          const messages = parseExpressResponseFrames(body2);
+          const messages = parseExpressResponseFrames(body);
           if (messages.length === 0) {
-            __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${body2.length} byte(s) from ${node.host} parsed to 0 frames`);
+            __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce: ${body.length} byte(s) from ${node.host} parsed to 0 frames`);
             return;
           }
           __privateMethod(this, _debugLog, debugLog_fn).call(this, `pullOnce got ${messages.length} offline frame(s) from ${node.host}:${node.port}`);
@@ -9780,18 +9877,21 @@ onmessage = (e) => {
         throw lastError instanceof Error ? lastError : new Error(String(lastError));
       };
       _http = new WeakSet();
-      http_fn = async function(node, method, path, body2) {
+      http_fn = async function(node, method, path, body) {
         const scheme = node.tls ? "https" : "http";
         const url2 = `${scheme}://${node.host}:${node.port}/${path}`;
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS);
+        const uploadMs = body ? Math.ceil(body.length / 65536) * 1e3 : 0;
+        let timer = setTimeout(() => controller.abort(), HTTP_TIMEOUT_MS + uploadMs);
         try {
           const response = await fetch(url2, {
             method,
-            body: body2 ? Buffer2.from(body2) : void 0,
-            headers: body2 ? { "Content-Type": "application/binary" } : void 0,
+            body: body ? Buffer2.from(body) : void 0,
+            headers: body ? { "Content-Type": "application/binary" } : void 0,
             signal: controller.signal
           });
+          clearTimeout(timer);
+          timer = setTimeout(() => controller.abort(), HTTP_BODY_TIMEOUT_MS);
           if (method === "POST" && response.status !== 201 || method === "GET" && response.status !== 200 || method === "DELETE" && response.status !== 205) {
             throw new Error(`express ${method} ${node.host}:${node.port} failed status=${response.status}`);
           }
@@ -9828,22 +9928,22 @@ onmessage = (e) => {
       return new Uint8Array(await subtle.digest("SHA-256", new Uint8Array(bytes)));
     }
   }
-  async function expressPushTranscript(nodeUserId, action, callerUserId, timeMs, body2) {
-    const text = [EXPRESS_PUSH_PROOF_DOMAIN, nodeUserId, action, callerUserId, timeMs, base64url(await sha2562(body2))].join("\n");
+  async function expressPushTranscript(nodeUserId, action, callerUserId, timeMs, body) {
+    const text = [EXPRESS_PUSH_PROOF_DOMAIN, nodeUserId, action, callerUserId, timeMs, base64url(await sha2562(body))].join("\n");
     return new TextEncoder().encode(text);
   }
-  async function createExpressPushProof(secretKey, nodeUserId, action, callerUserId, timeMs, body2) {
-    const nodeKey = base58ToBytes(nodeUserId);
-    if (nodeKey.length !== 32)
+  async function createExpressPushProof(secretKey, nodeUserId, action, callerUserId, timeMs, body) {
+    const nodeKey2 = base58ToBytes(nodeUserId);
+    if (nodeKey2.length !== 32)
       throw new Error("gateway node userid must decode to 32 bytes");
-    const transcript = await expressPushTranscript(nodeUserId, action, callerUserId, timeMs, body2);
+    const transcript = await expressPushTranscript(nodeUserId, action, callerUserId, timeMs, body);
     let proof;
     try {
-      proof = createCarrierRendezvousAuthProof(secretKey, nodeKey, transcript);
+      proof = createCarrierRendezvousAuthProof(secretKey, nodeKey2, transcript);
     } catch (err) {
       if (err instanceof RangeError || /low order/.test(err?.message ?? ""))
         throw err;
-      proof = await createCarrierRendezvousAuthProofWebCrypto(secretKey, nodeKey, transcript);
+      proof = await createCarrierRendezvousAuthProofWebCrypto(secretKey, nodeKey2, transcript);
     }
     return base64url(proof);
   }
@@ -9893,8 +9993,8 @@ onmessage = (e) => {
           if (!(o.secretKey instanceof Uint8Array) || o.secretKey.length !== 32)
             throw new TypeError("secretKey must be 32 bytes");
           __privateSet(this, _secretKey2, new Uint8Array(o.secretKey));
-          const derived = bytesToBase58(import_tweetnacl13.default.box.keyPair.fromSecretKey(__privateGet(this, _secretKey2)).publicKey);
-          if (o.callerUserId !== derived)
+          const derived2 = bytesToBase58(import_tweetnacl13.default.box.keyPair.fromSecretKey(__privateGet(this, _secretKey2)).publicKey);
+          if (o.callerUserId !== derived2)
             throw new Error("callerUserId does not match secretKey");
           this.callerUserId = o.callerUserId;
           this.url = (o.url ?? DEFAULT_EXPRESS_PUSH_URL).replace(/\/+$/, "");
@@ -9909,14 +10009,14 @@ onmessage = (e) => {
          * refused request delivered nothing). Every other answer is final.
          */
         async send(action, fields) {
-          const body2 = new TextEncoder().encode(encodeExpressPushForm(fields));
-          const first = await __privateMethod(this, _exchange, exchange_fn).call(this, action, body2, __privateMethod(this, _timeMs, timeMs_fn).call(this, __privateGet(this, _now).call(this) + __privateGet(this, _offsetMs)));
+          const body = new TextEncoder().encode(encodeExpressPushForm(fields));
+          const first = await __privateMethod(this, _exchange, exchange_fn).call(this, action, body, __privateMethod(this, _timeMs, timeMs_fn).call(this, __privateGet(this, _now).call(this) + __privateGet(this, _offsetMs)));
           if (first.answered && first.status === 400 && first.refusedByGateway) {
             const serverTime = Number(first.body?.data?.serverTime);
             if (Number.isSafeInteger(serverTime) && serverTime > 0) {
               __privateSet(this, _offsetMs, serverTime - __privateGet(this, _now).call(this));
               __privateSet(this, _lastTimeMs, 0);
-              return __privateMethod(this, _exchange, exchange_fn).call(this, action, body2, __privateMethod(this, _timeMs, timeMs_fn).call(this, serverTime));
+              return __privateMethod(this, _exchange, exchange_fn).call(this, action, body, __privateMethod(this, _timeMs, timeMs_fn).call(this, serverTime));
             }
           }
           return first;
@@ -9935,12 +10035,12 @@ onmessage = (e) => {
         return t;
       };
       _exchange = new WeakSet();
-      exchange_fn = async function(action, body2, timeMs) {
+      exchange_fn = async function(action, body, timeMs) {
         const fetchFn = __privateGet(this, _fetch2) ?? globalThis.fetch;
         if (!fetchFn)
           return { answered: false, reason: "no fetch implementation" };
         const time = String(timeMs);
-        const proof = await createExpressPushProof(__privateGet(this, _secretKey2), this.nodeUserId, action, this.callerUserId, time, body2);
+        const proof = await createExpressPushProof(__privateGet(this, _secretKey2), this.nodeUserId, action, this.callerUserId, time, body);
         const ac = new AbortController();
         const timer = setTimeout(() => ac.abort(), __privateGet(this, _timeoutMs));
         timer.unref?.();
@@ -9954,7 +10054,7 @@ onmessage = (e) => {
               "x-express-time": time,
               "x-express-proof": proof
             },
-            body: new Uint8Array(body2),
+            body: new Uint8Array(body),
             signal: ac.signal
           });
           text = await res.text();
@@ -10612,13 +10712,13 @@ onmessage = (e) => {
         if (plain.length === 0)
           return;
         const type2 = plain[0];
-        const body2 = plain.subarray(1);
+        const body = plain.subarray(1);
         switch (type2) {
           case TCP_PACKET_ROUTING_RESPONSE: {
-            if (body2.length < 1 + KEY_SIZE4)
+            if (body.length < 1 + KEY_SIZE4)
               return;
-            const connectionId = body2[0];
-            const friendKey = body2.subarray(1, 1 + KEY_SIZE4);
+            const connectionId = body[0];
+            const friendKey = body.subarray(1, 1 + KEY_SIZE4);
             if (connectionId !== 0) {
               const friendHex = Buffer2.from(friendKey).toString("hex");
               __privateGet(this, _cidByFriend).set(friendHex, connectionId);
@@ -10628,9 +10728,9 @@ onmessage = (e) => {
             return;
           }
           case TCP_PACKET_CONNECTION_NOTIFICATION: {
-            if (body2.length < 1)
+            if (body.length < 1)
               return;
-            const cid = body2[0];
+            const cid = body[0];
             const friendKey = __privateGet(this, _friendByCid).get(cid);
             if (friendKey) {
               this.emit("friendOnline", friendKey);
@@ -10638,9 +10738,9 @@ onmessage = (e) => {
             return;
           }
           case TCP_PACKET_DISCONNECT_NOTIFICATION: {
-            if (body2.length < 1)
+            if (body.length < 1)
               return;
-            const cid = body2[0];
+            const cid = body[0];
             const friendKey = __privateGet(this, _friendByCid).get(cid);
             if (friendKey) {
               this.emit("friendOffline", friendKey);
@@ -10648,40 +10748,40 @@ onmessage = (e) => {
             return;
           }
           case TCP_PACKET_PING: {
-            if (body2.length < 8)
+            if (body.length < 8)
               return;
-            const pingId = body2.subarray(0, 8);
+            const pingId = body.subarray(0, 8);
             __privateMethod(this, _sendFrame, sendFrame_fn).call(this, concatBytes([Uint8Array.of(TCP_PACKET_PONG), pingId]));
             return;
           }
           case TCP_PACKET_PONG: {
-            if (body2.length < 8)
+            if (body.length < 8)
               return;
             let v = 0n;
             for (let i = 0; i < 8; i++)
-              v = v << 8n | BigInt(body2[i]);
+              v = v << 8n | BigInt(body[i]);
             this.emit("pong", v);
             return;
           }
           case TCP_PACKET_OOB_RECV: {
-            if (body2.length < KEY_SIZE4)
+            if (body.length < KEY_SIZE4)
               return;
-            const sender = body2.subarray(0, KEY_SIZE4);
-            const payload = body2.subarray(KEY_SIZE4);
+            const sender = body.subarray(0, KEY_SIZE4);
+            const payload = body.subarray(KEY_SIZE4);
             this.emit("oob", sender, payload);
             return;
           }
           case TCP_PACKET_ONION_RESPONSE: {
-            if (body2.length === 0)
+            if (body.length === 0)
               return;
-            this.emit("onionResponse", new Uint8Array(body2));
+            this.emit("onionResponse", new Uint8Array(body));
             return;
           }
           default: {
             if (type2 >= 16) {
               const friendKey = __privateGet(this, _friendByCid).get(type2);
               if (friendKey) {
-                this.emit("peerData", friendKey, body2);
+                this.emit("peerData", friendKey, body);
               }
               return;
             }
@@ -11460,37 +11560,37 @@ onmessage = (e) => {
     return concatBytes(parts2);
   }
   function encodeStun(message, opts = {}) {
-    let body2 = encodeAttributes(message.attributes);
+    let body = encodeAttributes(message.attributes);
     if (opts.integrityKey) {
       const reserved = 24;
-      const lengthWithIntegrity = body2.length + reserved + (opts.fingerprint ? 8 : 0);
+      const lengthWithIntegrity = body.length + reserved + (opts.fingerprint ? 8 : 0);
       const headerForHmac = concatBytes([
         u16(message.type),
-        u16(body2.length + reserved),
+        u16(body.length + reserved),
         u32(STUN_MAGIC_COOKIE),
         message.transactionId
       ]);
-      const hmacInput = concatBytes([headerForHmac, body2]);
+      const hmacInput = concatBytes([headerForHmac, body]);
       const hmac2 = createHmac("sha1", Buffer2.from(opts.integrityKey)).update(hmacInput).digest();
-      body2 = concatBytes([
-        body2,
+      body = concatBytes([
+        body,
         u16(STUN_ATTR_MESSAGE_INTEGRITY),
         u16(20),
         Uint8Array.from(hmac2)
       ]);
     }
     if (opts.fingerprint) {
-      const lengthWithFingerprint = body2.length + 8;
+      const lengthWithFingerprint = body.length + 8;
       const headerForCrc = concatBytes([
         u16(message.type),
         u16(lengthWithFingerprint),
         u32(STUN_MAGIC_COOKIE),
         message.transactionId
       ]);
-      const crcInput = concatBytes([headerForCrc, body2]);
+      const crcInput = concatBytes([headerForCrc, body]);
       const crc = crc32(crcInput) ^ FINGERPRINT_XOR;
-      body2 = concatBytes([
-        body2,
+      body = concatBytes([
+        body,
         u16(STUN_ATTR_FINGERPRINT),
         u16(4),
         u32(crc >>> 0)
@@ -11498,11 +11598,11 @@ onmessage = (e) => {
     }
     const header = concatBytes([
       u16(message.type),
-      u16(body2.length),
+      u16(body.length),
       u32(STUN_MAGIC_COOKIE),
       message.transactionId
     ]);
-    return concatBytes([header, body2]);
+    return concatBytes([header, body]);
   }
   function decodeStun(data) {
     if (data.length < 20)
@@ -11646,6 +11746,160 @@ onmessage = (e) => {
         }
         return t;
       })();
+    }
+  });
+
+  // node_modules/@decentnetwork/peer/dist/turn-creds.js
+  function deriveCarrierTurnCreds(opts) {
+    if (opts.bootnodePublicKey.length !== 32) {
+      throw new Error(`bootnodePublicKey must be 32 bytes, got ${opts.bootnodePublicKey.length}`);
+    }
+    if (opts.ourSecretKey.length !== 32) {
+      throw new Error(`ourSecretKey must be 32 bytes, got ${opts.ourSecretKey.length}`);
+    }
+    const sharedKey2 = import_tweetnacl16.default.box.before(opts.bootnodePublicKey, opts.ourSecretKey);
+    const nonce = randomBytes2(24);
+    const digest = createHmac("sha256", Buffer2.from(sharedKey2)).update(nonce).digest();
+    const nonceB58 = bytesToBase58(nonce);
+    const passwordB58 = bytesToBase58(Uint8Array.from(digest));
+    return {
+      host: opts.bootnodeHost,
+      port: CARRIER_TURN_PORT,
+      realm: CARRIER_TURN_REALM,
+      username: `${opts.ourUserid}@${nonceB58}.${CARRIER_TURN_USER_SUFFIX}`,
+      password: passwordB58
+    };
+  }
+  var import_tweetnacl16, CARRIER_TURN_PORT, CARRIER_TURN_REALM, CARRIER_TURN_USER_SUFFIX;
+  var init_turn_creds = __esm({
+    "node_modules/@decentnetwork/peer/dist/turn-creds.js"() {
+      init_buffer_global();
+      init_process_global();
+      init_worker_timers();
+      init_node_crypto();
+      import_tweetnacl16 = __toESM(require_nacl_fast(), 1);
+      init_base58();
+      init_bytes();
+      CARRIER_TURN_PORT = 3478;
+      CARRIER_TURN_REALM = "elastos.org";
+      CARRIER_TURN_USER_SUFFIX = "auth.tox";
+    }
+  });
+
+  // node_modules/@decentnetwork/peer/dist/turn-relays.js
+  function parseTurnServersEnv(raw) {
+    return raw.split(",").map((entry) => entry.trim()).filter(Boolean).map((entry) => {
+      let auth2;
+      let hostPort = entry;
+      const at = entry.lastIndexOf("@");
+      if (at !== -1) {
+        auth2 = entry.slice(0, at);
+        hostPort = entry.slice(at + 1);
+      }
+      const idx = hostPort.lastIndexOf(":");
+      const host = idx === -1 ? hostPort : hostPort.slice(0, idx);
+      const port = idx === -1 ? CARRIER_TURN_PORT : Number.parseInt(hostPort.slice(idx + 1), 10);
+      const out = {
+        host,
+        port: Number.isFinite(port) && port > 0 && port < 65536 ? port : CARRIER_TURN_PORT
+      };
+      if (auth2 !== void 0) {
+        const colon = auth2.indexOf(":");
+        out.username = colon === -1 ? auth2 : auth2.slice(0, colon);
+        out.password = colon === -1 ? "" : auth2.slice(colon + 1);
+      }
+      return out;
+    }).filter((e) => e.host.length > 0);
+  }
+  function nodeKey(node) {
+    try {
+      if (node.pkBytes?.length === 32)
+        return node.pkBytes;
+      if (!node.pk)
+        return void 0;
+      const pk = base58ToBytes(node.pk);
+      return pk.length === 32 ? pk : void 0;
+    } catch {
+      return void 0;
+    }
+  }
+  function derived(node, opts, port = CARRIER_TURN_PORT) {
+    const pk = nodeKey(node);
+    if (!pk || !opts.ourUserid || opts.ourSecretKey?.length !== 32)
+      return void 0;
+    const c = deriveCarrierTurnCreds({
+      bootnodeHost: node.host,
+      bootnodePublicKey: pk,
+      ourUserid: opts.ourUserid,
+      ourSecretKey: opts.ourSecretKey
+    });
+    return { host: node.host, port, username: c.username, password: c.password, source: "derived" };
+  }
+  function turnRelayCandidates(opts) {
+    if (opts.option === false)
+      return [];
+    if (Array.isArray(opts.option)) {
+      return opts.option.filter((s) => s && typeof s.host === "string" && s.host.length > 0).map((s) => ({
+        host: s.host,
+        port: s.port && s.port > 0 ? s.port : CARRIER_TURN_PORT,
+        username: s.username ?? "",
+        password: s.password ?? "",
+        source: "option"
+      }));
+    }
+    const raw = opts.envRaw?.trim();
+    if (raw) {
+      const out2 = [];
+      for (const e of parseTurnServersEnv(raw)) {
+        if (e.username !== void 0) {
+          out2.push({ host: e.host, port: e.port, username: e.username, password: e.password ?? "", source: "env" });
+          continue;
+        }
+        const boot = opts.bootstrapNodes.find((n) => n.host === e.host);
+        const d = boot ? derived(boot, opts, e.port) : void 0;
+        out2.push(d ?? { host: e.host, port: e.port, username: "", password: "", source: "none" });
+      }
+      return out2;
+    }
+    const seen = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const node of opts.bootstrapNodes) {
+      if (!node?.host || node.isTcp || seen.has(node.host))
+        continue;
+      const d = derived(node, opts);
+      if (!d)
+        continue;
+      seen.add(node.host);
+      out.push(d);
+    }
+    return out;
+  }
+  function isUsableRelayedAddress(ip) {
+    const o = ip.split(".").map((p) => Number.parseInt(p, 10));
+    if (o.length !== 4 || o.some((n) => !Number.isInteger(n) || n < 0 || n > 255))
+      return false;
+    const [a, b] = o;
+    if (a === 0 || a === 10 || a === 127)
+      return false;
+    if (a === 100 && b >= 64 && b <= 127)
+      return false;
+    if (a === 169 && b === 254)
+      return false;
+    if (a === 172 && b >= 16 && b <= 31)
+      return false;
+    if (a === 192 && b === 168)
+      return false;
+    if (a >= 224)
+      return false;
+    return true;
+  }
+  var init_turn_relays = __esm({
+    "node_modules/@decentnetwork/peer/dist/turn-relays.js"() {
+      init_buffer_global();
+      init_process_global();
+      init_worker_timers();
+      init_turn_creds();
+      init_base58();
     }
   });
 
@@ -11951,43 +12205,6 @@ onmessage = (e) => {
           });
         }, ms2));
       };
-    }
-  });
-
-  // node_modules/@decentnetwork/peer/dist/turn-creds.js
-  function deriveCarrierTurnCreds(opts) {
-    if (opts.bootnodePublicKey.length !== 32) {
-      throw new Error(`bootnodePublicKey must be 32 bytes, got ${opts.bootnodePublicKey.length}`);
-    }
-    if (opts.ourSecretKey.length !== 32) {
-      throw new Error(`ourSecretKey must be 32 bytes, got ${opts.ourSecretKey.length}`);
-    }
-    const sharedKey2 = import_tweetnacl16.default.box.before(opts.bootnodePublicKey, opts.ourSecretKey);
-    const nonce = randomBytes2(24);
-    const digest = createHmac("sha256", Buffer2.from(sharedKey2)).update(nonce).digest();
-    const nonceB58 = bytesToBase58(nonce);
-    const passwordB58 = bytesToBase58(Uint8Array.from(digest));
-    return {
-      host: opts.bootnodeHost,
-      port: CARRIER_TURN_PORT,
-      realm: CARRIER_TURN_REALM,
-      username: `${opts.ourUserid}@${nonceB58}.${CARRIER_TURN_USER_SUFFIX}`,
-      password: passwordB58
-    };
-  }
-  var import_tweetnacl16, CARRIER_TURN_PORT, CARRIER_TURN_REALM, CARRIER_TURN_USER_SUFFIX;
-  var init_turn_creds = __esm({
-    "node_modules/@decentnetwork/peer/dist/turn-creds.js"() {
-      init_buffer_global();
-      init_process_global();
-      init_worker_timers();
-      init_node_crypto();
-      import_tweetnacl16 = __toESM(require_nacl_fast(), 1);
-      init_base58();
-      init_bytes();
-      CARRIER_TURN_PORT = 3478;
-      CARRIER_TURN_REALM = "elastos.org";
-      CARRIER_TURN_USER_SUFFIX = "auth.tox";
     }
   });
 
@@ -12522,7 +12739,7 @@ onmessage = (e) => {
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
-  var import_tweetnacl17, TURN_RELAY_SERVERS, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, EXPRESS_DOORBELL_SAFETY_MS, EXPRESS_PUSH_REREGISTER_MS, DOORBELL_CALL_SEEN_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, ONION_HOP_KEY_TTL_MS, ONION_HOP_KEY_CACHE_MAX, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_TRANSPORT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, PENDING_REQUESTER_PROFILE_MAX, PENDING_REQUESTER_PROFILE_TTL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPush, _expressPushRegisterTimer, _expressPushRegisterFails, _doorbellCallsSeen, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _onionHopKeyCache, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _pendingRequesterProfiles, _profileRetryAttempts, _profileRetryTimers, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _persistInFlight, _persistPending, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _requesterAvatar, requesterAvatar_fn, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _onExpressFriendMessage, onExpressFriendMessage_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _scheduleDoorbellRegister, scheduleDoorbellRegister_fn, _markDoorbellCall, markDoorbellCall_fn, _onDoorbellCall, onDoorbellCall_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn, _forceAdvanceRecvBuffer, forceAdvanceRecvBuffer_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _encodeOwnNickname, encodeOwnNickname_fn, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn, _encodeOwnUserInfo, encodeOwnUserInfo_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _onionHopKeys, onionHopKeys_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
+  var import_tweetnacl17, ANNOUNCE_WAIT_TIMEOUT_MS, MAX_FRIEND_ROUTE_ATTEMPTS, FRIEND_ROUTE_BATCH_SIZE, NODE_BLACKLIST_THRESHOLD, NODE_BLACKLIST_BASE_TTL_MS, NODE_BLACKLIST_MAX_TTL_MS, FRIEND_ANNOUNCE_ATTEMPTS, JOIN_ANNOUNCE_TIMEOUT_MS, SELF_ANNOUNCE_INTERVAL_MS, SELF_ANNOUNCE_WATCHDOG_MARGIN_MS, SELF_ANNOUNCE_PAUSE_MAX_MS, FAULT_REQUEST_HANG, ANNOUNCE_ENTRY_TTL_MS, BULK_ASSEMBLY_IDLE_MS, FAULT_ANNOUNCE_HANG_RUN, DHT_MAINTENANCE_INTERVAL_MS, MAX_KNOWN_NODES, MAX_SELF_ANNOUNCE_TARGETS, SELF_ANNOUNCE_ATTEMPTS, SELF_ANNOUNCE_BATCH_SIZE, ONION_DATA_ATTEMPTS, EXPRESS_PULL_INTERVAL_MS, EXPRESS_DOORBELL_SAFETY_MS, EXPRESS_PUSH_REREGISTER_MS, DOORBELL_CALL_SEEN_MS, FRIEND_PING_INTERVAL_MS, FRIEND_CONNECTION_LOOP_MS, DHT_PK_ANNOUNCE_COOLDOWN_MS, ONION_LOOKUP_MAX_BACKOFF_MS, ROUTE_WALKS_MAX_IN_FLIGHT, ONION_POOL_TTL_MS, ONION_HOP_KEY_TTL_MS, ONION_HOP_KEY_CACHE_MAX, FRIEND_TIMEOUT_MS, PROVEN_SESSION_HARD_TIMEOUT_MS, LAN_LOCK_STALE_MS, REHS_ACCEPT_COUNT, REHS_ACCEPT_MS, REHS_WINDOW_MS, REINIT_ON_DESYNC_MS, REINIT_STUCK_MS, RELAY_CONFIRM_WINDOW_MS, LAN_DISCOVERY_INTERVAL_MS, LAN_SWEEP_AFTER_MS, LAN_SWEEP_PORTS, LAN_SWEEP_EXTRA_HOSTS, LAN_SELF_PROBE_ENABLED, NET_PACKET_LAN_DISCOVERY, LAN_DISCOVERY_PORTS, PEER_NICKNAME, PEER_STATUS_MESSAGE, GREETING_TEXT, PEER_COOKIE_TTL_MS, AGENTNET_PROTO_VERSION, PEER_PKG_VERSION, TEXT_ACK_PREFIX, TEXT_ACK_TIMEOUT_MS, TEXT_TRANSPORT_ACK_TIMEOUT_MS, TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS, EXPRESS_POSTED_IDS_MAX, EXPRESS_POSTED_IDS_TTL_MS, PACKET_ID_REQUEST, PACKET_ID_KILL, PACKET_ID_ALIVE, PACKET_ID_SHARE_RELAYS, PACKET_ID_ONLINE, PACKET_ID_OFFLINE, PACKET_ID_NICKNAME, PACKET_ID_STATUSMESSAGE, PACKET_ID_USERSTATUS, PACKET_ID_TYPING, PACKET_ID_MESSAGE, PACKET_ID_ACTION, PACKET_ID_UDP_ENDPOINT, RECV_REQUEST_MIN_INTERVAL_MS, RECV_GAP_GIVEUP_MS, RECV_GAP_REREQUEST_MS, RECV_TRACK_WINDOW, RECV_RECOVERY_MIN_BULK_BYTES, PENDING_REQUESTER_PROFILE_MAX, PENDING_REQUESTER_PROFILE_TTL_MS, _opts3, _events, _fileRelayNegotiationUntil, _dnft12, _fileTransfer, _keyPair2, _udp, _turnClient, _turnSocket, _ourRelayAddr, _turnAllocating, _bootstrap, _dht, _knownNodes, _announceDataKey, _lastSelfAnnounceMs, _debug4, _debugVerbose, _packetTrace, _lastFriendRequestDispatch, _nodeHealth, _nodeBlacklist, _onionPoolCache, _onionPoolGen, _diagOnionPoolBuilds, _pkBytesCache, _onionLookupJitter, _routeWalksInFlight, _diagRouteWalks, _diagRouteWalksDeferred, _pendingFriendRequests, _friends, _textHandlers, _pendingTextAcks, _deliveredTextIds, _deliveredPersistTimer, _deliveredTextOrder, _friendStoreFile, _persistSeq, _cookieSymmetricKey, _friendSessions, _cryptoEndpointIndex, _express, _expressPush, _expressPushRegisterTimer, _expressPushRegisterFails, _doorbellCallsSeen, _expressPollTimer, _tcpRelays, _selfAnnounceTimer, _friendConnectionTimer, _lanDiscoveryTimer, _lanProbeTargets, _ownHostProbeFriendId, _ownHostProbeUntilMs, _dhtMaintenanceTimer, _dhtPkSendCooldown, _onionLookupCooldown, _onionLookupMisses, _onionHopKeyCache, _peerInitiatedCookies, _strangerHandshakeLogMs, _routeRequestCooldown, _announceRouteUsed, _friendDhtKeys, _friendRequestResendCooldown, _dhtPkConsecutiveFailures, _lastSelfAnnounceStoredCount, _selfAnnounceStoredAt, _diagTcpOnionSent, _diagTcpOnionRecv, _lastLoggedRoutesForFriend, _lastCookieSentKey, _lastEndpointSelectedKey, _cookieRetryCount, _tcpOnlyWarningShown, _noEndpointWarned, _initiateSkipLogged, _bulkCompleted, _bulkAssembly, _assemblySweepTimer, _inviteAssembly, _initiateDeferSinceMs, _lastDesyncDeleteMs, _srflxCache, _profileSentTo, _pendingRequesterProfiles, _profileRetryAttempts, _profileRetryTimers, _testRequestSink, _testResendSink, _onlineRetryTimers, _onlineRetryAttempts, _greetingSentTo, _selfAnnouncePromise, _selfAnnounceRunCount, _persistInFlight, _persistPending, _selfAnnounceEpoch, _selfAnnouncePauseDepth, _started, _newSessionShell, newSessionShell_fn, _recordOutgoingFriendRequest, recordOutgoingFriendRequest_fn, _sendTextPlain, sendTextPlain_fn, _shouldRequireTextAck, shouldRequireTextAck_fn, _expressPostedIds, _expressPostKey, expressPostKey_fn, _noteExpressPosted, noteExpressPosted_fn, _waitForTextAck, waitForTextAck_fn, _cancelTextAckWait, cancelTextAckWait_fn, _waitForFriendConnected, waitForFriendConnected_fn, _dispatchTextMessage, dispatchTextMessage_fn, _requesterAvatar, requesterAvatar_fn, _rememberPendingRequesterProfile, rememberPendingRequesterProfile_fn, _sendTextAck, sendTextAck_fn, _rememberDeliveredTextId, rememberDeliveredTextId_fn, _deliveredStoreFile, deliveredStoreFile_get, _persistDeliveredTextIds, persistDeliveredTextIds_fn, _loadDeliveredTextIds, loadDeliveredTextIds_fn, _awaitTransportAck, awaitTransportAck_fn, _sendDnft1Frame, sendDnft1Frame_fn, _learnFriendDhtKey, learnFriendDhtKey_fn, _friendIdForPoolKey, friendIdForPoolKey_fn, _handleTcpDatagram, handleTcpDatagram_fn, _remoteIsTcp, remoteIsTcp_fn, _onDatagram, _handleOnionDhtPk, handleOnionDhtPk_fn, _emitFriendRequest, emitFriendRequest_fn, _emitOfflineFriendRequest, emitOfflineFriendRequest_fn, _onExpressFriendMessage, onExpressFriendMessage_fn, _emitOfflineFriendMessage, emitOfflineFriendMessage_fn, _discoverFriendRoutes, discoverFriendRoutes_fn, _walkFriendRoutes, walkFriendRoutes_fn, _discoverAndCacheFriendEndpoint, discoverAndCacheFriendEndpoint_fn, _announceSelfBestEffort, announceSelfBestEffort_fn, _publishSelfAnnounceStoredCount, publishSelfAnnounceStoredCount_fn, _ensureSelfAnnounceLoop, ensureSelfAnnounceLoop_fn, _scheduleDoorbellRegister, scheduleDoorbellRegister_fn, _markDoorbellCall, markDoorbellCall_fn, _onDoorbellCall, onDoorbellCall_fn, _ensureExpressPullLoop, ensureExpressPullLoop_fn, _ensureFriendConnectionLoop, ensureFriendConnectionLoop_fn, _doFriendConnections, doFriendConnections_fn, _deliverLosslessPayload, deliverLosslessPayload_fn, _isLosslessDuplicate, isLosslessDuplicate_fn, _recvRecoveryWanted, recvRecoveryWanted_fn, _releaseRecvHold, releaseRecvHold_fn, _noteReliableReceived, noteReliableReceived_fn, _afterAckMove, afterAckMove_fn, _armRecvGapTimer, armRecvGapTimer_fn, _skipRecvGap, skipRecvGap_fn, _requestMissingReliablePackets, requestMissingReliablePackets_fn, _sendRequestPacket, sendRequestPacket_fn, _sweepAssemblies, sweepAssemblies_fn, _armAssemblySweep, armAssemblySweep_fn, _assembleBulkMsg, assembleBulkMsg_fn, _assembleInvite, assembleInvite_fn, _tryEmitInlineFile, tryEmitInlineFile_fn, _tryEmitBinaryInlineFile, tryEmitBinaryInlineFile_fn, _applyPeerAck, applyPeerAck_fn, _handleRetransmitRequest, handleRetransmitRequest_fn, _resendReliablePacket, resendReliablePacket_fn, _sendMessengerPacket, sendMessengerPacket_fn, _sendToFriend, sendToFriend_fn, _sendOnline, sendOnline_fn, _sendOnlineIfOwed, sendOnlineIfOwed_fn, _scheduleOnlineRetry, scheduleOnlineRetry_fn, _clearOnlineRetry, clearOnlineRetry_fn, _scheduleProfileRetry, scheduleProfileRetry_fn, _encodeOwnNickname, encodeOwnNickname_fn, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn, _encodeOwnUserInfo, encodeOwnUserInfo_fn, _sendProfileAndGreeting, sendProfileAndGreeting_fn, _noteAcceptProof, noteAcceptProof_fn, _rememberPeerInitiatedCookie, rememberPeerInitiatedCookie_fn, _handshakeStartedByPeer, handshakeStartedByPeer_fn, _cacheFriendRemote, cacheFriendRemote_fn, _isUnroutableSelfSource, isUnroutableSelfSource_fn, _adoptRemote, adoptRemote_fn, _rememberEndpointCandidate, rememberEndpointCandidate_fn, _gatherOwnSrflx, gatherOwnSrflx_fn, _ensureTurnRelay, ensureTurnRelay_fn, _sendViaRelay, sendViaRelay_fn, _sendUdpEndpointOffer, sendUdpEndpointOffer_fn, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn, _collectSessionEndpointCandidates, collectSessionEndpointCandidates_fn, _initiateSession, initiateSession_fn, _sweepLanForCookieResponse, sweepLanForCookieResponse_fn, _dhtPingId, dhtPingId_fn, _closestKnownNodes, closestKnownNodes_fn, _friendByDhtPk, friendByDhtPk_fn, _handleDhtRpc, handleDhtRpc_fn, _refreshFriendDhtKeyFromDht, refreshFriendDhtKeyFromDht_fn, _sendDhtGetNodes, sendDhtGetNodes_fn, _sendDhtPing, sendDhtPing_fn, _ensureDhtMaintenanceLoop, ensureDhtMaintenanceLoop_fn, _doDhtMaintenance, doDhtMaintenance_fn, _sendOnionDhtPk, sendOnionDhtPk_fn, _setFriendOnline, setFriendOnline_fn, _setFriendOffline, setFriendOffline_fn, _sendAnnounceAndWait, sendAnnounceAndWait_fn, _waitForAnnounceResponse, waitForAnnounceResponse_fn, _sendPacket, sendPacket_fn, _onionHopKeys, onionHopKeys_fn, _sendOnionOverRelays, sendOnionOverRelays_fn, _sendThroughOnionPath, sendThroughOnionPath_fn, _onionCandidatePool, onionCandidatePool_fn, _onionBasePool, onionBasePool_fn, _buildOnionBasePool, buildOnionBasePool_fn, _nodePkBytes, nodePkBytes_fn, _selectTcpOnionHops, selectTcpOnionHops_fn, _selectOnionPath, selectOnionPath_fn, _sendDirectCryptoFriendRequest, sendDirectCryptoFriendRequest_fn, _debugLog2, debugLog_fn2, _debugVerboseLog, debugVerboseLog_fn, _tracePacket, tracePacket_fn, _recordNodeSuccess, recordNodeSuccess_fn, _recordNodeFailure, recordNodeFailure_fn, _isNodeBlacklisted, isNodeBlacklisted_fn, _nodeScore, nodeScore_fn, _pauseSelfAnnounce, pauseSelfAnnounce_fn, _runSelfAnnounce, runSelfAnnounce_fn, _loadPersistedFriends, loadPersistedFriends_fn, _persistFriends, persistFriends_fn, _sweepStaleFriendTemps, sweepStaleFriendTemps_fn, _Peer, Peer, VIRTUAL_IFACE_RE, _lanIfaceCacheMs, _lanAddrsCache, _lanSubnetsCache, _allOwnAddrsCache, _ownVirtualAddrsCache, _wslHostAddrsCache, _wslHostCacheMs;
   var init_peer = __esm({
     "node_modules/@decentnetwork/peer/dist/peer.js"() {
       init_buffer_global();
@@ -12555,29 +12772,10 @@ onmessage = (e) => {
       init_udp();
       init_bytes();
       init_stun();
+      init_turn_relays();
       init_turn();
       init_ice_servers();
       init_dgram_lifecycle();
-      TURN_RELAY_SERVERS = (() => {
-        const raw = process.env.DECENT_TURN_SERVERS?.trim();
-        if (!raw) {
-          return [
-            { host: "tokyo.fi.chat", port: 3478, username: "allcom", password: "allcompass" },
-            { host: "gfax.cn", port: 3478, username: "allcom", password: "allcompass" }
-          ];
-        }
-        return raw.split(",").map((entry) => entry.trim()).filter(Boolean).map((entry) => {
-          const idx = entry.lastIndexOf(":");
-          const host = idx === -1 ? entry : entry.slice(0, idx);
-          const port = idx === -1 ? 3478 : Number.parseInt(entry.slice(idx + 1), 10);
-          return {
-            host,
-            port: Number.isFinite(port) && port > 0 ? port : 3478,
-            username: "allcom",
-            password: "allcompass"
-          };
-        });
-      })();
       ANNOUNCE_WAIT_TIMEOUT_MS = readEnvInt("DECENT_ANNOUNCE_WAIT_TIMEOUT_MS", 4e3);
       MAX_FRIEND_ROUTE_ATTEMPTS = readEnvInt("DECENT_FRIEND_ROUTE_MAX_ATTEMPTS", 24);
       FRIEND_ROUTE_BATCH_SIZE = readEnvInt("DECENT_FRIEND_ROUTE_BATCH_SIZE", 8);
@@ -12607,6 +12805,8 @@ onmessage = (e) => {
       FRIEND_CONNECTION_LOOP_MS = readEnvInt("DECENT_FRIEND_CONNECTION_LOOP_MS", 250);
       DHT_PK_ANNOUNCE_COOLDOWN_MS = readEnvInt("DECENT_DHT_PK_ANNOUNCE_COOLDOWN_MS", 25e3);
       ONION_LOOKUP_MAX_BACKOFF_MS = readEnvInt("DECENT_ONION_LOOKUP_MAX_BACKOFF_MS", 12e4);
+      ROUTE_WALKS_MAX_IN_FLIGHT = readEnvInt("DECENT_ROUTE_WALKS_MAX_IN_FLIGHT", 0);
+      ONION_POOL_TTL_MS = readEnvInt("DECENT_ONION_POOL_TTL_MS", 5e3);
       ONION_HOP_KEY_TTL_MS = readEnvInt("DECENT_ONION_HOP_KEY_TTL_MS", 6e5);
       ONION_HOP_KEY_CACHE_MAX = 512;
       FRIEND_TIMEOUT_MS = readEnvInt("DECENT_FRIEND_TIMEOUT_MS", 32e3);
@@ -12628,6 +12828,7 @@ onmessage = (e) => {
       PEER_NICKNAME = process.env.DECENT_PEER_NAME ?? "@decentnetwork/peer";
       PEER_STATUS_MESSAGE = process.env.DECENT_PEER_STATUS_MESSAGE ?? "decent peer";
       GREETING_TEXT = process.env.DECENT_GREETING_TEXT ?? "";
+      PEER_COOKIE_TTL_MS = 3e4;
       AGENTNET_PROTO_VERSION = 2;
       PEER_PKG_VERSION = "0.1.112";
       TEXT_ACK_PREFIX = "DNPACK1:";
@@ -12635,6 +12836,8 @@ onmessage = (e) => {
       TEXT_TRANSPORT_ACK_TIMEOUT_MS = readEnvInt("DECENT_TEXT_TRANSPORT_ACK_TIMEOUT_MS", 2e4);
       TEXT_ACK_RETRY_MS = readEnvInt("DECENT_TEXT_ACK_RETRY_MS", 5e3);
       TEXT_AUTO_ACK_TIMEOUT_MS = readEnvInt("DECENT_TEXT_AUTO_ACK_TIMEOUT_MS", 15e3);
+      EXPRESS_POSTED_IDS_MAX = 4096;
+      EXPRESS_POSTED_IDS_TTL_MS = 7 * 24 * 36e5;
       PACKET_ID_REQUEST = 1;
       PACKET_ID_KILL = 2;
       PACKET_ID_ALIVE = 16;
@@ -12649,6 +12852,10 @@ onmessage = (e) => {
       PACKET_ID_ACTION = 65;
       PACKET_ID_UDP_ENDPOINT = 160;
       RECV_REQUEST_MIN_INTERVAL_MS = 200;
+      RECV_GAP_GIVEUP_MS = readEnvInt("DECENT_RECV_GAP_GIVEUP_MS", 1e4);
+      RECV_GAP_REREQUEST_MS = 500;
+      RECV_TRACK_WINDOW = 8192;
+      RECV_RECOVERY_MIN_BULK_BYTES = 16 * 1024;
       PENDING_REQUESTER_PROFILE_MAX = 64;
       PENDING_REQUESTER_PROFILE_TTL_MS = 24 * 60 * 60 * 1e3;
       _Peer = class _Peer {
@@ -12661,6 +12868,8 @@ onmessage = (e) => {
            *  path, where the send window stood after the last fragment. */
           __privateAdd(this, _sendTextPlain);
           __privateAdd(this, _shouldRequireTextAck);
+          __privateAdd(this, _expressPostKey);
+          __privateAdd(this, _noteExpressPosted);
           __privateAdd(this, _waitForTextAck);
           __privateAdd(this, _cancelTextAckWait);
           __privateAdd(this, _waitForFriendConnected);
@@ -12748,6 +12957,7 @@ onmessage = (e) => {
            *   throttle meant for background upkeep.
            */
           __privateAdd(this, _discoverFriendRoutes);
+          __privateAdd(this, _walkFriendRoutes);
           __privateAdd(this, _discoverAndCacheFriendEndpoint);
           __privateAdd(this, _announceSelfBestEffort);
           /** Count nodes whose acknowledged store is still within its TTL. */
@@ -12765,19 +12975,40 @@ onmessage = (e) => {
            *  buffered packets through the exact same dispatch. `kind` is the first
            *  payload byte (never undefined here — the caller defaults it). */
           __privateAdd(this, _deliverLosslessPayload);
-          /** Drain the receive reorder buffer forward from receiveBufferStart while it
-           *  holds the next contiguous packet, delivering each in strict order. */
-          __privateAdd(this, _drainRecvBufferContiguous);
-          /** Safety valve: the reorder buffer grew past the window, so a packet below
-           *  it is (almost certainly) a genuine loss that will never retransmit. Jump
-           *  the low-water mark to the lowest buffered number — abandoning the gap
-           *  (partial messages are dropped gracefully by the reassemblers) — rather
-           *  than wedging every later packet (incl. chat) forever. */
-          __privateAdd(this, _forceAdvanceRecvBuffer);
-          /** Ask the sender to retransmit the packets missing below our highest
-           *  buffered number. Encodes the toxcore PACKET_ID_REQUEST byte stream
-           *  (the exact inverse of #handleRetransmitRequest): walk [low, high] and
-           *  emit the running gap-counter at each MISSING number. Rate-limited. */
+          /** True when a decrypted lossless packet is a transport duplicate: below the
+           *  ack point, or already received above it. Exception: multi-fragment
+           *  reliable messages that reassemble by tid (BULKMSG, INVITE_REQUEST and
+           *  INVITE_RESPONSE) pass through; #assembleBulkMsg / #assembleInvite dedup
+           *  and order fragments by packet number themselves. */
+          __privateAdd(this, _isLosslessDuplicate);
+          /**
+           * Record a received reliable packet number and move the ack point
+           * (receiveBufferStart) the way toxcore's recv_array does: to the first
+           * number we have not received. While a gap sits there, ask the sender for
+           * the missing numbers (PACKET_ID_REQUEST, rate-limited, re-sent every
+           * RECV_GAP_REREQUEST_MS) and skip the gap only after RECV_GAP_GIVEUP_MS
+           * without the ack point moving. Delivery is not held back.
+           */
+          /** True while this friend has an inline message in flight that only
+           *  net_crypto retransmission can complete (see RECV_RECOVERY_MIN_BULK_BYTES). */
+          __privateAdd(this, _recvRecoveryWanted);
+          /** No recoverable message in flight: ack everything up to the highest
+           *  number seen, as up to 0.1.178 (never backward), and stop tracking. */
+          __privateAdd(this, _releaseRecvHold);
+          __privateAdd(this, _noteReliableReceived);
+          __privateAdd(this, _afterAckMove);
+          __privateAdd(this, _armRecvGapTimer);
+          /** The gap at the ack point did not fill in RECV_GAP_GIVEUP_MS: move the ack
+           *  point to the lowest number we hold (the old skip-the-gap behaviour, now
+           *  only for a gap the sender would not resend). */
+          __privateAdd(this, _skipRecvGap);
+          /** Ask the sender to retransmit the numbers missing between the ack point
+           *  and the highest number received. Encodes the toxcore PACKET_ID_REQUEST
+           *  byte stream exactly as net_crypto.c generate_request_packet does (walk
+           *  recv_array from buffer_start to buffer_end, emit the running counter at
+           *  each missing number, a 0 filler every 255 present ones); the sender's
+           *  handle_request_packet frees what we did not list and resends what we
+           *  did. Rate-limited to one per RECV_REQUEST_MIN_INTERVAL_MS. */
           __privateAdd(this, _requestMissingReliablePackets);
           /** Send a PACKET_ID_REQUEST. Like a retransmit (#resendReliablePacket) it
            *  rides the CURRENT nonce but does NOT consume a reliable send number —
@@ -12795,6 +13026,13 @@ onmessage = (e) => {
            *  hold every byte — then concatenate in packet-number order. This tolerates
            *  reordering + duplicates WITHOUT stalling the reliable stream (a genuinely
            *  lost fragment just expires this one message after 60s, nothing else). */
+          /** Drop expired bulkmsg / invite assemblies, logging each one ONCE, always
+           *  (not only with debug on): a message cut incomplete used to vanish with no
+           *  trace at all (an iPhone photo over a lossy relay, 2026-11-14). */
+          __privateAdd(this, _sweepAssemblies);
+          /** The lazy sweep only runs when another fragment arrives; a timer makes an
+           *  abandoned last message get its log line too. */
+          __privateAdd(this, _armAssemblySweep);
           __privateAdd(this, _assembleBulkMsg);
           /** Append a Carrier invite fragment (INVITE_REQUEST/RESPONSE) and return the
            *  full reassembled payload once every fragment has landed. Like
@@ -12815,6 +13053,13 @@ onmessage = (e) => {
            *  payload; before it existed such a message landed in the chat as a wall of
            *  U+FFFD mojibake with the file lost. Returns true when handled. */
           __privateAdd(this, _tryEmitBinaryInlineFile);
+          /** toxcore clear_buffer_until(&send_array, buffer_start): the peer has
+           *  every number below `bufferStart`, so free those parked packets and move
+           *  our ack point there. Returns false for an ack point BEHIND the applied one
+           *  (a late or reordered copy; toxcore drops that packet outright, we only
+           *  ignore its ack). One past what we have sent is clamped to what we have
+           *  sent. */
+          __privateAdd(this, _applyPeerAck);
           /** Toxcore handle_request_packet: parse the peer's PACKET_ID_REQUEST and
            *  (a) implicitly ACK every walked packet number that isn't requested,
            *  (b) retransmit the requested ones from the send buffer. */
@@ -12834,6 +13079,21 @@ onmessage = (e) => {
            * Throws only if zero transports succeeded.
            */
           __privateAdd(this, _sendToFriend);
+          /**
+           * Send our PACKET_ID_ONLINE for the current session unless it already went
+           * out. "Went out" means numbered and parked in sendArray: #sendMessengerPacket
+           * numbers the packet before its first await, so the number moving is proof,
+           * and a copy lost on the wire is retransmitted on the peer's PACKET_ID_REQUEST.
+           * If the send threw before numbering (no session or no transport yet), retry
+           * with bounded backoff while this session stays established. Toxcore sends
+           * ONLINE once per connection, so a native friend that misses ours shows us
+           * offline, and drops our other messenger packets, for the whole session.
+           */
+          __privateAdd(this, _sendOnline);
+          /** #sendOnline when this session still owes the peer its ONLINE. */
+          __privateAdd(this, _sendOnlineIfOwed);
+          __privateAdd(this, _scheduleOnlineRetry);
+          __privateAdd(this, _clearOnlineRetry);
           __privateAdd(this, _scheduleProfileRetry);
           /** Our toxcore PACKET_ID_NICKNAME payload: the raw UTF-8 nickname. */
           __privateAdd(this, _encodeOwnNickname);
@@ -12846,6 +13106,19 @@ onmessage = (e) => {
           /** Our Carrier PACKET_TYPE_USERINFO payload (sent as PACKET_ID_STATUSMESSAGE). */
           __privateAdd(this, _encodeOwnUserInfo);
           __privateAdd(this, _sendProfileAndGreeting);
+          /** A friend we asked showed they accepted: stamp acceptedAt + acceptProof
+           *  once, persist, emit friendAccepted. False for a stranger or a friend
+           *  already accepted. */
+          __privateAdd(this, _noteAcceptProof);
+          /** Remember a cookie we gave a friend who has not accepted yet. Only those
+           *  are kept (a few per friend, briefly), so a flood of cookie requests
+           *  claiming other keys cannot grow this. */
+          __privateAdd(this, _rememberPeerInitiatedCookie);
+          /** True when this handshake came back on a cookie we issued in a cookie
+           *  RESPONSE to this friend: they asked us for it, so they started the
+           *  session. A responder's handshake carries a cookie we minted for
+           *  ourselves inside our own handshake instead. */
+          __privateAdd(this, _handshakeStartedByPeer);
           __privateAdd(this, _cacheFriendRemote);
           /** Single choke point for setting session.remote (the direct-UDP send
            *  endpoint). Never downgrades off a LOCKED physical-LAN path to a non-LAN
@@ -12966,6 +13239,14 @@ onmessage = (e) => {
            *  selector and the 2-hop TCP one — a relay stands in for node A, so a
            *  relayed path needs one fewer usable node than a direct one. */
           __privateAdd(this, _onionCandidatePool);
+          /** The ranked onion hop pool, rebuilt only when the node table or the
+           *  blacklist changes, or after ONION_POOL_TTL_MS (node scores drift). */
+          __privateAdd(this, _onionBasePool);
+          __privateAdd(this, _buildOnionBasePool);
+          /** A node's key, decoded once per peer (shared by the onion pool and the
+           *  route walk). Bounded: cleared when it
+           *  outgrows twice the node table. */
+          __privateAdd(this, _nodePkBytes);
           /** Two hops (B and C) for a relayed onion request. The relay is node A, so
            *  this succeeds on node sets too thin for a direct 3-hop path — which is
            *  the browser's normal state, and where every request used to fall through
@@ -13098,6 +13379,20 @@ onmessage = (e) => {
            * site filters via #isNodeBlacklisted before adding a node to its queue.
            */
           __privateAdd(this, _nodeBlacklist, /* @__PURE__ */ new Map());
+          /** The ranked onion hop pool (see #onionBasePool) and what it was built from. */
+          __privateAdd(this, _onionPoolCache, void 0);
+          /** Bumped when the blacklist changes; with the #knownNodes reference it
+           *  decides when the onion pool is rebuilt. */
+          __privateAdd(this, _onionPoolGen, 0);
+          __privateAdd(this, _diagOnionPoolBuilds, 0);
+          /** Decoded node keys (see #nodePkBytes). */
+          __privateAdd(this, _pkBytesCache, /* @__PURE__ */ new Map());
+          /** Per-friend jitter factor for the route-walk budget. */
+          __privateAdd(this, _onionLookupJitter, /* @__PURE__ */ new Map());
+          /** Automatic route walks running now (see ROUTE_WALKS_MAX_IN_FLIGHT). */
+          __privateAdd(this, _routeWalksInFlight, 0);
+          __privateAdd(this, _diagRouteWalks, 0);
+          __privateAdd(this, _diagRouteWalksDeferred, 0);
           __privateAdd(this, _pendingFriendRequests, /* @__PURE__ */ new Map());
           __privateAdd(this, _friends, /* @__PURE__ */ new Map());
           __privateAdd(this, _textHandlers, /* @__PURE__ */ new Set());
@@ -13164,6 +13459,11 @@ onmessage = (e) => {
            *  in tox-onion.ts for why: six scalar multiplications per onion packet
            *  was 40% of a registry's CPU. Rolled every ONION_HOP_KEY_TTL_MS. */
           __privateAdd(this, _onionHopKeyCache, /* @__PURE__ */ new Map());
+          /** Cookies we issued in cookie responses to friends who have not accepted
+           *  yet (see #handshakeStartedByPeer). */
+          __privateAdd(this, _peerInitiatedCookies, /* @__PURE__ */ new Map());
+          /** Last time a handshake from a non-friend was logged (rate limit). */
+          __privateAdd(this, _strangerHandshakeLogMs, /* @__PURE__ */ new Map());
           // Per-friend cooldown for re-asserting the TCP-relay route toward an
           // unconnected friend (the "accepted friend that never connects" wedge —
           // requestRoute only fired once at startup and was never retried).
@@ -13242,6 +13542,7 @@ onmessage = (e) => {
           // Reassembly buffer for multi-fragment Carrier invites (WebRTC signaling).
           // Keyed by `${friendId}:${tid}`; namespaced separately from #bulkAssembly so
           // a bulkmsg and an invite that happen to share a tid can't collide.
+          __privateAdd(this, _assemblySweepTimer, void 0);
           __privateAdd(this, _inviteAssembly, /* @__PURE__ */ new Map());
           // When we FIRST deferred initiation to a higher-pubkey peer (per friend).
           // If the peer hasn't established within the grace window we break the
@@ -13263,6 +13564,13 @@ onmessage = (e) => {
           __privateAdd(this, _pendingRequesterProfiles, /* @__PURE__ */ new Map());
           __privateAdd(this, _profileRetryAttempts, /* @__PURE__ */ new Map());
           __privateAdd(this, _profileRetryTimers, /* @__PURE__ */ new Map());
+          /** Test seam: sees every PACKET_ID_REQUEST we send (friend, ack point, body). */
+          __privateAdd(this, _testRequestSink, void 0);
+          /** Test seam: sees every packet we resend on a peer's request (friend, number, plaintext). */
+          __privateAdd(this, _testResendSink, void 0);
+          /** Pending PACKET_ID_ONLINE retries (see FriendSession.onlineSent). */
+          __privateAdd(this, _onlineRetryTimers, /* @__PURE__ */ new Map());
+          __privateAdd(this, _onlineRetryAttempts, /* @__PURE__ */ new Map());
           __privateAdd(this, _greetingSentTo, /* @__PURE__ */ new Set());
           __privateAdd(this, _selfAnnouncePromise, void 0);
           __privateAdd(this, _selfAnnounceRunCount, 0);
@@ -13277,6 +13585,10 @@ onmessage = (e) => {
           __privateAdd(this, _selfAnnounceEpoch, 0);
           __privateAdd(this, _selfAnnouncePauseDepth, 0);
           __privateAdd(this, _started, false);
+          /** Delivery ids already posted to express, per friend: `${pubkey}:${id}` →
+           *  when. Bounded; a restart forgets them (a re-post after a restart carries
+           *  the same id, which an envelope-reading friend still shows once). */
+          __privateAdd(this, _expressPostedIds, /* @__PURE__ */ new Map());
           __privateAdd(this, _onDatagram, ({ data, remote, viaRelay }) => {
             if (!__privateGet(this, _keyPair2)) {
               return;
@@ -13349,11 +13661,12 @@ onmessage = (e) => {
                 }
                 __privateMethod(this, _learnFriendDhtKey, learnFriendDhtKey_fn).call(this, senderId, request.senderDhtPublicKey);
               }
-              const response = createCookieResponse({
+              const { packet: response, cookie: issuedCookie } = createCookieResponseWithCookie({
                 request,
                 receiverDhtSecretKey: __privateGet(this, _keyPair2).secretKey,
                 receiverCookieSymmetricKey: __privateGet(this, _cookieSymmetricKey)
               });
+              __privateMethod(this, _rememberPeerInitiatedCookie, rememberPeerInitiatedCookie_fn).call(this, senderId, issuedCookie);
               if (fromTcp) {
                 const sent = __privateGet(this, _tcpRelays)?.sendOobToFriend(request.senderDhtPublicKey, response) ?? 0;
                 if (sent > 0) {
@@ -13473,6 +13786,20 @@ onmessage = (e) => {
                 return;
               }
               const friendId = carrierIdFromPublicKey(hs.senderRealPublicKey);
+              if (!__privateGet(this, _friends).has(friendId)) {
+                const now = Date.now();
+                const last = __privateGet(this, _strangerHandshakeLogMs).get(friendId) ?? 0;
+                if (now - last > 6e4) {
+                  if (__privateGet(this, _strangerHandshakeLogMs).size >= 256)
+                    __privateGet(this, _strangerHandshakeLogMs).clear();
+                  __privateGet(this, _strangerHandshakeLogMs).set(friendId, now);
+                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto handshake from ${friendId} ignored: not a friend${__privateGet(this, _pendingFriendRequests).has(friendId) ? " (request pending)" : ""}`);
+                }
+                return;
+              }
+              if (__privateMethod(this, _handshakeStartedByPeer, handshakeStartedByPeer_fn).call(this, friendId, hs.recipientCookie)) {
+                __privateMethod(this, _noteAcceptProof, noteAcceptProof_fn).call(this, friendId, "handshake");
+              }
               let state = __privateGet(this, _friendSessions).get(friendId);
               const weInitiated = state !== void 0 && state.handshakeSentMs !== void 0;
               if (state && state.established && state.peerSessionPublicKey && bytesEqual3(state.peerSessionPublicKey, hs.sessionPublicKey)) {
@@ -13574,6 +13901,10 @@ onmessage = (e) => {
               } else {
                 __privateMethod(this, _adoptRemote, adoptRemote_fn).call(this, state, remote.address, remote.port, true);
               }
+              if (isNewSession || !wasEstablished) {
+                state.onlineSent = false;
+                __privateMethod(this, _clearOnlineRetry, clearOnlineRetry_fn).call(this, friendId);
+              }
               if (isNewSession) {
                 state.sendPacketNumber = 0;
                 state.receiveBufferStart = 0;
@@ -13581,6 +13912,11 @@ onmessage = (e) => {
                 state.sendBufferStartNum = void 0;
                 state.recvBuffer = void 0;
                 state.lastRecvRequestMs = void 0;
+                state.recvAhead = void 0;
+                state.recvGapSinceMs = void 0;
+                if (state.recvGapTimer)
+                  clearTimeout(state.recvGapTimer);
+                state.recvGapTimer = void 0;
               } else {
                 state.sendPacketNumber ?? (state.sendPacketNumber = 0);
                 state.receiveBufferStart ?? (state.receiveBufferStart = 0);
@@ -13604,7 +13940,10 @@ onmessage = (e) => {
                 __privateGet(this, _friends).set(friendId, {
                   ...friend,
                   status: "online",
-                  acceptedAt: friend.acceptedAt ?? Date.now(),
+                  // Not acceptedAt: a JS peer before 0.1.184 answers a handshake
+                  // from anyone, so a session is no proof the friend accepted. It
+                  // still stops automatic friend-request re-sends, as acceptedAt did.
+                  sessionAt: friend.sessionAt ?? Date.now(),
                   remoteHost: remote.address,
                   remotePort: remote.port
                 });
@@ -13636,18 +13975,13 @@ onmessage = (e) => {
                   }
                   return __privateMethod(this, _sendPacket, sendPacket_fn).call(this, reply, { host: remote.address, port: remote.port });
                 };
-                void sendReply().then(() => {
-                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto handshake reply sent to ${friendId}${replyFromTcp ? " (tcp)" : ""}`);
-                  void __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_ONLINE, new Uint8Array()).catch((error) => {
-                    __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `send online packet failed: ${error.message}`);
-                  });
-                }).catch((error) => {
+                void sendReply().then((sent) => {
+                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto handshake reply sent to ${friendId}${replyFromTcp ? ` (tcp, ${sent ?? 0} relay(s))` : ""}`);
+                }, (error) => {
                   __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto handshake reply failed: ${error.message}`);
-                });
+                }).then(() => __privateMethod(this, _sendOnline, sendOnline_fn).call(this, friendId, "handshake"));
               } else {
-                void __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_ONLINE, new Uint8Array()).catch((error) => {
-                  __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `send online packet failed: ${error.message}`);
-                });
+                __privateMethod(this, _sendOnline, sendOnline_fn).call(this, friendId, "handshake");
               }
               return;
             }
@@ -13672,6 +14006,7 @@ onmessage = (e) => {
                     __privateGet(this, _cryptoEndpointIndex).clear();
                   __privateGet(this, _cryptoEndpointIndex).set(epKey, friendId);
                 }
+                state.peerAckCurrent = __privateMethod(this, _applyPeerAck, applyPeerAck_fn).call(this, state, opened.bufferStart);
                 const innerKind = opened.payload.length > 0 ? opened.payload[0] : -1;
                 const isSingleTransportKind = __privateGet(this, _opts3).bulkDataPacketId !== void 0 && innerKind === __privateGet(this, _opts3).bulkDataPacketId || innerKind === PACKET_ID_FILE_DATA || innerKind === PACKET_ID_FILE_FEC;
                 state.lastPingRecvMs = Date.now();
@@ -13699,18 +14034,10 @@ onmessage = (e) => {
                   }
                   state.lastUdpRecvMs = Date.now();
                 }
-                if (!isSingleTransportKind && opened.packetNumber < (state.receiveBufferStart ?? 0)) {
-                  let reorderable = false;
-                  if (innerKind === PACKET_ID_MESSAGE) {
-                    try {
-                      const t = decodeCarrierPacket(opened.payload.slice(1)).type;
-                      reorderable = t === PACKET_TYPE_BULKMSG || t === PACKET_TYPE_INVITE_REQUEST || t === PACKET_TYPE_INVITE_RESPONSE;
-                    } catch {
-                    }
-                  }
-                  if (!reorderable)
-                    continue;
-                }
+                if (state.onlineSent === false)
+                  __privateMethod(this, _sendOnlineIfOwed, sendOnlineIfOwed_fn).call(this, friendId, "data");
+                if (!isSingleTransportKind && __privateMethod(this, _isLosslessDuplicate, isLosslessDuplicate_fn).call(this, state, opened.packetNumber, opened.payload))
+                  continue;
                 {
                   const trackedLow = (state.peerBaseNonce[state.peerBaseNonce.length - 2] << 8 | state.peerBaseNonce[state.peerBaseNonce.length - 1]) >>> 0;
                   const fwd = (opened.nonceLast2 - trackedLow & 65535) < 32768;
@@ -13722,10 +14049,12 @@ onmessage = (e) => {
                 const kind = opened.payload[0] ?? -1;
                 const inner = opened.payload.slice(1);
                 const consumesReliableNumber = kind !== PACKET_ID_REQUEST && kind < 192 && kind !== __privateGet(this, _opts3).bulkDataPacketId;
-                if (consumesReliableNumber) {
-                  state.receiveBufferStart = Math.max(state.receiveBufferStart ?? 0, opened.packetNumber + 1 >>> 0);
+                try {
+                  __privateMethod(this, _deliverLosslessPayload, deliverLosslessPayload_fn).call(this, friendId, state, kind, inner, remote, opened.packetNumber);
+                } finally {
+                  if (consumesReliableNumber)
+                    __privateMethod(this, _noteReliableReceived, noteReliableReceived_fn).call(this, friendId, state, opened.packetNumber);
                 }
-                __privateMethod(this, _deliverLosslessPayload, deliverLosslessPayload_fn).call(this, friendId, state, kind, inner, remote, opened.packetNumber);
                 return;
               }
               if (remote.address.startsWith("tcp:")) {
@@ -13888,6 +14217,7 @@ onmessage = (e) => {
                 session.friendDhtPublicKey ?? (session.friendDhtPublicKey = new Uint8Array(friendKey));
               }
               __privateGet(this, _friendSessions).set(friendId, session);
+              __privateMethod(this, _sendOnlineIfOwed, sendOnlineIfOwed_fn).call(this, friendId, "tcp-route");
               if (!session.established) {
                 __privateGet(this, _cookieRetryCount).delete(friendId);
                 void __privateMethod(this, _initiateSession, initiateSession_fn).call(this, friendId).catch(() => {
@@ -13959,6 +14289,20 @@ onmessage = (e) => {
             clearTimeout(timer);
           __privateGet(this, _profileRetryTimers).clear();
           __privateGet(this, _profileRetryAttempts).clear();
+          for (const timer of __privateGet(this, _onlineRetryTimers).values())
+            clearTimeout(timer);
+          __privateGet(this, _onlineRetryTimers).clear();
+          __privateGet(this, _onlineRetryAttempts).clear();
+          if (__privateGet(this, _assemblySweepTimer)) {
+            clearInterval(__privateGet(this, _assemblySweepTimer));
+            __privateSet(this, _assemblySweepTimer, void 0);
+          }
+          for (const s of __privateGet(this, _friendSessions).values()) {
+            if (s.recvGapTimer) {
+              clearTimeout(s.recvGapTimer);
+              s.recvGapTimer = void 0;
+            }
+          }
           __privateGet(this, _fileRelayNegotiationUntil).clear();
           if (__privateGet(this, _expressPollTimer)) {
             clearInterval(__privateGet(this, _expressPollTimer));
@@ -14145,6 +14489,10 @@ onmessage = (e) => {
             udpLocalPort: __privateGet(this, _udp)?.localPort() ?? null,
             tcpRelayConnected: relays.length,
             tcpOnionSent: __privateGet(this, _diagTcpOnionSent),
+            onionPoolBuilds: __privateGet(this, _diagOnionPoolBuilds),
+            routeWalksInFlight: __privateGet(this, _routeWalksInFlight),
+            routeWalks: __privateGet(this, _diagRouteWalks),
+            routeWalksDeferred: __privateGet(this, _diagRouteWalksDeferred),
             tcpOnionRecv: __privateGet(this, _diagTcpOnionRecv),
             tcpRelayEndpoints: relays.map((r) => ({ host: r.host, port: r.port }))
           };
@@ -14182,8 +14530,9 @@ onmessage = (e) => {
           const friendAddress = parseCarrierAddress(pubkey);
           const friendId = carrierIdFromPublicKey(friendAddress.publicKey);
           const existing = __privateGet(this, _friends).get(friendId);
-          if (existing?.acceptedAt && !opts?.force) {
-            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend request skipped \u2014 ${friendId} already accepted at ${new Date(existing.acceptedAt).toISOString()}`);
+          const settledAt = existing?.acceptedAt ?? existing?.sessionAt;
+          if (settledAt && !opts?.force) {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend request skipped \u2014 ${friendId} already ${existing?.acceptedAt ? "accepted" : "had a session"} at ${new Date(settledAt).toISOString()}`);
             __privateSet(this, _lastFriendRequestDispatch, {
               transport: "onion",
               routes: 0,
@@ -14339,7 +14688,8 @@ onmessage = (e) => {
             ...pushed?.clientMeta ?? {},
             ...pushed?.profileExt ?? {},
             status: "offline",
-            acceptedAt: Date.now()
+            acceptedAt: Date.now(),
+            acceptProof: "local"
           };
           __privateGet(this, _friends).set(pubkey, record);
           const session = __privateGet(this, _friendSessions).get(pubkey);
@@ -14425,6 +14775,7 @@ onmessage = (e) => {
             clearTimeout(profileRetry);
           __privateGet(this, _profileRetryTimers).delete(friendId);
           __privateGet(this, _profileRetryAttempts).delete(friendId);
+          __privateMethod(this, _clearOnlineRetry, clearOnlineRetry_fn).call(this, friendId);
           __privateGet(this, _greetingSentTo).delete(friendId);
           if (existed) {
             __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
@@ -14455,16 +14806,32 @@ onmessage = (e) => {
          * to re-queue, and re-sending a message that did arrive is how the same
          * picture turns up twice on a phone — which is a worse bug than a tick that
          * is one shade too confident. Report the uncertainty; let the host show it.
+         *
+         * Pass `opts.deliveryId` from the host's outbox, the same on every attempt
+         * at one message. Up to 0.1.181 every call made a new id, and to a friend
+         * with protoVersion >= 2 whose session was not proven (a backgrounded phone)
+         * every 5 s retry was a new express post, then a throw after 15 s although
+         * the message was stored. A web host re-sent on the throw: one message showed
+         * 7 times on the iPhone, each with its own time (Decent-Network/feedback#25).
+         * Now a message goes to express at most once per delivery id, and a message
+         * stored there resolves "offline".
          */
-        async sendText(pubkey, text) {
+        async sendText(pubkey, text, opts = {}) {
           if (text.length > 0 && !text.startsWith(TEXT_ACK_PREFIX) && __privateMethod(this, _shouldRequireTextAck, shouldRequireTextAck_fn).call(this, pubkey)) {
-            await this.sendTextUntilAck(pubkey, text, {
+            const r = await this.sendTextUntilAck(pubkey, text, {
+              deliveryId: opts.deliveryId,
               timeoutMs: TEXT_AUTO_ACK_TIMEOUT_MS,
               retryIntervalMs: Math.min(TEXT_ACK_RETRY_MS, TEXT_AUTO_ACK_TIMEOUT_MS)
             });
-            return { delivery: "acked" };
+            return { delivery: r.delivery, deliveryId: r.deliveryId };
+          }
+          if (opts.deliveryId !== void 0 && __privateGet(this, _expressPostedIds).has(__privateMethod(this, _expressPostKey, expressPostKey_fn).call(this, pubkey, opts.deliveryId))) {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `sendText: ${opts.deliveryId} to ${pubkey} is already on express \u2014 not posting it again`);
+            return { delivery: "offline", deliveryId: opts.deliveryId };
           }
           const outcome = await __privateMethod(this, _sendTextPlain, sendTextPlain_fn).call(this, pubkey, text);
+          if (outcome.via === "offline" && opts.deliveryId !== void 0)
+            __privateMethod(this, _noteExpressPosted, noteExpressPosted_fn).call(this, pubkey, opts.deliveryId);
           if (outcome.via === "offline")
             return { delivery: "offline" };
           if (outcome.endPacketNumber === void 0)
@@ -14493,25 +14860,34 @@ onmessage = (e) => {
           const retryIntervalMs = Math.max(250, opts.retryIntervalMs ?? TEXT_ACK_RETRY_MS);
           const timeoutMs = Math.max(retryIntervalMs, opts.timeoutMs ?? TEXT_ACK_TIMEOUT_MS);
           const envelope = encodeTextAckEnvelope({ t: "msg", id: deliveryId, text });
+          const postKey = __privateMethod(this, _expressPostKey, expressPostKey_fn).call(this, pubkey, deliveryId);
           const started = Date.now();
           let lastError;
           while (Date.now() - started < timeoutMs) {
             const remaining = Math.max(1, timeoutMs - (Date.now() - started));
             const waitMs = Math.min(retryIntervalMs, remaining);
             const ackPromise = __privateMethod(this, _waitForTextAck, waitForTextAck_fn).call(this, deliveryId, waitMs);
+            const posted = __privateGet(this, _expressPostedIds).has(postKey);
+            let outcome;
             try {
-              await __privateMethod(this, _sendTextPlain, sendTextPlain_fn).call(this, pubkey, envelope);
+              outcome = await __privateMethod(this, _sendTextPlain, sendTextPlain_fn).call(this, pubkey, envelope, { allowExpress: !posted });
             } catch (error) {
               __privateMethod(this, _cancelTextAckWait, cancelTextAckWait_fn).call(this, deliveryId);
               lastError = error;
               await sleep(waitMs);
               continue;
             }
+            if (outcome.via === "offline")
+              __privateMethod(this, _noteExpressPosted, noteExpressPosted_fn).call(this, pubkey, deliveryId);
             if (await ackPromise) {
-              return { deliveryId };
+              return { deliveryId, delivery: "acked" };
             }
           }
           __privateMethod(this, _cancelTextAckWait, cancelTextAckWait_fn).call(this, deliveryId);
+          if (__privateGet(this, _expressPostedIds).has(postKey)) {
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `text ${deliveryId} to ${pubkey}: no ACK within ${timeoutMs}ms; it is on express \u2014 delivery "offline"`);
+            return { deliveryId, delivery: "offline" };
+          }
           throw lastError ?? new Error(`text delivery ACK timed out for ${pubkey}`);
         }
         /**
@@ -14541,10 +14917,49 @@ onmessage = (e) => {
             throw new Error("no express node is configured");
           const enveloped = (friend.protoVersion ?? 0) >= 2;
           const deliveryId = enveloped ? opts.deliveryId ?? createTextDeliveryId() : void 0;
-          const body2 = deliveryId ? encodeTextAckEnvelope({ t: "msg", id: deliveryId, text }) : text;
-          await __privateGet(this, _express).sendOfflineText(pubkey, encodeFriendMessagePacket(body2));
+          const body = deliveryId ? encodeTextAckEnvelope({ t: "msg", id: deliveryId, text }) : text;
+          await __privateGet(this, _express).sendOfflineText(pubkey, encodeFriendMessagePacket(body));
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `sendTextViaExpress: posted to express for ${pubkey}${deliveryId ? ` (id ${deliveryId})` : ""}`);
           return deliveryId ? { delivery: "offline", deliveryId } : { delivery: "offline" };
+        }
+        /**
+         * Send a file to a friend who is offline the way iOS does (1.8.37+,
+         * OFFLINE-FILE-MESSAGE.md): packed into ONE binary friend message,
+         * [u32 BE metaLen][meta JSON {type:"file",filename,contentType,size}][bytes],
+         * and posted to the Express store-and-forward relay as the Carrier core posts
+         * any friend message to an offline friend (a PACKET_TYPE_MESSAGE carrying the
+         * raw bytes, encrypted; no base64, no text envelope). The friend's app pulls
+         * it and stores it as a received file (a `voice-<ms>-<ms>.m4a` name makes it
+         * a voice note).
+         *
+         * Refuses a message over 5 242 880 bytes in all (meta included), and a meta
+         * over 4096 bytes (a very long name). `fileId` is the SHA-256 hex of the file
+         * bytes; the Beagle apps key the row as `ft-` + its first 16 chars, so a host
+         * can give its own row the same id. Throws when the friend is unknown, there
+         * is no express node, or the post fails.
+         */
+        async sendFileViaExpress(pubkey, file) {
+          if (!__privateGet(this, _friends).has(pubkey))
+            throw new Error(`Not a friend: ${pubkey}`);
+          const name = file.name;
+          if (typeof name !== "string" || name.length === 0)
+            throw new Error("a file needs a name");
+          if (!(file.data instanceof Uint8Array))
+            throw new Error("file data must be a Uint8Array");
+          const message = encodeAndroidFileEnvelope(name, file.data, file.contentType || contentTypeForFileName(name));
+          const metaLen = message.length - 4 - file.data.length;
+          if (metaLen > OFFLINE_FILE_MAX_META_BYTES) {
+            throw new Error(`file name too long for an offline file message (meta ${metaLen} B > 4096 B)`);
+          }
+          if (message.length > OFFLINE_FILE_MAX_MESSAGE_BYTES) {
+            throw new Error(`file too large for Express: ${message.length} B with its header, the limit is ${OFFLINE_FILE_MAX_MESSAGE_BYTES} B (5 MiB)`);
+          }
+          if (!__privateGet(this, _express)?.hasNodes())
+            throw new Error("no express node is configured");
+          const fileId = sha256Hex(file.data);
+          await __privateGet(this, _express).sendOfflineText(pubkey, encodeFriendMessagePacket(message));
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `sendFileViaExpress: "${name}" (${file.data.length} B, ft-${fileId.slice(0, 16)}) posted to express for ${pubkey}`);
+          return { delivery: "offline", fileId };
         }
         waitForFriendConnected(pubkey, timeoutMs = 3e4) {
           return __privateMethod(this, _waitForFriendConnected, waitForFriendConnected_fn).call(this, pubkey, timeoutMs);
@@ -14616,13 +15031,13 @@ onmessage = (e) => {
           const gw = __privateGet(this, _expressPush);
           if (!gw)
             return { answered: false, reason: "express push gateway is off" };
-          const body2 = { ...payload, userId: payload.userId ?? this.userid() };
-          if (body2.userId !== this.userid())
+          const body = { ...payload, userId: payload.userId ?? this.userid() };
+          if (body.userId !== this.userid())
             throw new Error("a call push names its caller: payload.userId must be our userid");
           const fields = [
             ["env", opts.env ?? "prod"],
             ["account", calleeUserId],
-            ["payload", JSON.stringify(body2)],
+            ["payload", JSON.stringify(body)],
             ["appName", opts.appName ?? "webrtc"]
           ];
           return gw.send("call", fields);
@@ -14682,6 +15097,19 @@ onmessage = (e) => {
         /** Test seam: one decrypted lossless payload from `fromPubkey`, exactly as
          *  the datagram handler delivers it, over a session marked established (the
          *  state after a completed handshake, friend record or not). */
+        /** @internal Test seams for the cached onion pool and the route-walk gate. */
+        _testOnionPool(nodeD) {
+          return __privateMethod(this, _onionCandidatePool, onionCandidatePool_fn).call(this, nodeD).map((c) => c.node);
+        }
+        _testRecordNodeFailure(nodeId) {
+          __privateMethod(this, _recordNodeFailure, recordNodeFailure_fn).call(this, nodeId);
+        }
+        _testDiscoverFriendRoutes(friendPublicKey) {
+          return __privateMethod(this, _discoverFriendRoutes, discoverFriendRoutes_fn).call(this, friendPublicKey);
+        }
+        _testRouteWalkJitter(friendId) {
+          return __privateGet(this, _onionLookupJitter).get(`routes:${friendId}`);
+        }
         _testDispatchMessengerPacket(fromPubkey, kind, inner) {
           let session = __privateGet(this, _friendSessions).get(fromPubkey);
           if (!session) {
@@ -14739,11 +15167,11 @@ onmessage = (e) => {
           }
           const deliveryTimeoutMs = opts.deliveryTimeoutMs ?? Math.min(18e4, 2e4 + Math.ceil(envelope.length / 50));
           if (__privateMethod(this, _shouldRequireTextAck, shouldRequireTextAck_fn).call(this, pubkey)) {
-            await this.sendTextUntilAck(pubkey, envelope, {
+            const r = await this.sendTextUntilAck(pubkey, envelope, {
               timeoutMs: deliveryTimeoutMs,
               retryIntervalMs: Math.max(TEXT_ACK_RETRY_MS, Math.ceil(envelope.length / 100))
             });
-            return { delivery: "acked" };
+            return { delivery: r.delivery };
           }
           const outcome = await __privateMethod(this, _sendTextPlain, sendTextPlain_fn).call(this, pubkey, envelope);
           if (outcome.via === "offline")
@@ -14903,11 +15331,31 @@ onmessage = (e) => {
           __privateGet(this, _events).on("file-complete", cb);
         }
         /** Transfer cancelled by the peer: { friendId, fileId, sending }. */
+        /**
+         * A file transfer ended without completing. `reason`:
+         *  - "local": we cancelled it (cancelFile / cancelFileById);
+         *  - "no-response": our offer got no answer for 60 s;
+         *  - "timeout": 60 s without progress — a send whose acks stopped, or an
+         *    accepted receive whose data stopped (the sender vanished);
+         *  - "peer-offline": the friend's session was torn down (timeout, re-key,
+         *    KILL or OFFLINE), which ends every live transfer with it, both ways;
+         *  - absent: the friend cancelled it (FILECONTROL KILL).
+         * For an incoming transfer (`sending: false`) ended by "timeout" or
+         * "peer-offline", `received`/`total` say how far it got and `resumable`
+         * whether the contiguous prefix is in the resume dir: a re-offer of the same
+         * fileId, once accepted, continues from there.
+         */
         onFileCancel(cb) {
           __privateGet(this, _events).on("file-cancel", cb);
         }
         onFriendConnection(cb) {
           __privateGet(this, _events).on("friendConnection", cb);
+        }
+        /** A friend we asked accepted, with the proof (0.1.184). Fires once per
+         *  friend. A session alone never fires it: before 0.1.184 a JS peer answered
+         *  a handshake from anyone. */
+        onFriendAccepted(cb) {
+          __privateGet(this, _events).on("friendAccepted", cb);
         }
         onFriendInfo(cb) {
           __privateGet(this, _events).on("friendInfo", cb);
@@ -15033,6 +15481,98 @@ onmessage = (e) => {
             punkId: opts.punkId
           };
         }
+        /** Test seam: a session in the state the handshake leaves it in (established,
+         *  ONLINE owed), with or without a transport, then the handshake's ONLINE send. */
+        _testHandshakeDone(friendId, transport) {
+          const session = {
+            ourSessionKeyPair: import_tweetnacl17.default.box.keyPair(),
+            ourBaseNonce: randomBytes2(24),
+            peerBaseNonce: randomBytes2(24),
+            sessionSharedKey: randomBytes2(32),
+            established: true,
+            sessionEstablishedAtMs: Date.now(),
+            sendPacketNumber: 0,
+            receiveBufferStart: 0,
+            remote: transport.remote,
+            hasTcpRoute: transport.tcp === true,
+            onlineSent: false
+          };
+          __privateGet(this, _friendSessions).set(friendId, session);
+          __privateMethod(this, _clearOnlineRetry, clearOnlineRetry_fn).call(this, friendId);
+          __privateMethod(this, _sendOnline, sendOnline_fn).call(this, friendId, "handshake");
+        }
+        /** Test seam: give a session a transport without any hook running (what a
+         *  path learned elsewhere looks like), or run the TCP-route hook. */
+        _testSetTransport(friendId, t) {
+          const session = __privateGet(this, _friendSessions).get(friendId);
+          if (!session)
+            return;
+          if (t.remote)
+            session.remote = t.remote;
+          if (t.tcp !== void 0)
+            session.hasTcpRoute = t.tcp;
+          if (t.runTcpHook)
+            __privateMethod(this, _sendOnlineIfOwed, sendOnlineIfOwed_fn).call(this, friendId, "tcp-route");
+        }
+        /** Test seam: a decrypted lossless packet `pn` from `friendId` (payload =
+         *  kind byte + body), through the same dedup / ack-point / delivery steps as
+         *  the CRYPTO_DATA path. Returns false when it was dropped as a duplicate. */
+        _testReceiveLossless(friendId, pn, payload, bufferStart) {
+          const state = __privateGet(this, _friendSessions).get(friendId);
+          if (!state)
+            throw new Error("no session");
+          if (bufferStart !== void 0)
+            state.peerAckCurrent = __privateMethod(this, _applyPeerAck, applyPeerAck_fn).call(this, state, bufferStart);
+          const kind = payload[0] ?? -1;
+          const single = __privateGet(this, _opts3).bulkDataPacketId !== void 0 && kind === __privateGet(this, _opts3).bulkDataPacketId || kind === PACKET_ID_FILE_DATA || kind === PACKET_ID_FILE_FEC;
+          if (!single && __privateMethod(this, _isLosslessDuplicate, isLosslessDuplicate_fn).call(this, state, pn, payload))
+            return false;
+          const remote = state.remote ?? { host: "127.0.0.1", port: 33445 };
+          try {
+            __privateMethod(this, _deliverLosslessPayload, deliverLosslessPayload_fn).call(this, friendId, state, kind, payload.slice(1), { address: remote.host, port: remote.port }, pn);
+          } finally {
+            if (kind !== PACKET_ID_REQUEST && kind < 192 && kind !== __privateGet(this, _opts3).bulkDataPacketId) {
+              __privateMethod(this, _noteReliableReceived, noteReliableReceived_fn).call(this, friendId, state, pn);
+            }
+          }
+          return true;
+        }
+        /** Test seam: send one messenger packet of `kind`, and read when our last
+         *  keepalive (ALIVE) went out. */
+        async _testSendMessenger(friendId, kind) {
+          await __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, kind, new Uint8Array()).catch(() => void 0);
+        }
+        _testLastAliveSentMs(friendId) {
+          return __privateGet(this, _friendSessions).get(friendId)?.lastPingSentMs;
+        }
+        /** Test seam: watch the PACKET_ID_REQUESTs we send. */
+        _testOnRequest(cb) {
+          __privateSet(this, _testRequestSink, cb);
+        }
+        /** Test seam: watch the packets we resend on a peer's PACKET_ID_REQUEST. */
+        _testOnResend(cb) {
+          __privateSet(this, _testResendSink, cb);
+        }
+        /** Test seam: our send window (the peer's applied ack point, parked numbers, next number). */
+        _testSendState(friendId) {
+          const s = __privateGet(this, _friendSessions).get(friendId);
+          return { ackPoint: s?.sendBufferStartNum, parked: [...s?.sendArray?.keys() ?? []], next: s?.sendPacketNumber ?? 0 };
+        }
+        /** Test seam: the ack point we report (receiveBufferStart) and the gap. */
+        _testRecvState(friendId) {
+          const s = __privateGet(this, _friendSessions).get(friendId);
+          return { ackPoint: s?.receiveBufferStart ?? 0, ahead: s?.recvAhead?.size ?? 0, gapOpen: !!s?.recvGapTimer };
+        }
+        /** Test seam: what this session owes / has parked. */
+        _testOnlineState(friendId) {
+          const session = __privateGet(this, _friendSessions).get(friendId);
+          return {
+            onlineSent: session?.onlineSent,
+            parkedKinds: [...session?.sendArray?.entries() ?? []].map(([n, p]) => [n, p[0] ?? -1]),
+            retryPending: __privateGet(this, _onlineRetryTimers).has(friendId),
+            retryAttempts: __privateGet(this, _onlineRetryAttempts).get(friendId) ?? 0
+          };
+        }
         /** Test seam: the friendreq packet sendFriendRequest would send. */
         _testEncodeOwnFriendRequest(hello) {
           return __privateMethod(this, _encodeOwnFriendRequest, encodeOwnFriendRequest_fn).call(this, hello);
@@ -15082,6 +15622,14 @@ onmessage = (e) => {
       _lastFriendRequestDispatch = new WeakMap();
       _nodeHealth = new WeakMap();
       _nodeBlacklist = new WeakMap();
+      _onionPoolCache = new WeakMap();
+      _onionPoolGen = new WeakMap();
+      _diagOnionPoolBuilds = new WeakMap();
+      _pkBytesCache = new WeakMap();
+      _onionLookupJitter = new WeakMap();
+      _routeWalksInFlight = new WeakMap();
+      _diagRouteWalks = new WeakMap();
+      _diagRouteWalksDeferred = new WeakMap();
       _pendingFriendRequests = new WeakMap();
       _friends = new WeakMap();
       _textHandlers = new WeakMap();
@@ -15112,6 +15660,8 @@ onmessage = (e) => {
       _onionLookupCooldown = new WeakMap();
       _onionLookupMisses = new WeakMap();
       _onionHopKeyCache = new WeakMap();
+      _peerInitiatedCookies = new WeakMap();
+      _strangerHandshakeLogMs = new WeakMap();
       _routeRequestCooldown = new WeakMap();
       _announceRouteUsed = new WeakMap();
       _friendDhtKeys = new WeakMap();
@@ -15130,6 +15680,7 @@ onmessage = (e) => {
       _initiateSkipLogged = new WeakMap();
       _bulkCompleted = new WeakMap();
       _bulkAssembly = new WeakMap();
+      _assemblySweepTimer = new WeakMap();
       _inviteAssembly = new WeakMap();
       _initiateDeferSinceMs = new WeakMap();
       _lastDesyncDeleteMs = new WeakMap();
@@ -15138,6 +15689,10 @@ onmessage = (e) => {
       _pendingRequesterProfiles = new WeakMap();
       _profileRetryAttempts = new WeakMap();
       _profileRetryTimers = new WeakMap();
+      _testRequestSink = new WeakMap();
+      _testResendSink = new WeakMap();
+      _onlineRetryTimers = new WeakMap();
+      _onlineRetryAttempts = new WeakMap();
       _greetingSentTo = new WeakMap();
       _selfAnnouncePromise = new WeakMap();
       _selfAnnounceRunCount = new WeakMap();
@@ -15156,7 +15711,7 @@ onmessage = (e) => {
       _recordOutgoingFriendRequest = new WeakSet();
       recordOutgoingFriendRequest_fn = function(friendId, address, nospam, hello) {
         const existing = __privateGet(this, _friends).get(friendId);
-        if (existing?.status === "online" || existing?.acceptedAt) {
+        if (existing?.status === "online" || existing?.acceptedAt || existing?.sessionAt) {
           return;
         }
         __privateGet(this, _friends).set(friendId, {
@@ -15179,7 +15734,7 @@ onmessage = (e) => {
         }
       };
       _sendTextPlain = new WeakSet();
-      sendTextPlain_fn = async function(pubkey, text) {
+      sendTextPlain_fn = async function(pubkey, text, opts = {}) {
         const friend = __privateGet(this, _friends).get(pubkey);
         if (!friend) {
           throw new Error(`Not a friend: ${pubkey}`);
@@ -15233,6 +15788,8 @@ onmessage = (e) => {
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `sendText: empty connection-kick to ${pubkey} with no live session \u2014 dropping (not flooding express)`);
           return { via: "online" };
         }
+        if (opts.allowExpress === false)
+          return { via: "held" };
         if (__privateGet(this, _express)?.hasNodes() && !__privateGet(this, _opts3).expressControlPlaneOnly) {
           await __privateGet(this, _express).sendOfflineText(pubkey, packet);
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `sendText: queued via express for ${pubkey}`);
@@ -15246,6 +15803,22 @@ onmessage = (e) => {
         if ((friend?.protoVersion ?? 0) >= 2)
           return true;
         return __privateGet(this, _opts3).expressControlPlaneOnly === true;
+      };
+      _expressPostedIds = new WeakMap();
+      _expressPostKey = new WeakSet();
+      expressPostKey_fn = function(pubkey, deliveryId) {
+        return `${pubkey}:${deliveryId}`;
+      };
+      _noteExpressPosted = new WeakSet();
+      noteExpressPosted_fn = function(pubkey, deliveryId) {
+        const now = Date.now();
+        __privateGet(this, _expressPostedIds).delete(__privateMethod(this, _expressPostKey, expressPostKey_fn).call(this, pubkey, deliveryId));
+        __privateGet(this, _expressPostedIds).set(__privateMethod(this, _expressPostKey, expressPostKey_fn).call(this, pubkey, deliveryId), now);
+        for (const [k, at] of __privateGet(this, _expressPostedIds)) {
+          if (__privateGet(this, _expressPostedIds).size <= EXPRESS_POSTED_IDS_MAX && now - at < EXPRESS_POSTED_IDS_TTL_MS)
+            break;
+          __privateGet(this, _expressPostedIds).delete(k);
+        }
       };
       _waitForTextAck = new WeakSet();
       waitForTextAck_fn = function(deliveryId, timeoutMs) {
@@ -15579,15 +16152,7 @@ onmessage = (e) => {
         session.friendRealPublicKey ?? (session.friendRealPublicKey = senderPublicKey);
         session.friendDhtPublicKey = friendDhtPublicKey;
         __privateMethod(this, _learnFriendDhtKey, learnFriendDhtKey_fn).call(this, senderId, friendDhtPublicKey);
-        if (friend.status === "requested" && !friend.acceptedAt) {
-          __privateGet(this, _friends).set(senderId, {
-            ...friend,
-            status: "offline",
-            acceptedAt: Date.now()
-          });
-          __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
-          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend ${senderId} accepted (proof: dhtpk_update); will stop re-sending friend request`);
-        }
+        __privateMethod(this, _noteAcceptProof, noteAcceptProof_fn).call(this, senderId, "dhtpk");
         const friendDhtId = carrierIdFromPublicKey(friendDhtPublicKey);
         const knownMatch = __privateGet(this, _knownNodes).find((node) => node.pk === friendDhtId || node.pk === senderId);
         if (knownMatch) {
@@ -15746,14 +16311,7 @@ onmessage = (e) => {
             return;
           }
           const text = new TextDecoder().decode(decoded.data);
-          const friend = __privateGet(this, _friends).get(fromUserId);
-          if (friend && friend.status === "requested" && !friend.acceptedAt) {
-            __privateGet(this, _friends).set(fromUserId, {
-              ...friend,
-              status: "offline",
-              acceptedAt: Date.now()
-            });
-            __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
+          if (__privateMethod(this, _noteAcceptProof, noteAcceptProof_fn).call(this, fromUserId, "offline-message")) {
             __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `offline message from ${fromUserId} treated as implicit accept of our friend request; friend is now accepted, queueing DHT-PK announce`);
             try {
               const realPk = base58ToBytes(fromUserId);
@@ -15785,33 +16343,39 @@ onmessage = (e) => {
         const routeKey = `routes:${carrierIdFromPublicKey(friendPublicKey)}`;
         if (!userInitiated) {
           const misses = __privateGet(this, _onionLookupMisses).get(routeKey) ?? 0;
-          const budget = Math.min(DHT_PK_ANNOUNCE_COOLDOWN_MS * Math.max(1, misses), ONION_LOOKUP_MAX_BACKOFF_MS);
+          const jitter = __privateGet(this, _onionLookupJitter).get(routeKey) ?? 1;
+          const budget = Math.min(DHT_PK_ANNOUNCE_COOLDOWN_MS * Math.max(1, misses), ONION_LOOKUP_MAX_BACKOFF_MS) * jitter;
           const since = Date.now() - (__privateGet(this, _onionLookupCooldown).get(routeKey) ?? 0);
           if (since < budget) {
-            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `route discovery for ${routeKey} skipped: ${Math.round(since / 1e3)}s since last (budget ${Math.round(budget / 1e3)}s, misses ${misses})`);
+            __privateMethod(this, _debugVerboseLog, debugVerboseLog_fn).call(this, `route discovery for ${routeKey} skipped: ${Math.round(since / 1e3)}s since last (budget ${Math.round(budget / 1e3)}s, misses ${misses})`);
+            return [];
+          }
+          if (ROUTE_WALKS_MAX_IN_FLIGHT > 0 && __privateGet(this, _routeWalksInFlight) >= ROUTE_WALKS_MAX_IN_FLIGHT) {
+            __privateMethod(this, _debugVerboseLog, debugVerboseLog_fn).call(this, `route discovery for ${routeKey} deferred: ${__privateGet(this, _routeWalksInFlight)} walks in flight`);
+            __privateSet(this, _diagRouteWalksDeferred, __privateGet(this, _diagRouteWalksDeferred) + 1);
             return [];
           }
           __privateGet(this, _onionLookupCooldown).set(routeKey, Date.now());
+          __privateGet(this, _onionLookupJitter).set(routeKey, 0.8 + Math.random() * 0.4);
+          __privateSet(this, _routeWalksInFlight, __privateGet(this, _routeWalksInFlight) + 1);
+          __privateSet(this, _diagRouteWalks, __privateGet(this, _diagRouteWalks) + 1);
+          try {
+            return await __privateMethod(this, _walkFriendRoutes, walkFriendRoutes_fn).call(this, friendPublicKey, routeKey, false);
+          } finally {
+            __privateSet(this, _routeWalksInFlight, __privateGet(this, _routeWalksInFlight) - 1);
+          }
+        }
+        return __privateMethod(this, _walkFriendRoutes, walkFriendRoutes_fn).call(this, friendPublicKey, routeKey, true);
+      };
+      _walkFriendRoutes = new WeakSet();
+      walkFriendRoutes_fn = async function(friendPublicKey, routeKey, userInitiated) {
+        if (!__privateGet(this, _keyPair2)) {
+          throw new Error("Peer is not started");
         }
         const searchKey = createEphemeralKeyPair();
         const routes = [];
         const routeSeen = /* @__PURE__ */ new Set();
-        const pkCache = /* @__PURE__ */ new Map();
-        const nodePkBytes = (node) => {
-          if (!node.pk)
-            return null;
-          let v = pkCache.get(node.pk);
-          if (v === void 0) {
-            try {
-              const b = base58ToBytes(node.pk);
-              v = b.length === 32 ? b : null;
-            } catch {
-              v = null;
-            }
-            pkCache.set(node.pk, v);
-          }
-          return v;
-        };
+        const nodePkBytes = (node) => __privateMethod(this, _nodePkBytes, nodePkBytes_fn).call(this, node);
         const xorCloser2 = (a, b) => {
           for (let i = 0; i < 32; i++) {
             const da = a[i] ^ friendPublicKey[i];
@@ -16467,7 +17031,7 @@ onmessage = (e) => {
             }
           }
           if (!haveEndpoint) {
-            if (!friend.acceptedAt && friend.address) {
+            if (!friend.acceptedAt && !friend.sessionAt && friend.address) {
               const lastFr = __privateGet(this, _friendRequestResendCooldown).get(friendId) ?? 0;
               if (now - lastFr > 6e4) {
                 __privateGet(this, _friendRequestResendCooldown).set(friendId, now);
@@ -16516,6 +17080,9 @@ onmessage = (e) => {
       };
       _deliverLosslessPayload = new WeakSet();
       deliverLosslessPayload_fn = function(friendId, state, kind, inner, remote, packetNumber = 0) {
+        if (kind === PACKET_ID_MESSAGE || kind === PACKET_ID_ACTION || kind === PACKET_ID_FILE_SENDREQUEST || kind >= 160 && kind <= 254) {
+          __privateMethod(this, _noteAcceptProof, noteAcceptProof_fn).call(this, friendId, "message");
+        }
         if (kind === PACKET_ID_FILE_CONTROL)
           __privateGet(this, _fileRelayNegotiationUntil).delete(friendId);
         if (kind >= PACKET_ID_FILE_SENDREQUEST && kind <= PACKET_ID_FILE_FEC) {
@@ -16526,6 +17093,7 @@ onmessage = (e) => {
         if (kind === PACKET_ID_ONLINE) {
           __privateMethod(this, _setFriendOnline, setFriendOnline_fn).call(this, friendId, remote.address, remote.port);
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `crypto online packet received from ${friendId}`);
+          __privateMethod(this, _sendOnlineIfOwed, sendOnlineIfOwed_fn).call(this, friendId, "friend-online");
           __privateMethod(this, _sendProfileAndGreeting, sendProfileAndGreeting_fn).call(this, friendId);
           return;
         }
@@ -16546,6 +17114,7 @@ onmessage = (e) => {
         }
         if (kind === PACKET_ID_UDP_ENDPOINT) {
           __privateMethod(this, _handleUdpEndpointOffer, handleUdpEndpointOffer_fn).call(this, friendId, inner);
+          __privateMethod(this, _sendOnlineIfOwed, sendOnlineIfOwed_fn).call(this, friendId, "udp-endpoint");
           return;
         }
         if (kind === PACKET_ID_REQUEST) {
@@ -16735,40 +17304,170 @@ onmessage = (e) => {
         }
         __privateMethod(this, _debugVerboseLog, debugVerboseLog_fn).call(this, `unknown messenger packet kind ${kind} from ${friendId}`);
       };
-      _drainRecvBufferContiguous = new WeakSet();
-      drainRecvBufferContiguous_fn = function(friendId, state, remote) {
-        const buf = state.recvBuffer;
-        if (!buf)
+      _isLosslessDuplicate = new WeakSet();
+      isLosslessDuplicate_fn = function(state, packetNumber, payload) {
+        const ack = state.receiveBufferStart ?? 0;
+        const below = packetNumber - ack >>> 0 >= 2147483648;
+        if (!below && !state.recvAhead?.has(packetNumber))
+          return false;
+        if (payload[0] === PACKET_ID_MESSAGE) {
+          try {
+            const t = decodeCarrierPacket(payload.slice(1)).type;
+            if (t === PACKET_TYPE_BULKMSG || t === PACKET_TYPE_INVITE_REQUEST || t === PACKET_TYPE_INVITE_RESPONSE)
+              return false;
+          } catch {
+          }
+        }
+        return true;
+      };
+      _recvRecoveryWanted = new WeakSet();
+      recvRecoveryWanted_fn = function(friendId, state) {
+        const prefix = `${friendId}:`;
+        const ack = state.receiveBufferStart ?? 0;
+        for (const [key2, entry] of __privateGet(this, _bulkAssembly)) {
+          if (!key2.startsWith(prefix))
+            continue;
+          if (entry.total >= RECV_RECOVERY_MIN_BULK_BYTES)
+            return true;
+          if (entry.total === 0 && entry.frags.size > 0) {
+            let above = true;
+            for (const pn of entry.frags.keys()) {
+              const d = pn - ack >>> 0;
+              if (d === 0 || d >= 2147483648) {
+                above = false;
+                break;
+              }
+            }
+            if (above)
+              return true;
+          }
+        }
+        for (const key2 of __privateGet(this, _inviteAssembly).keys()) {
+          if (key2.startsWith(prefix))
+            return true;
+        }
+        return false;
+      };
+      _releaseRecvHold = new WeakSet();
+      releaseRecvHold_fn = function(friendId, state, packetNumber) {
+        const ack = state.receiveBufferStart ?? 0;
+        let top = packetNumber;
+        for (const n of state.recvAhead ?? []) {
+          if (top === void 0 || n - top >>> 0 < 2147483648)
+            top = n;
+        }
+        if (top !== void 0 && top - ack >>> 0 < 2147483648)
+          state.receiveBufferStart = top + 1 >>> 0;
+        if (state.recvAhead?.size)
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `recv: no inline message in flight from ${friendId}; acking past ${state.recvAhead.size} out-of-order packet(s)`);
+        state.recvAhead = void 0;
+        __privateMethod(this, _afterAckMove, afterAckMove_fn).call(this, friendId, state);
+      };
+      _noteReliableReceived = new WeakSet();
+      noteReliableReceived_fn = function(friendId, state, packetNumber) {
+        const ack = state.receiveBufferStart ?? 0;
+        const d = packetNumber - ack >>> 0;
+        if (d >= 2147483648)
           return;
-        for (let held = buf.get(state.receiveBufferStart ?? 0); held; held = buf.get(state.receiveBufferStart ?? 0)) {
-          buf.delete(state.receiveBufferStart ?? 0);
-          state.receiveBufferStart = (state.receiveBufferStart ?? 0) + 1 >>> 0;
-          __privateMethod(this, _deliverLosslessPayload, deliverLosslessPayload_fn).call(this, friendId, state, held.kind, held.inner, remote);
+        if (d > 0 || state.recvAhead?.size) {
+          if (!__privateMethod(this, _recvRecoveryWanted, recvRecoveryWanted_fn).call(this, friendId, state)) {
+            __privateMethod(this, _releaseRecvHold, releaseRecvHold_fn).call(this, friendId, state, packetNumber);
+            return;
+          }
+        }
+        if (d >= RECV_TRACK_WINDOW) {
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `recv: ${friendId} jumped ${d} packets ahead of the ack point ${ack}; skipping the gap`);
+          state.receiveBufferStart = packetNumber + 1 >>> 0;
+          state.recvAhead = void 0;
+          __privateMethod(this, _afterAckMove, afterAckMove_fn).call(this, friendId, state);
+          return;
+        }
+        if (d === 0) {
+          let next = ack + 1 >>> 0;
+          const ahead = state.recvAhead;
+          if (ahead) {
+            while (ahead.has(next)) {
+              ahead.delete(next);
+              next = next + 1 >>> 0;
+            }
+            if (ahead.size === 0)
+              state.recvAhead = void 0;
+          }
+          state.receiveBufferStart = next;
+          __privateMethod(this, _afterAckMove, afterAckMove_fn).call(this, friendId, state);
+          return;
+        }
+        const opening = !state.recvAhead || state.recvAhead.size === 0;
+        (state.recvAhead ?? (state.recvAhead = /* @__PURE__ */ new Set())).add(packetNumber);
+        if (opening) {
+          state.recvGapSinceMs = Date.now();
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `recv: gap at ${ack} from ${friendId} (got ${packetNumber}); requesting`);
+        }
+        __privateMethod(this, _requestMissingReliablePackets, requestMissingReliablePackets_fn).call(this, friendId, state);
+        __privateMethod(this, _armRecvGapTimer, armRecvGapTimer_fn).call(this, friendId, state);
+      };
+      _afterAckMove = new WeakSet();
+      afterAckMove_fn = function(friendId, state) {
+        if (state.recvAhead && state.recvAhead.size > 0) {
+          state.recvGapSinceMs = Date.now();
+          __privateMethod(this, _requestMissingReliablePackets, requestMissingReliablePackets_fn).call(this, friendId, state);
+          __privateMethod(this, _armRecvGapTimer, armRecvGapTimer_fn).call(this, friendId, state);
+          return;
+        }
+        state.recvGapSinceMs = void 0;
+        if (state.recvGapTimer) {
+          clearTimeout(state.recvGapTimer);
+          state.recvGapTimer = void 0;
         }
       };
-      _forceAdvanceRecvBuffer = new WeakSet();
-      forceAdvanceRecvBuffer_fn = function(friendId, state, remote) {
-        const buf = state.recvBuffer;
-        if (!buf || buf.size === 0)
+      _armRecvGapTimer = new WeakSet();
+      armRecvGapTimer_fn = function(friendId, state) {
+        if (state.recvGapTimer)
           return;
-        const expected = state.receiveBufferStart ?? 0;
-        let lowest = expected;
-        let bestDist = Infinity;
-        for (const n of buf.keys()) {
-          const d = n - expected >>> 0;
-          if (d < bestDist) {
-            bestDist = d;
+        state.recvGapTimer = setTimeout(() => {
+          state.recvGapTimer = void 0;
+          if (__privateGet(this, _friendSessions).get(friendId) !== state || !state.established)
+            return;
+          if (!state.recvAhead || state.recvAhead.size === 0)
+            return;
+          if (!__privateMethod(this, _recvRecoveryWanted, recvRecoveryWanted_fn).call(this, friendId, state)) {
+            __privateMethod(this, _releaseRecvHold, releaseRecvHold_fn).call(this, friendId, state);
+            return;
+          }
+          if (Date.now() - (state.recvGapSinceMs ?? 0) >= RECV_GAP_GIVEUP_MS) {
+            __privateMethod(this, _skipRecvGap, skipRecvGap_fn).call(this, friendId, state);
+            return;
+          }
+          __privateMethod(this, _requestMissingReliablePackets, requestMissingReliablePackets_fn).call(this, friendId, state);
+          __privateMethod(this, _armRecvGapTimer, armRecvGapTimer_fn).call(this, friendId, state);
+        }, RECV_GAP_REREQUEST_MS);
+        state.recvGapTimer.unref?.();
+      };
+      _skipRecvGap = new WeakSet();
+      skipRecvGap_fn = function(friendId, state) {
+        const ahead = state.recvAhead;
+        if (!ahead || ahead.size === 0)
+          return;
+        const ack = state.receiveBufferStart ?? 0;
+        let lowest = ack;
+        let best = Infinity;
+        for (const n of ahead) {
+          const d = n - ack >>> 0;
+          if (d < best) {
+            best = d;
             lowest = n;
           }
         }
-        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `recv reorder overflow from ${friendId}: abandoning gap [${expected}..${lowest}), ${buf.size} held`);
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `recv: gap [${ack}..${lowest}) from ${friendId} not resent in ${Math.round(RECV_GAP_GIVEUP_MS / 1e3)}s; skipping it`);
+        ahead.delete(lowest);
         state.receiveBufferStart = lowest;
-        __privateMethod(this, _drainRecvBufferContiguous, drainRecvBufferContiguous_fn).call(this, friendId, state, remote);
+        __privateMethod(this, _noteReliableReceived, noteReliableReceived_fn).call(this, friendId, state, lowest);
       };
       _requestMissingReliablePackets = new WeakSet();
       requestMissingReliablePackets_fn = function(friendId, state) {
-        const buf = state.recvBuffer;
-        if (!buf || buf.size === 0)
+        var _a;
+        const ahead = state.recvAhead;
+        if (!ahead || ahead.size === 0)
           return;
         const now = Date.now();
         if (state.lastRecvRequestMs && now - state.lastRecvRequestMs < RECV_REQUEST_MIN_INTERVAL_MS)
@@ -16776,17 +17475,18 @@ onmessage = (e) => {
         const low = state.receiveBufferStart ?? 0;
         let high = low;
         let bestDist = -1;
-        for (const n of buf.keys()) {
+        for (const n of ahead) {
           const d = n - low >>> 0;
           if (d > bestDist) {
             bestDist = d;
             high = n;
           }
         }
-        const bytes = encodeRetransmitRequest(low, high, (n) => buf.has(n));
+        const bytes = encodeRetransmitRequest(low, high, (n) => ahead.has(n));
         if (bytes.length === 0)
           return;
         state.lastRecvRequestMs = now;
+        (_a = __privateGet(this, _testRequestSink)) == null ? void 0 : _a.call(this, friendId, low, bytes);
         void __privateMethod(this, _sendRequestPacket, sendRequestPacket_fn).call(this, friendId, state, bytes).catch(() => {
         });
       };
@@ -16807,15 +17507,43 @@ onmessage = (e) => {
         incrementNonce(state.ourBaseNonce);
         await __privateMethod(this, _sendToFriend, sendToFriend_fn).call(this, friendId, encrypted, state, false, false);
       };
+      _sweepAssemblies = new WeakSet();
+      sweepAssemblies_fn = function(now) {
+        const sweep = (kind, map) => {
+          for (const [key2, entry] of map) {
+            if (entry.expireAtMs >= now)
+              continue;
+            map.delete(key2);
+            const colon = key2.lastIndexOf(":");
+            const nums = [...entry.frags.keys()].sort((a, b) => a - b);
+            const gaps = [];
+            for (let i = 1; i < nums.length; i++) {
+              const a = nums[i - 1] + 1, b = nums[i] - 1;
+              if (b >= a)
+                gaps.push(a === b ? `${a}` : `${a}-${b}`);
+            }
+            const pn = nums.length ? `pn ${nums[0]}-${nums[nums.length - 1]}` : "no fragments";
+            console.warn(`[peer] ${kind} from ${key2.slice(0, colon)} tid ${key2.slice(colon + 1)} dropped incomplete: ${entry.got}/${entry.total || "?"} bytes in ${entry.frags.size} fragment(s) (${pn}); missing pn ${gaps.length ? gaps.slice(0, 12).join(",") + (gaps.length > 12 ? ",\u2026" : "") : "none between"}${entry.total === 0 ? "; first fragment (totalsz) never arrived" : ""}`);
+          }
+        };
+        sweep("bulkmsg", __privateGet(this, _bulkAssembly));
+        sweep("invite", __privateGet(this, _inviteAssembly));
+        if (__privateGet(this, _bulkAssembly).size === 0 && __privateGet(this, _inviteAssembly).size === 0 && __privateGet(this, _assemblySweepTimer)) {
+          clearInterval(__privateGet(this, _assemblySweepTimer));
+          __privateSet(this, _assemblySweepTimer, void 0);
+        }
+      };
+      _armAssemblySweep = new WeakSet();
+      armAssemblySweep_fn = function() {
+        if (__privateGet(this, _assemblySweepTimer))
+          return;
+        __privateSet(this, _assemblySweepTimer, setInterval(() => __privateMethod(this, _sweepAssemblies, sweepAssemblies_fn).call(this, Date.now()), 5e3));
+        __privateGet(this, _assemblySweepTimer).unref?.();
+      };
       _assembleBulkMsg = new WeakSet();
       assembleBulkMsg_fn = function(friendId, frag, packetNumber) {
         const now = Date.now();
-        for (const [key3, entry2] of __privateGet(this, _bulkAssembly)) {
-          if (entry2.expireAtMs < now) {
-            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `bulkmsg ${key3} abandoned: no fragment for ${Math.round(BULK_ASSEMBLY_IDLE_MS / 1e3)}s (had ${entry2.got}/${entry2.total} bytes)`);
-            __privateGet(this, _bulkAssembly).delete(key3);
-          }
-        }
+        __privateMethod(this, _sweepAssemblies, sweepAssemblies_fn).call(this, now);
         const key2 = `${friendId}:${frag.tid.toString()}`;
         for (const [k, at] of __privateGet(this, _bulkCompleted)) {
           if (at < now - 6e4)
@@ -16829,6 +17557,7 @@ onmessage = (e) => {
         if (!entry) {
           entry = { total: 0, frags: /* @__PURE__ */ new Map(), got: 0, expireAtMs: now + BULK_ASSEMBLY_IDLE_MS };
           __privateGet(this, _bulkAssembly).set(key2, entry);
+          __privateMethod(this, _armAssemblySweep, armAssemblySweep_fn).call(this);
         }
         if (frag.totalsz > 0) {
           if (frag.totalsz > CARRIER_MAX_APP_BULKMSG_LEN) {
@@ -16857,15 +17586,13 @@ onmessage = (e) => {
       _assembleInvite = new WeakSet();
       assembleInvite_fn = function(friendId, frag, packetNumber) {
         const now = Date.now();
-        for (const [key3, entry2] of __privateGet(this, _inviteAssembly)) {
-          if (entry2.expireAtMs < now)
-            __privateGet(this, _inviteAssembly).delete(key3);
-        }
+        __privateMethod(this, _sweepAssemblies, sweepAssemblies_fn).call(this, now);
         const key2 = `${friendId}:${frag.tid.toString()}`;
         let entry = __privateGet(this, _inviteAssembly).get(key2);
         if (!entry) {
           entry = { total: 0, frags: /* @__PURE__ */ new Map(), got: 0, expireAtMs: now + 6e4 };
           __privateGet(this, _inviteAssembly).set(key2, entry);
+          __privateMethod(this, _armAssemblySweep, armAssemblySweep_fn).call(this);
         }
         if (frag.totalsz > 0) {
           if (frag.totalsz > CARRIER_MAX_INVITE_DATA_LEN) {
@@ -16907,7 +17634,8 @@ onmessage = (e) => {
             name,
             fileType: parsed.type,
             data,
-            via
+            via,
+            fileId: sha256Hex(data)
           });
           __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `inline file from ${friendId}: "${name}" (${data.length} bytes, ${via})`);
           return true;
@@ -16917,24 +17645,54 @@ onmessage = (e) => {
       };
       _tryEmitBinaryInlineFile = new WeakSet();
       tryEmitBinaryInlineFile_fn = function(friendId, bytes, via) {
-        const envelope = decodeAndroidFileEnvelope(bytes);
+        const envelope = unpackOfflineFile(bytes);
         if (!envelope)
           return false;
-        if (envelope.declaredSize !== void 0 && envelope.declaredSize !== envelope.data.length) {
-          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `inline file from ${friendId}: declared ${envelope.declaredSize}B, got ${envelope.data.length}B`);
+        if (envelope.kind === "truncated") {
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `inline file from ${friendId}: "${envelope.name}" truncated (declared ${envelope.declaredSize}B, ${envelope.available}B present, ${via}); dropped`);
+          return true;
         }
         __privateGet(this, _events).emit("inlineFile", {
           pubkey: friendId,
           name: envelope.name,
           fileType: inlineFileTypeFor(envelope.name, envelope.contentType),
           data: envelope.data,
-          via
+          via,
+          fileId: sha256Hex(envelope.data)
         });
         __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `inline file (Android envelope) from ${friendId}: "${envelope.name}" (${envelope.data.length} bytes, ${via})`);
         return true;
       };
+      _applyPeerAck = new WeakSet();
+      applyPeerAck_fn = function(state, bufferStart) {
+        const start = state.sendBufferStartNum;
+        if (start === void 0 || bufferStart === start)
+          return true;
+        const adv = bufferStart - start >>> 0;
+        if (adv >= 2147483648)
+          return false;
+        const end = state.sendPacketNumber ?? start;
+        const span = end - start >>> 0;
+        const to = adv > span ? end : bufferStart;
+        const arr = state.sendArray;
+        if (arr && arr.size > 0) {
+          const freed = adv > span ? span : adv;
+          if (freed <= arr.size * 2) {
+            for (let i = start; i !== to; i = i + 1 >>> 0)
+              arr.delete(i);
+          } else {
+            for (const k of arr.keys())
+              if (k - start >>> 0 < freed)
+                arr.delete(k);
+          }
+        }
+        state.sendBufferStartNum = to;
+        return true;
+      };
       _handleRetransmitRequest = new WeakSet();
       handleRetransmitRequest_fn = function(friendId, session, data) {
+        if (session.peerAckCurrent === false)
+          return;
         const start = session.sendBufferStartNum;
         const end = session.sendPacketNumber;
         if (start === void 0 || end === void 0 || !session.sendArray || session.sendArray.size === 0) {
@@ -16962,18 +17720,16 @@ onmessage = (e) => {
             n++;
           }
         }
-        let s = start;
-        while (s !== end && !session.sendArray.has(s))
-          s = s + 1 >>> 0;
-        session.sendBufferStartNum = s;
         if (requested.length === 0)
           return;
         __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `retransmit request from ${friendId}: resending ${requested.length} packet(s) [${requested.slice(0, 8).join(",")}${requested.length > 8 ? ",\u2026" : ""}]`);
         void (async () => {
+          var _a;
           for (const num of requested) {
             const payload = session.sendArray?.get(num);
             if (!payload)
               continue;
+            (_a = __privateGet(this, _testResendSink)) == null ? void 0 : _a.call(this, friendId, num, payload);
             try {
               await __privateMethod(this, _resendReliablePacket, resendReliablePacket_fn).call(this, friendId, session, num, payload);
             } catch {
@@ -17023,12 +17779,13 @@ onmessage = (e) => {
           session.sendArray ?? (session.sendArray = /* @__PURE__ */ new Map());
           session.sendBufferStartNum ?? (session.sendBufferStartNum = packetNumber);
           session.sendArray.set(packetNumber, payload);
-          while (session.sendArray.size > 8192 && session.sendBufferStartNum !== session.sendPacketNumber) {
-            session.sendArray.delete(session.sendBufferStartNum);
-            session.sendBufferStartNum = session.sendBufferStartNum + 1 >>> 0;
+          while (session.sendArray.size > 8192) {
+            const oldest = session.sendArray.keys().next().value;
+            session.sendArray.delete(oldest);
           }
         }
-        session.lastPingSentMs = Date.now();
+        if (kind === PACKET_ID_ALIVE)
+          session.lastPingSentMs = Date.now();
         await __privateMethod(this, _sendToFriend, sendToFriend_fn).call(this, friendId, encrypted, session, isBulkData, isFileTransfer);
       };
       _sendToFriend = new WeakSet();
@@ -17072,6 +17829,58 @@ onmessage = (e) => {
         if (!udpOk && !relayOk && !tcpOk) {
           throw firstError ?? new Error(`no transport accepted send for ${friendId}`);
         }
+      };
+      _sendOnline = new WeakSet();
+      sendOnline_fn = function(friendId, why) {
+        const session = __privateGet(this, _friendSessions).get(friendId);
+        if (!session?.established || session.onlineSent === true)
+          return;
+        const before = session.sendPacketNumber ?? 0;
+        const sending = __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_ONLINE, new Uint8Array());
+        const parked = (session.sendPacketNumber ?? 0) !== before;
+        sending.catch((error) => {
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, parked ? `online packet ${before} to ${friendId} not delivered yet (${error.message}); parked for retransmit` : `send online packet failed: ${error.message}`);
+        });
+        if (parked) {
+          session.onlineSent = true;
+          const attempts = __privateGet(this, _onlineRetryAttempts).get(friendId);
+          __privateMethod(this, _clearOnlineRetry, clearOnlineRetry_fn).call(this, friendId);
+          __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `online packet ${before} sent to ${friendId} (${why}${attempts ? `, after ${attempts} retr${attempts === 1 ? "y" : "ies"}` : ""})`);
+          return;
+        }
+        session.onlineSent = false;
+        __privateMethod(this, _scheduleOnlineRetry, scheduleOnlineRetry_fn).call(this, friendId, session);
+      };
+      _sendOnlineIfOwed = new WeakSet();
+      sendOnlineIfOwed_fn = function(friendId, why) {
+        const session = __privateGet(this, _friendSessions).get(friendId);
+        if (session?.established && session.onlineSent === false)
+          __privateMethod(this, _sendOnline, sendOnline_fn).call(this, friendId, why);
+      };
+      _scheduleOnlineRetry = new WeakSet();
+      scheduleOnlineRetry_fn = function(friendId, session) {
+        if (__privateGet(this, _onlineRetryTimers).has(friendId))
+          return;
+        const attempt = (__privateGet(this, _onlineRetryAttempts).get(friendId) ?? 0) + 1;
+        __privateGet(this, _onlineRetryAttempts).set(friendId, attempt);
+        const delayMs = Math.min(3e4, 1e3 * 2 ** Math.min(attempt - 1, 5));
+        const timer = setTimeout(() => {
+          __privateGet(this, _onlineRetryTimers).delete(friendId);
+          if (__privateGet(this, _friendSessions).get(friendId) !== session)
+            return;
+          __privateMethod(this, _sendOnlineIfOwed, sendOnlineIfOwed_fn).call(this, friendId, `retry ${attempt}`);
+        }, delayMs);
+        timer.unref?.();
+        __privateGet(this, _onlineRetryTimers).set(friendId, timer);
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `online retry ${attempt} for ${friendId} scheduled in ${delayMs}ms`);
+      };
+      _clearOnlineRetry = new WeakSet();
+      clearOnlineRetry_fn = function(friendId) {
+        const timer = __privateGet(this, _onlineRetryTimers).get(friendId);
+        if (timer)
+          clearTimeout(timer);
+        __privateGet(this, _onlineRetryTimers).delete(friendId);
+        __privateGet(this, _onlineRetryAttempts).delete(friendId);
       };
       _scheduleProfileRetry = new WeakSet();
       scheduleProfileRetry_fn = function(friendId) {
@@ -17165,6 +17974,43 @@ onmessage = (e) => {
             }
           })();
         }
+      };
+      _noteAcceptProof = new WeakSet();
+      noteAcceptProof_fn = function(friendId, proof) {
+        const friend = __privateGet(this, _friends).get(friendId);
+        if (!friend || friend.acceptedAt)
+          return false;
+        const at = Date.now();
+        __privateGet(this, _friends).set(friendId, {
+          ...friend,
+          status: friend.status === "requested" ? "offline" : friend.status,
+          acceptedAt: at,
+          acceptProof: proof
+        });
+        __privateMethod(this, _persistFriends, persistFriends_fn).call(this);
+        __privateGet(this, _peerInitiatedCookies).delete(friendId);
+        __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `friend ${friendId} accepted (proof: ${proof}); will stop re-sending friend request`);
+        __privateGet(this, _events).emit("friendAccepted", { pubkey: friendId, proof, at });
+        return true;
+      };
+      _rememberPeerInitiatedCookie = new WeakSet();
+      rememberPeerInitiatedCookie_fn = function(friendId, cookie) {
+        const friend = __privateGet(this, _friends).get(friendId);
+        if (!friend || friend.acceptedAt)
+          return;
+        const now = Date.now();
+        const kept = (__privateGet(this, _peerInitiatedCookies).get(friendId) ?? []).filter((c) => now - c.at < PEER_COOKIE_TTL_MS);
+        kept.push({ hex: bytesToHex2(cookie), at: now });
+        __privateGet(this, _peerInitiatedCookies).set(friendId, kept.slice(-4));
+      };
+      _handshakeStartedByPeer = new WeakSet();
+      handshakeStartedByPeer_fn = function(friendId, recipientCookie) {
+        const kept = __privateGet(this, _peerInitiatedCookies).get(friendId);
+        if (!kept)
+          return false;
+        const hex2 = bytesToHex2(recipientCookie);
+        const now = Date.now();
+        return kept.some((c) => c.hex === hex2 && now - c.at < PEER_COOKIE_TTL_MS);
       };
       _cacheFriendRemote = new WeakSet();
       cacheFriendRemote_fn = function(friendId, host, port, realPublicKey, dhtPublicKey) {
@@ -17294,7 +18140,16 @@ onmessage = (e) => {
         if (__privateGet(this, _turnAllocating))
           return __privateGet(this, _turnAllocating);
         __privateSet(this, _turnAllocating, (async () => {
-          for (const srv of TURN_RELAY_SERVERS) {
+          const candidates = turnRelayCandidates({
+            option: __privateGet(this, _opts3).turnRelays,
+            envRaw: typeof process !== "undefined" ? process.env?.DECENT_TURN_SERVERS : void 0,
+            bootstrapNodes: __privateGet(this, _opts3).bootstrapNodes,
+            ourUserid: __privateGet(this, _keyPair2) ? carrierIdFromPublicKey(__privateGet(this, _keyPair2).publicKey) : void 0,
+            ourSecretKey: __privateGet(this, _keyPair2)?.secretKey
+          });
+          if (candidates.length === 0)
+            __privateMethod(this, _debugLog2, debugLog_fn2).call(this, "turn relay: no TURN server to try");
+          for (const srv of candidates) {
             let sock;
             let client;
             try {
@@ -17305,6 +18160,9 @@ onmessage = (e) => {
                 creds: { host: srv.host, port: srv.port, realm: "", username: srv.username, password: srv.password }
               });
               const alloc = await client.allocate();
+              if (!isUsableRelayedAddress(alloc.relayedAddress.address)) {
+                throw new Error(`relayed address ${alloc.relayedAddress.address} is not public`);
+              }
               client.onData((peer, data) => {
                 __privateGet(this, _onDatagram).call(this, {
                   data: Buffer2.from(data),
@@ -17317,7 +18175,7 @@ onmessage = (e) => {
               sock = void 0;
               client = void 0;
               __privateSet(this, _ourRelayAddr, { host: alloc.relayedAddress.address, port: alloc.relayedAddress.port });
-              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `turn relay allocated on ${srv.host}: ${__privateGet(this, _ourRelayAddr).host}:${__privateGet(this, _ourRelayAddr).port}`);
+              __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `turn relay allocated on ${srv.host} (${srv.source} credential): ${__privateGet(this, _ourRelayAddr).host}:${__privateGet(this, _ourRelayAddr).port}`);
               return __privateGet(this, _ourRelayAddr);
             } catch (error) {
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `turn relay allocate failed on ${srv.host}: ${error.message}`);
@@ -17460,6 +18318,7 @@ onmessage = (e) => {
           __privateMethod(this, _adoptRemote, adoptRemote_fn).call(this, session, host, port);
         }
         if (session.established) {
+          __privateMethod(this, _sendOnlineIfOwed, sendOnlineIfOwed_fn).call(this, friendId, "udp-endpoint");
           void __privateMethod(this, _sendMessengerPacket, sendMessengerPacket_fn).call(this, friendId, PACKET_ID_ALIVE, new Uint8Array()).catch(() => void 0);
         } else {
           void __privateMethod(this, _initiateSession, initiateSession_fn).call(this, friendId).catch(() => void 0);
@@ -18211,6 +19070,7 @@ onmessage = (e) => {
       };
       _setFriendOffline = new WeakSet();
       setFriendOffline_fn = function(friendId) {
+        __privateGet(this, _fileTransfer).clearFriend(friendId, "peer-offline");
         __privateGet(this, _profileSentTo).delete(friendId);
         const profileRetry = __privateGet(this, _profileRetryTimers).get(friendId);
         if (profileRetry)
@@ -18448,7 +19308,25 @@ onmessage = (e) => {
       };
       _onionCandidatePool = new WeakSet();
       onionCandidatePool_fn = function(nodeD) {
-        const nodeDId = `${nodeD.host}:${nodeD.port}`;
+        const candidates = __privateMethod(this, _onionBasePool, onionBasePool_fn).call(this).filter((c) => c.node.host !== nodeD.host);
+        const preferredRelays = candidates.filter((item) => isLikelyStableRelayPort(item.node.port));
+        const healthy = preferredRelays.filter((item) => item.score > -2);
+        return healthy.length >= 3 ? healthy : preferredRelays.length >= 3 ? preferredRelays : candidates;
+      };
+      _onionBasePool = new WeakSet();
+      onionBasePool_fn = function() {
+        const now = Date.now();
+        const c = __privateGet(this, _onionPoolCache);
+        if (c && c.nodes === __privateGet(this, _knownNodes) && c.gen === __privateGet(this, _onionPoolGen) && now - c.builtMs < ONION_POOL_TTL_MS) {
+          return c.pool;
+        }
+        const pool = __privateMethod(this, _buildOnionBasePool, buildOnionBasePool_fn).call(this);
+        __privateSet(this, _onionPoolCache, { nodes: __privateGet(this, _knownNodes), gen: __privateGet(this, _onionPoolGen), builtMs: now, pool });
+        __privateSet(this, _diagOnionPoolBuilds, __privateGet(this, _diagOnionPoolBuilds) + 1);
+        return pool;
+      };
+      _buildOnionBasePool = new WeakSet();
+      buildOnionBasePool_fn = function() {
         const candidates = [];
         const bootstrapIds = new Set(__privateGet(this, _opts3).bootstrapNodes.map((node) => `${node.host}:${node.port}`));
         const seenHosts = /* @__PURE__ */ new Set();
@@ -18458,7 +19336,7 @@ onmessage = (e) => {
             continue;
           }
           const id = `${node.host}:${node.port}`;
-          if (id === nodeDId || node.host === nodeD.host || seenHosts.has(node.host)) {
+          if (seenHosts.has(node.host)) {
             continue;
           }
           if (isPrivateAddress(node.host) || isCgnatAddress(node.host) || isOwnAddress(node.host)) {
@@ -18467,25 +19345,42 @@ onmessage = (e) => {
           if (__privateMethod(this, _isNodeBlacklisted, isNodeBlacklisted_fn).call(this, id)) {
             continue;
           }
-          try {
-            const pk = base58ToBytes(node.pk);
-            const pkHex = Buffer2.from(pk).toString("hex");
-            if (pk.length === 32 && !seenPublicKeys.has(pkHex)) {
-              seenHosts.add(node.host);
-              seenPublicKeys.add(pkHex);
-              candidates.push({
-                node,
-                publicKey: pk,
-                score: __privateMethod(this, _nodeScore, nodeScore_fn).call(this, id) + relayPortScore(node.port) + (bootstrapIds.has(id) ? 4 : 0)
-              });
-            }
-          } catch {
+          const pk = __privateMethod(this, _nodePkBytes, nodePkBytes_fn).call(this, node);
+          if (!pk)
+            continue;
+          const pkHex = bytesToHex2(pk);
+          if (!seenPublicKeys.has(pkHex)) {
+            seenHosts.add(node.host);
+            seenPublicKeys.add(pkHex);
+            candidates.push({
+              node,
+              publicKey: pk,
+              score: __privateMethod(this, _nodeScore, nodeScore_fn).call(this, id) + relayPortScore(node.port) + (bootstrapIds.has(id) ? 4 : 0)
+            });
           }
         }
         candidates.sort((a, b) => b.score - a.score);
-        const preferredRelays = candidates.filter((item) => isLikelyStableRelayPort(item.node.port));
-        const healthy = preferredRelays.filter((item) => item.score > -2);
-        return healthy.length >= 3 ? healthy : preferredRelays.length >= 3 ? preferredRelays : candidates;
+        return candidates;
+      };
+      _nodePkBytes = new WeakSet();
+      nodePkBytes_fn = function(node) {
+        if (node.pkBytes?.length === 32)
+          return node.pkBytes;
+        if (!node.pk)
+          return null;
+        let v = __privateGet(this, _pkBytesCache).get(node.pk);
+        if (v === void 0) {
+          try {
+            const b = base58ToBytes(node.pk);
+            v = b.length === 32 ? b : null;
+          } catch {
+            v = null;
+          }
+          if (__privateGet(this, _pkBytesCache).size >= 2 * MAX_KNOWN_NODES)
+            __privateGet(this, _pkBytesCache).clear();
+          __privateGet(this, _pkBytesCache).set(node.pk, v);
+        }
+        return v;
       };
       _selectTcpOnionHops = new WeakSet();
       selectTcpOnionHops_fn = function(nodeD, pathOffset = 0) {
@@ -18588,7 +19483,8 @@ onmessage = (e) => {
           fail: prev.fail,
           lastOkMs: Date.now()
         });
-        __privateGet(this, _nodeBlacklist).delete(nodeId);
+        if (__privateGet(this, _nodeBlacklist).delete(nodeId))
+          __privateSet(this, _onionPoolGen, __privateGet(this, _onionPoolGen) + 1);
       };
       _recordNodeFailure = new WeakSet();
       recordNodeFailure_fn = function(nodeId) {
@@ -18602,6 +19498,8 @@ onmessage = (e) => {
         const consecutive = next.fail - next.ok;
         if (consecutive >= NODE_BLACKLIST_THRESHOLD) {
           const ttl = Math.min(NODE_BLACKLIST_MAX_TTL_MS, NODE_BLACKLIST_BASE_TTL_MS * Math.pow(1.5, consecutive - NODE_BLACKLIST_THRESHOLD));
+          if (!__privateGet(this, _nodeBlacklist).has(nodeId))
+            __privateSet(this, _onionPoolGen, __privateGet(this, _onionPoolGen) + 1);
           __privateGet(this, _nodeBlacklist).set(nodeId, Date.now() + ttl);
           __privateMethod(this, _debugVerboseLog, debugVerboseLog_fn).call(this, `node ${nodeId} blacklisted for ${Math.round(ttl / 1e3)}s after ${consecutive} consecutive fails`);
         }
@@ -18613,6 +19511,7 @@ onmessage = (e) => {
           return false;
         if (Date.now() > expiry) {
           __privateGet(this, _nodeBlacklist).delete(nodeId);
+          __privateSet(this, _onionPoolGen, __privateGet(this, _onionPoolGen) + 1);
           return false;
         }
         return true;
@@ -18689,7 +19588,9 @@ onmessage = (e) => {
             if (!record || typeof record.pubkey !== "string" || !record.pubkey) {
               continue;
             }
-            const trusted = record.acceptedAt ? record : {
+            if (record.acceptedAt && !record.acceptProof)
+              record.acceptProof = "legacy";
+            const trusted = record.acceptedAt || record.sessionAt ? record : {
               ...record,
               remoteHost: void 0,
               remotePort: void 0,
@@ -18738,12 +19639,12 @@ onmessage = (e) => {
         __privateSet(this, _persistInFlight, true);
         const flush = async () => {
           while (__privateGet(this, _persistPending) !== void 0) {
-            const body2 = __privateGet(this, _persistPending);
+            const body = __privateGet(this, _persistPending);
             __privateSet(this, _persistPending, void 0);
             const tmp = `${file}.tmp.${process.pid}.${__privateWrapper(this, _persistSeq)._++}`;
             try {
               await mkdir(dirname(file), { recursive: true });
-              await writeFile(tmp, body2, "utf8");
+              await writeFile(tmp, body, "utf8");
               await rename(tmp, file);
             } catch (error) {
               __privateMethod(this, _debugLog2, debugLog_fn2).call(this, `persist friends failed: ${error.message}`);
@@ -19945,8 +20846,8 @@ ${ts}`);
       if (!supported || Notification.permission !== "granted")
         return;
       const who = await nameOf?.(msg.peer) || `${String(msg.peer).slice(0, 8)}\u2026`;
-      const body2 = msg.file ? `\u{1F4CE} ${msg.file.name || "file"}` : String(msg.text || "").slice(0, 160);
-      const opts = { body: body2, tag: `beagle:${msg.peer}`, renotify: true, data: { peer: msg.peer }, silent: false };
+      const body = msg.file ? `\u{1F4CE} ${msg.file.name || "file"}` : String(msg.text || "").slice(0, 160);
+      const opts = { body, tag: `beagle:${msg.peer}`, renotify: true, data: { peer: msg.peer }, silent: false };
       try {
         const reg = await navigator.serviceWorker?.getRegistration?.();
         if (reg?.showNotification) {
@@ -24883,11 +25784,11 @@ ${ts}`);
   _discover = new WeakSet();
   discover_fn = async function() {
     const res = await __privateMethod(this, _fetch3, fetch_fn).call(this, `${__privateGet(this, _base)}${ROUTE}`, { method: "GET", headers: { accept: "application/json" } });
-    const body2 = await readJson(res);
+    const body = await readJson(res);
     if (!res.ok)
-      throw httpError("GET", res, body2);
-    const nodeUrl = body2?.nodeUrl;
-    const carrierServerKey = body2?.carrierServerKey;
+      throw httpError("GET", res, body);
+    const nodeUrl = body?.nodeUrl;
+    const carrierServerKey = body?.carrierServerKey;
     if (typeof nodeUrl !== "string" || !nodeUrl || typeof carrierServerKey !== "string") {
       throw new TurnFetchError("GET: discovery reply is malformed", res.status);
     }
@@ -24909,13 +25810,13 @@ ${ts}`);
     if (!signed || typeof signed.type !== "string")
       throw new TurnFetchError("signer returned no proof");
     const proof = { type: signed.type, value: proofValue2(signed.value) };
-    const body2 = { self: self2, timestamp, nonce, proof };
+    const body = { self: self2, timestamp, nonce, proof };
     if (carrierServerKey)
-      body2.carrierServerKey = carrierServerKey;
+      body.carrierServerKey = carrierServerKey;
     const res = await __privateMethod(this, _fetch3, fetch_fn).call(this, `${__privateGet(this, _base)}${ROUTE}`, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify(body2)
+      body: JSON.stringify(body)
     });
     const reply = await readJson(res);
     if (!res.ok)
@@ -24964,8 +25865,8 @@ ${ts}`);
       return void 0;
     }
   }
-  function httpError(method, res, body2) {
-    const code = typeof body2?.error?.code === "string" ? body2.error.code : void 0;
+  function httpError(method, res, body) {
+    const code = typeof body?.error?.code === "string" ? body.error.code : void 0;
     const header = Number(res.headers?.get?.("x-server-time"));
     const retryAfter = Number(res.headers?.get?.("retry-after"));
     return new TurnFetchError(`${method}: HTTP ${res.status}${code ? ` ${code}` : ""}`, res.status, code, Number.isSafeInteger(header) && header > 0 ? header : void 0, Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter, 3600) * 1e3 : void 0);
@@ -25218,6 +26119,10 @@ ${ts}`);
   }
 
   // src/backend-c.js
+  var newDeliveryId = () => {
+    const b = crypto.getRandomValues(new Uint8Array(12));
+    return `${Date.now().toString(36)}-${btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
+  };
   var PENDING_KEY = "pending-requests";
   var PROFILE_KEY = "profile";
   var AUTOACCEPT_KEY = "autoaccept";
@@ -25270,8 +26175,8 @@ ${ts}`);
     const fail = (error) => ({ ok: false, error });
     const savePending = () => kvPut2(PENDING_KEY, pending2);
     const saveAliases = () => kvPut2(ALIAS_KEY, aliases);
-    async function recordMessage(peer2, dir, text, via, file, status) {
-      const msg = { peer: peer2, dir, text, via, ts: Date.now(), read: dir === "out" };
+    async function recordMessage(peer2, dir, text, via, file, status, extra) {
+      const msg = { peer: peer2, dir, text, via, ts: Date.now(), read: dir === "out", ...extra };
       if (status)
         msg.status = status;
       if (file)
@@ -25281,6 +26186,13 @@ ${ts}`);
       onEvent?.({ type: "message", msg });
       return msg;
     }
+    const deliveryIdOf = async (m) => {
+      if (!m.deliveryId) {
+        m.deliveryId = newDeliveryId();
+        await updateMessage2(m.id, { deliveryId: m.deliveryId });
+      }
+      return m.deliveryId;
+    };
     await seedVfs();
     installVfsPersistence();
     const [boot, express] = await Promise.allSettled([loadBootstrapNodes(), fetchExpressNodes()]);
@@ -25414,7 +26326,7 @@ ${ts}`);
         if (skipId != null && m.id === skipId)
           continue;
         try {
-          const r = await peer.sendText(uid, m.text);
+          const r = await peer.sendText(uid, m.text, { deliveryId: await deliveryIdOf(m) });
           confirm(uid);
           await updateMessage2(m.id, {
             status: "sent",
@@ -25784,7 +26696,7 @@ ${ts}`);
       }
       return list;
     };
-    async function call2(req) {
+    async function call(req) {
       switch (req.op) {
         case "ping":
           return ok({ pong: true });
@@ -25946,7 +26858,7 @@ ${ts}`);
         case "chat-send": {
           if (!req.userid || typeof req.text !== "string")
             return fail("chat-send requires userid and text");
-          const msg = await recordMessage(req.userid, "out", req.text, "online", null, "sending");
+          const msg = await recordMessage(req.userid, "out", req.text, "online", null, "sending", { deliveryId: newDeliveryId() });
           const prev = sendChains.get(req.userid) ?? Promise.resolve();
           const job = prev.then(async () => {
             const drained = await flushOutbox(req.userid, msg.id).catch(() => false);
@@ -25956,7 +26868,7 @@ ${ts}`);
               return;
             }
             try {
-              const r = await peer.sendText(req.userid, req.text);
+              const r = await peer.sendText(req.userid, req.text, { deliveryId: msg.deliveryId });
               confirm(req.userid);
               await updateMessage2(msg.id, {
                 status: "sent",
@@ -25976,7 +26888,9 @@ ${ts}`);
           if (req.id == null || !req.userid || typeof req.text !== "string")
             return fail("chat-retry requires id, userid and text");
           await updateMessage2(req.id, { status: "sending", error: null });
-          void peer.sendText(req.userid, req.text).then(() => updateMessage2(req.id, { status: "sent" })).catch((err) => updateMessage2(req.id, { status: "queued", error: String(err?.message || err) }));
+          const prior = (await historyFor2(req.userid, 1e3)).find((m) => m.id === req.id) || { id: req.id };
+          const deliveryId = await deliveryIdOf(prior);
+          void peer.sendText(req.userid, req.text, { deliveryId }).then(() => updateMessage2(req.id, { status: "sent" })).catch((err) => updateMessage2(req.id, { status: "queued", error: String(err?.message || err) }));
           return ok({ id: req.id, status: "sending" });
         }
         case "chat-history":
@@ -26064,7 +26978,7 @@ ${ts}`);
       hasVirtualLan: false,
       identity: self2,
       expressNodes: bootstrapNodes,
-      call: call2,
+      call,
       setCallOwner(ownsTab) {
         if (!ownsTab)
           callRouter.close();
@@ -29992,12 +30906,12 @@ ${ts}`);
   }
   var toHex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
   function eip191Hash(message) {
-    const body2 = enc2.encode(message);
+    const body = enc2.encode(message);
     const prefix = enc2.encode(`Ethereum Signed Message:
-${body2.length}`);
-    const all = new Uint8Array(prefix.length + body2.length);
+${body.length}`);
+    const all = new Uint8Array(prefix.length + body.length);
     all.set(prefix);
-    all.set(body2, prefix.length);
+    all.set(body, prefix.length);
     return keccak_256(all);
   }
   function recoverEthAddress(message, signature) {
@@ -30190,9 +31104,9 @@ ${body2.length}`);
   function base64ToHex(b642) {
     return Array.from(atob(b642), (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
   }
-  async function ensSignAndSet(call2, record) {
+  async function ensSignAndSet(call, record) {
     const message = JSON.stringify(record);
-    const signed = await call2("sign", { text: message });
+    const signed = await call("sign", { text: message });
     if (!signed.ok || !signed.data?.sig)
       return { ok: false, error: signed.error || "identity sign failed" };
     const payload = {
@@ -30406,13 +31320,13 @@ ${body2.length}`);
         }
         case "POST /api/identity-import": {
           try {
-            let body2 = {};
+            let body = {};
             try {
-              body2 = typeof init?.body === "string" ? JSON.parse(init.body) : init?.body ?? {};
+              body = typeof init?.body === "string" ? JSON.parse(init.body) : init?.body ?? {};
             } catch {
-              body2 = {};
+              body = {};
             }
-            const id = await host.importBlob(body2?.keyfile ?? body2);
+            const id = await host.importBlob(body?.keyfile ?? body);
             return json({ ok: true, data: { userId: id.userid, carrier: id.address } });
           } catch (err) {
             return json({ ok: false, error: String(err?.message || err) });
@@ -30426,31 +31340,29 @@ ${body2.length}`);
             return json({ ok: false, error: String(err?.message || err) }, 500);
           }
         }
-        case "POST /api/chat-retry":
-          return json(await call("chat-retry", { id: body.id, userid: body.userid, text: body.text }));
         case "POST /api/set-profile": {
-          let body2 = {};
+          let body = {};
           if (typeof init?.body === "string") {
             try {
-              body2 = JSON.parse(init.body);
+              body = JSON.parse(init.body);
             } catch {
-              body2 = {};
+              body = {};
             }
           }
-          if (body2.name !== void 0)
-            profile.name = body2.name;
-          if (body2.description !== void 0)
-            profile.description = body2.description;
-          if (body2.punkId !== void 0)
-            profile.punkId = body2.punkId === null ? null : Number(body2.punkId);
-          if (body2.listed !== void 0)
-            profile.listed = body2.listed !== false;
-          if (body2.avatarDataUrl !== void 0)
-            profile.avatarDataUrl = body2.avatarDataUrl || null;
-          if (body2.onboarded !== void 0)
-            profile.onboarded = !!body2.onboarded;
-          if (body2.referredBy !== void 0)
-            profile.referredBy = body2.referredBy ? String(body2.referredBy).slice(0, 64) : null;
+          if (body.name !== void 0)
+            profile.name = body.name;
+          if (body.description !== void 0)
+            profile.description = body.description;
+          if (body.punkId !== void 0)
+            profile.punkId = body.punkId === null ? null : Number(body.punkId);
+          if (body.listed !== void 0)
+            profile.listed = body.listed !== false;
+          if (body.avatarDataUrl !== void 0)
+            profile.avatarDataUrl = body.avatarDataUrl || null;
+          if (body.onboarded !== void 0)
+            profile.onboarded = !!body.onboarded;
+          if (body.referredBy !== void 0)
+            profile.referredBy = body.referredBy ? String(body.referredBy).slice(0, 64) : null;
           try {
             await persist(profile);
           } catch {
@@ -30550,16 +31462,16 @@ ${body2.length}`);
           }
         }
         case "POST /api/add": {
-          let body2 = {};
+          let body = {};
           try {
-            body2 = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+            body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
           } catch {
-            body2 = {};
+            body = {};
           }
-          const address = String(body2.address || "").trim();
+          const address = String(body.address || "").trim();
           if (!address)
             return json({ ok: false, error: "no address" }, 400);
-          const r = await forwardAdd?.(address, String(body2.hello || ""));
+          const r = await forwardAdd?.(address, String(body.hello || ""));
           if (!r)
             return json({ ok: false, readOnly: true, error: NO_ANSWER }, 409);
           return r.ok ? json({ ok: true, viaOwner: true }) : json({ ok: false, readOnly: true, error: r.error || "could not send" }, 409);
@@ -30583,15 +31495,15 @@ ${body2.length}`);
       if (UNSUPPORTED.has(p))
         return json({ ok: false, unsupported: true, error: "not available in the browser client" });
       const raw = init?.body;
-      let body2 = {};
+      let body = {};
       if (typeof raw === "string") {
         try {
-          body2 = JSON.parse(raw);
+          body = JSON.parse(raw);
         } catch {
-          body2 = {};
+          body = {};
         }
       }
-      const call2 = (op, extra = {}) => backend2.call({ op, ...extra });
+      const call = (op, extra = {}) => backend2.call({ op, ...extra });
       const punkOne = /^\/api\/punk\/(\d{1,5})$/.exec(p);
       if (method === "GET" && punkOne) {
         try {
@@ -30605,13 +31517,13 @@ ${body2.length}`);
         case "GET /api/backend":
           return json({ ok: true, kind: "browser", hasVirtualLan: false, state: "browser", switchable: false, releaseSecondsLeft: 0, command: "" });
         case "GET /api/diag":
-          return json(await call2("diag"));
+          return json(await call("diag"));
         case "GET /api/desktop":
         case "GET /api/state": {
           const [diag, pend, flist, ens] = await Promise.all([
-            call2("diag"),
-            call2("friends-pending"),
-            call2("friends-list"),
+            call("diag"),
+            call("friends-pending"),
+            call("friends-list"),
             ensNames()
           ]);
           const profile = getProfile();
@@ -30642,7 +31554,7 @@ ${body2.length}`);
           return p === "/api/state" ? json({ me, friends: peers2, pending: requests }) : json({ me, peers: peers2, requests, exits: [], activeExit: null });
         }
         case "GET /api/friends-list": {
-          const [r, ens] = await Promise.all([call2("friends-list"), ensNames()]);
+          const [r, ens] = await Promise.all([call("friends-list"), ensNames()]);
           return json({ friends: (r.data?.friends ?? []).map((f) => peerFrom(f, ens)) });
         }
         case "GET /api/bridge-roster": {
@@ -30691,7 +31603,7 @@ ${body2.length}`);
           return json({ ok: true, list: ens.list.filter((e) => e.userid) });
         }
         case "GET /api/ens-name": {
-          const diag = await call2("diag");
+          const diag = await call("diag");
           const uid = diag.data?.identity?.userid;
           let rec = uid ? await ensOwnRecord(uid) : null;
           if (rec === void 0)
@@ -30701,10 +31613,10 @@ ${body2.length}`);
           return json({ ok: true, registered: !!rec, record: rec || null, mineOwned, writeBlocked });
         }
         case "POST /api/ens-bind-wallet": {
-          const pre = applyWalletBind(null, { chain: String(body2.chain ?? ""), address: body2.address, userid: "" });
+          const pre = applyWalletBind(null, { chain: String(body.chain ?? ""), address: body.address, userid: "" });
           if (!pre.ok)
             return json({ ok: false, error: pre.error }, pre.status);
-          const diag = await call2("diag");
+          const diag = await call("diag");
           const uid = diag.data?.identity?.userid;
           if (!uid)
             return json({ ok: false, error: "identity unavailable" }, 502);
@@ -30716,10 +31628,10 @@ ${body2.length}`);
           if (mine2.owner !== uid) {
             return json({ ok: false, error: "this name was registered by your mobile wallet \u2014 bind addresses there" }, 403);
           }
-          const bound = applyWalletBind(mine2, { chain: String(body2.chain), address: body2.address, userid: uid, proof: body2.proof ?? null });
+          const bound = applyWalletBind(mine2, { chain: String(body.chain), address: body.address, userid: uid, proof: body.proof ?? null });
           if (!bound.ok)
             return json({ ok: false, error: bound.error }, bound.status);
-          const r = await ensSignAndSet(call2, {
+          const r = await ensSignAndSet(call, {
             name: mine2.name,
             owner: uid,
             addresses: bound.addresses,
@@ -30757,20 +31669,22 @@ ${body2.length}`);
         case "GET /api/chat-history": {
           const peer = url2.searchParams.get("peer") || void 0;
           const { limit, before } = historyPage(url2, 200);
-          const r = await call2("chat-history", { userid: peer, limit, before });
+          const r = await call("chat-history", { userid: peer, limit, before });
           const messages = r.data?.messages ?? [];
           if (!peer)
             return json({ chats: {} });
           return json({ chats: { [peer]: await withGreetings(peer, messages, { limit, before }) } });
         }
         case "POST /api/chat-send":
-          return json(await call2("chat-send", { userid: body2.userid, text: body2.text }));
+          return json(await call("chat-send", { userid: body.userid, text: body.text }));
+        case "POST /api/chat-retry":
+          return json(await call("chat-retry", { id: body.id, userid: body.userid, text: body.text }));
         case "POST /api/chat-log-local":
-          return json(await call2("chat-log-local", { userid: body2.userid, dir: body2.dir, text: body2.text }));
+          return json(await call("chat-log-local", { userid: body.userid, dir: body.dir, text: body.text }));
         case "POST /api/chat-mark-read":
-          return json(await call2("chat-mark-read", { userid: body2.userid }));
+          return json(await call("chat-mark-read", { userid: body.userid }));
         case "POST /api/add": {
-          let address = String(body2.address ?? "").trim();
+          let address = String(body.address ?? "").trim();
           if (looksLikeName(address)) {
             try {
               address = await resolveBeaglesName(address);
@@ -30778,38 +31692,38 @@ ${body2.length}`);
               return json({ ok: false, error: err.message }, 400);
             }
           }
-          return json(await call2("friend-request", { address, hello: body2.hello }));
+          return json(await call("friend-request", { address, hello: body.hello }));
         }
         case "POST /api/launch-token": {
-          const r = await call2("launch-token", { origin: body2.origin });
+          const r = await call("launch-token", { origin: body.origin });
           return r.ok ? json({ ok: true, ...r.data ?? {} }) : json({ ok: false, error: r.error });
         }
         case "POST /api/accept": {
           let entry = null;
           try {
-            const pend = await call2("friends-pending");
-            entry = (pend.data?.pending ?? []).find((r2) => r2.userid === body2.userid) ?? null;
+            const pend = await call("friends-pending");
+            entry = (pend.data?.pending ?? []).find((r2) => r2.userid === body.userid) ?? null;
           } catch {
           }
-          const r = await call2("friends-accept", { userid: body2.userid });
+          const r = await call("friends-accept", { userid: body.userid });
           if (r?.ok && entry)
-            void greetings.record(body2.userid, entry.hello, entry.ts).catch(() => {
+            void greetings.record(body.userid, entry.hello, entry.ts).catch(() => {
             });
           return json(r);
         }
         case "POST /api/reject":
-          return json(await call2("friends-reject", { userid: body2.userid }));
+          return json(await call("friends-reject", { userid: body.userid }));
         case "POST /api/autoaccept":
-          return json(await call2("friends-autoaccept", { enabled: body2.enabled }));
+          return json(await call("friends-autoaccept", { enabled: body.enabled }));
         case "POST /api/friend-remove": {
-          const r = await call2("friend-remove", { userid: body2.userid });
+          const r = await call("friend-remove", { userid: body.userid });
           if (r?.ok)
-            void greetings.remove(body2.userid).catch(() => {
+            void greetings.remove(body.userid).catch(() => {
             });
           return json(r);
         }
         case "POST /api/friend-alias":
-          return json(await call2("friend-set-alias", { userid: body2.userid, alias: body2.alias }));
+          return json(await call("friend-set-alias", { userid: body.userid, alias: body.alias }));
         case "GET /api/identity-export": {
           try {
             const blob = host.exportBlob();
@@ -30822,24 +31736,24 @@ ${body2.length}`);
         }
         case "POST /api/identity-import": {
           try {
-            const id = await host.importBlob(body2?.keyfile ?? body2);
+            const id = await host.importBlob(body?.keyfile ?? body);
             return json({ ok: true, data: { userId: id.userid, carrier: id.address } });
           } catch (err) {
             return json({ ok: false, error: String(err?.message || err) });
           }
         }
         case "POST /api/create-identity": {
-          const d = await call2("diag");
+          const d = await call("diag");
           return json({ ok: true, data: { userId: d.data?.identity?.userid ?? "", carrier: d.data?.identity?.address ?? "" } });
         }
         case "POST /api/set-profile":
-          return json(await call2("set-profile", {
-            name: body2.name,
-            description: body2.description,
-            punkId: body2.punkId,
-            onboarded: body2.onboarded,
-            avatarDataUrl: body2.avatarDataUrl,
-            referredBy: body2.referredBy
+          return json(await call("set-profile", {
+            name: body.name,
+            description: body.description,
+            punkId: body.punkId,
+            onboarded: body.onboarded,
+            avatarDataUrl: body.avatarDataUrl,
+            referredBy: body.referredBy
           }));
         case "POST /api/file-send": {
           const userid = url2.searchParams.get("userid");
@@ -30847,7 +31761,7 @@ ${body2.length}`);
           if (!userid || !raw)
             return json({ ok: false, error: "file-send requires userid and a body" }, 400);
           const buf = raw instanceof ArrayBuffer ? raw : await new Response(raw).arrayBuffer();
-          return json(await call2("file-send", { userid, name, data: new Uint8Array(buf) }));
+          return json(await call("file-send", { userid, name, data: new Uint8Array(buf) }));
         }
         case "POST /api/webrtc-file-save": {
           const userid = url2.searchParams.get("userid");
@@ -30856,11 +31770,11 @@ ${body2.length}`);
           if (!raw)
             return json({ ok: false, error: "webrtc-file-save requires a body" }, 400);
           const buf = raw instanceof ArrayBuffer ? raw : await new Response(raw).arrayBuffer();
-          return json(await call2("webrtc-file-save", { userid, name, dir, data: new Uint8Array(buf) }));
+          return json(await call("webrtc-file-save", { userid, name, dir, data: new Uint8Array(buf) }));
         }
         case "GET /api/file-download": {
           const name = url2.searchParams.get("name");
-          const r = await call2("file-get", { name });
+          const r = await call("file-get", { name });
           if (!r.ok || !r.data?.bytes)
             return new Response("not found", { status: 404 });
           const dl = url2.searchParams.get("dl") === "1";
@@ -30886,11 +31800,11 @@ ${body2.length}`);
           return json({ ok: true, ...await callTurnServers() });
         case "GET /api/call-poll": {
           const since = url2.searchParams.get("since");
-          const r = await call2("call-poll", { since });
+          const r = await call("call-poll", { since });
           return json(r.data ?? { signals: [], cursor: 0 });
         }
         case "POST /api/call-signal":
-          return json(await call2("call-signal", { userid: body2.userid, data: body2.data }));
+          return json(await call("call-signal", { userid: body.userid, data: body.data }));
         default:
           return json({ ok: false, error: `no browser handler for ${method} ${p}` }, 404);
       }
@@ -31329,14 +32243,14 @@ ${body2.length}`);
      *  through its own patched fetch, so it takes exactly the path a click in
      *  that tab would. Resolves { status, body } or null when nobody answers. */
     forwardApi(path, init) {
-      const body2 = init?.body;
-      const cloneable = body2 == null || typeof body2 === "string" || body2 instanceof Blob || body2 instanceof ArrayBuffer || ArrayBuffer.isView(body2);
+      const body = init?.body;
+      const cloneable = body == null || typeof body === "string" || body instanceof Blob || body instanceof ArrayBuffer || ArrayBuffer.isView(body);
       return this.askChannel({
         type: "api-request",
         path: String(path),
         method: (init?.method || "GET").toUpperCase(),
-        contentType: init?.headers?.["content-type"] || init?.headers?.["Content-Type"] || (typeof body2 === "string" ? "application/json" : void 0),
-        body: cloneable ? body2 : String(body2)
+        contentType: init?.headers?.["content-type"] || init?.headers?.["Content-Type"] || (typeof body === "string" ? "application/json" : void 0),
+        body: cloneable ? body : String(body)
       }, "api-result", ACTION_FORWARD_MS);
     },
     /** One message on the action channel, one answer (or null on timeout). */
