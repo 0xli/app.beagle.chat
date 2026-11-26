@@ -2107,6 +2107,10 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
         };
         try {
           const r = await it.sender(it.file, onProgress);
+          if (r && r.rtcFailed) {
+            it.rtcFailed = true;
+            it.rtcError = r.rtcError ? String(r.rtcError) : null;
+          }
           if (r && r.ok === false) {
             it.status = "failed";
             it.error = r.error && String(r.error) || "send failed";
@@ -2164,16 +2168,6 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       }
     };
   }
-  function failureReport(done, lang) {
-    const failed = (done || []).filter((x) => x.status === "failed");
-    if (!failed.length)
-      return null;
-    const zh = lang === "zh";
-    if (done.length === 1)
-      return (zh ? "\u53D1\u9001\u5931\u8D25: " : "Send failed: ") + (failed[0].error || "");
-    const head = zh ? `${done.length} \u4E2A\u6587\u4EF6\u4E2D\u6709 ${failed.length} \u4E2A\u6CA1\u6709\u53D1\u9001:` : `${failed.length} of ${done.length} files did not send:`;
-    return head + "\n\n" + failed.map((x) => `\u2022 ${x.name} \u2014 ${x.error || (zh ? "\u53D1\u9001\u5931\u8D25" : "send failed")}`).join("\n");
-  }
   function successFlash(done, lang) {
     const n = (done || []).length;
     const zh = lang === "zh";
@@ -2181,6 +2175,31 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     if (n <= 1)
       return rtc ? zh ? "WebRTC \u6587\u4EF6\u53D1\u9001\u5B8C\u6210" : "WebRTC file sent" : zh ? "\u6587\u4EF6\u5DF2\u63D0\u4EA4\u53D1\u9001" : "File send started";
     return rtc ? zh ? `\u5DF2\u901A\u8FC7 WebRTC \u53D1\u9001 ${n} \u4E2A\u6587\u4EF6` : `${n} files sent via WebRTC` : zh ? `\u5DF2\u63D0\u4EA4\u53D1\u9001 ${n} \u4E2A\u6587\u4EF6` : `${n} file sends started`;
+  }
+  function keptResults(done) {
+    return (done || []).filter((x) => x.status === "failed" || x.rtcFailed);
+  }
+  function resultLabel(it, lang) {
+    const zh = lang === "zh";
+    const name = (it.via === "webrtc" ? "WebRTC \xB7 " : "") + (it.name || "file");
+    if (it.status === "failed") {
+      const why = it.error || (zh ? "\u53D1\u9001\u5931\u8D25" : "send failed");
+      if (it.rtcFailed)
+        return name + (zh ? " \xB7 \u5931\u8D25(WebRTC \u4E0E Carrier \u5747\u672A\u6210\u529F): " : " \xB7 failed (WebRTC, then Carrier): ") + why;
+      return name + (zh ? " \xB7 \u5931\u8D25: " : " \xB7 failed: ") + why;
+    }
+    return name + (zh ? " \xB7 WebRTC \u5931\u8D25 \u2014 \u5DF2\u901A\u8FC7 Carrier \u53D1\u9001" : " \xB7 WebRTC failed \u2014 sent via Carrier");
+  }
+  function finishFlash(done, lang) {
+    const zh = lang === "zh";
+    const failed = (done || []).filter((x) => x.status === "failed").length;
+    if (failed) {
+      const n = (done || []).length;
+      return ["err", n === 1 ? zh ? "\u53D1\u9001\u5931\u8D25,\u89C1\u4E0B\u65B9" : "Send failed \u2014 see below" : zh ? `${n} \u4E2A\u6587\u4EF6\u4E2D\u6709 ${failed} \u4E2A\u6CA1\u6709\u53D1\u9001,\u89C1\u4E0B\u65B9` : `${failed} of ${n} files did not send \u2014 see below`];
+    }
+    if ((done || []).some((x) => x.rtcFailed))
+      return ["ok", zh ? "WebRTC \u5931\u8D25,\u5DF2\u901A\u8FC7 Carrier \u53D1\u9001" : "WebRTC failed \u2014 sent via Carrier"];
+    return ["ok", successFlash(done, lang)];
   }
   var PROOF_KEY = { eth: "proof.eth", sol: "proof.sol" };
   var HEAD = "Beagle wallet binding";
@@ -4537,6 +4556,7 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     };
     const [dragOver, setDragOver] = React.useState(false);
     const [sending, setSending] = React.useState(null);
+    const [sendResults, setSendResults] = React.useState([]);
     const [theater, setTheater] = React.useState(null);
     React.useEffect(() => {
       setDraft("");
@@ -4565,11 +4585,11 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
     };
     const finishRef = React.useRef(null);
     finishRef.current = (done) => {
-      const report = failureReport(done, lang);
-      if (report)
-        window.alert(report);
-      else
-        showFlash("ok", successFlash(done, lang));
+      const kept = keptResults(done);
+      if (kept.length)
+        setSendResults((prev) => prev.concat(kept).slice(-20));
+      const [kind, msg] = finishFlash(done, lang);
+      showFlash(kind, msg);
       requestAnimationFrame(scrollToBottom);
     };
     const queueRef = React.useRef(null);
@@ -4587,6 +4607,8 @@ ${lines}`, { assistant: { kind: "adopt", rows: fresh } }));
       queueRef.current.add(files, sender, { via: mode, peerId: peer.id });
     };
     const mySending = sending ? sending.filter((s) => s.peerId === peer.id) : [];
+    const myResults = sendResults.filter((s) => s.peerId === peer.id);
+    const dismissResults = () => setSendResults((prev) => prev.filter((s) => s.peerId !== peer.id));
     const onDrop = (e) => {
       e.preventDefault();
       setDragOver(false);
@@ -4748,7 +4770,7 @@ ${peer.address}`
           stroke: 2.2,
           color: flash.kind === "err" ? "var(--danger)" : "var(--accent)"
         }
-      ), flash.msg), mySending.length > 0 && /* @__PURE__ */ React.createElement("div", { "data-testid": "file-send-queue", style: { maxWidth: 1200, margin: "0 auto 8px", display: "flex", flexDirection: "column", gap: 3, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--faint)", maxHeight: 132, overflowY: "auto" } }, mySending.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--dim)" } }, (lang === "zh" ? "\u53D1\u9001 " : "Sending ") + mySending.filter((s) => s.status === "sent" || s.status === "failed").length + " / " + mySending.length + (lang === "zh" ? " \u4E2A\u6587\u4EF6" : " files")), mySending.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, "data-status": s.status, style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0, color: s.status === "failed" ? "var(--danger)" : void 0 } }, /* @__PURE__ */ React.createElement(
+      ), flash.msg), (mySending.length > 0 || myResults.length > 0) && /* @__PURE__ */ React.createElement("div", { "data-testid": "file-send-queue", style: { maxWidth: 1200, margin: "0 auto 8px", display: "flex", flexDirection: "column", gap: 3, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--faint)", maxHeight: 132, overflowY: "auto" } }, mySending.length > 1 && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--dim)" } }, (lang === "zh" ? "\u53D1\u9001 " : "Sending ") + mySending.filter((s) => s.status === "sent" || s.status === "failed").length + " / " + mySending.length + (lang === "zh" ? " \u4E2A\u6587\u4EF6" : " files")), mySending.map((s) => /* @__PURE__ */ React.createElement("div", { key: s.id, "data-status": s.status, style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0, color: s.status === "failed" ? "var(--danger)" : void 0 } }, /* @__PURE__ */ React.createElement(
         Icon,
         {
           name: s.status === "sent" ? "check" : s.status === "failed" ? "x" : "paperclip",
@@ -4756,7 +4778,37 @@ ${peer.address}`
           stroke: 2,
           color: s.status === "failed" ? "var(--danger)" : s.status === "waiting" ? "var(--faint)" : "var(--accent)"
         }
-      ), /* @__PURE__ */ React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } }, (s.status === "sending" ? lang === "zh" ? "\u53D1\u9001\u4E2D: " : "Sending: " : "") + (s.via === "webrtc" ? "WebRTC \xB7 " : "") + s.name + (s.status === "sending" ? (s.size ? " \xB7 " + dkFileSize(s.sent || 0) + " / " + dkFileSize(s.size) : "") + (s.pct != null ? " \xB7 " + Math.min(100, Math.max(0, s.pct)).toFixed(1) + "%" : "") + (s.kbps != null ? " \xB7 " + dkSpeed(s.kbps) : "") : s.status === "waiting" ? " \xB7 " + (s.size ? dkFileSize(s.size) + " \xB7 " : "") + (lang === "zh" ? "\u7B49\u5F85\u4E2D" : "waiting") : s.status === "failed" ? " \xB7 " + (s.error || "") : " \xB7 " + (lang === "zh" ? "\u5DF2\u63D0\u4EA4" : "done")))))), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", gap: phone ? 6 : 10 } }, /* @__PURE__ */ React.createElement(
+      ), /* @__PURE__ */ React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } }, (s.status === "sending" ? lang === "zh" ? "\u53D1\u9001\u4E2D: " : "Sending: " : "") + (s.via === "webrtc" ? "WebRTC \xB7 " : "") + s.name + (s.status === "sending" ? (s.size ? " \xB7 " + dkFileSize(s.sent || 0) + " / " + dkFileSize(s.size) : "") + (s.pct != null ? " \xB7 " + Math.min(100, Math.max(0, s.pct)).toFixed(1) + "%" : "") + (s.kbps != null ? " \xB7 " + dkSpeed(s.kbps) : "") : s.status === "waiting" ? " \xB7 " + (s.size ? dkFileSize(s.size) + " \xB7 " : "") + (lang === "zh" ? "\u7B49\u5F85\u4E2D" : "waiting") : s.status === "failed" ? " \xB7 " + (s.error || "") : " \xB7 " + (lang === "zh" ? "\u5DF2\u63D0\u4EA4" : "done"))))), myResults.map((s, i) => /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: "r" + s.id,
+          "data-testid": "file-send-result",
+          "data-status": s.status,
+          "data-rtc-failed": s.rtcFailed ? "1" : void 0,
+          title: s.rtcError ? "WebRTC: " + s.rtcError : void 0,
+          style: { display: "flex", alignItems: "center", gap: 8, minWidth: 0, color: s.status === "failed" ? "var(--danger)" : "var(--dim)" }
+        },
+        /* @__PURE__ */ React.createElement(
+          Icon,
+          {
+            name: s.status === "failed" ? "x" : "check",
+            size: 13,
+            stroke: 2,
+            color: s.status === "failed" ? "var(--danger)" : "var(--faint)"
+          }
+        ),
+        /* @__PURE__ */ React.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 } }, resultLabel(s, lang)),
+        i === myResults.length - 1 && /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            onClick: dismissResults,
+            title: lang === "zh" ? "\u5173\u95ED" : "Dismiss",
+            "aria-label": lang === "zh" ? "\u5173\u95ED" : "Dismiss",
+            style: { flexShrink: 0, border: "none", background: "transparent", color: "var(--faint)", cursor: "pointer", padding: "0 2px", fontFamily: "var(--mono)", fontSize: 11.5 }
+          },
+          lang === "zh" ? "\u5173\u95ED" : "dismiss"
+        )
+      ))), /* @__PURE__ */ React.createElement("div", { style: { maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", gap: phone ? 6 : 10 } }, /* @__PURE__ */ React.createElement(
         "input",
         {
           ref: fileRef,
@@ -4907,7 +4959,7 @@ ${peer.address}`
           style: { maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 6 }
         }
       ))),
-      pubProfile && /* @__PURE__ */ React.createElement(DkPublicProfile, { T, userid: peer.userId, fallbackName: verifiedLabel(peer.userId, peer.alias), isFriend: true, onClose: () => setPubProfile(false) }),
+      pubProfile && /* @__PURE__ */ React.createElement(DkPublicProfile, { T, userid: peer.userId, fallbackName: verifiedLabel(peer.userId, peer.alias), isFriend: true, friend: peer, onClose: () => setPubProfile(false) }),
       nameCardProf && (() => {
         const cardFriend2 = cardFriend(nameCardProf, peers);
         return /* @__PURE__ */ React.createElement(
@@ -4958,6 +5010,75 @@ ${peer.address}`
     return /* @__PURE__ */ React.createElement("div", { style: { flex: 1, display: "flex", minWidth: 0, minHeight: 0 } }, /* @__PURE__ */ React.createElement(PeerSidebar, { T, peers, requests, activeId, onSelect, onAct, onAdd, prefillAddr, onPrefillConsumed, muted, isProtocol, protocolFix }), peer ? /* @__PURE__ */ React.createElement(Conversation, { T, peer, lang, peers, onOpenChat: onSelect, thread, isProtocol, onSend, onSendFile, onSendRtcFile, onAlias, onRemove, onOpenNet, onCall, onReloadThread, hasEarlier, onLoadEarlier, onAssistantRemove, onAssistantAdopt, muted: !!muted && muted.includes(peer.id), onToggleMute }) : /* @__PURE__ */ React.createElement(ChatEmpty, { T }));
   }
   Object.assign(window, { ChatTab });
+  var PLATFORM = { ios: "iOS", android: "Android", darwin: "macOS", macos: "macOS", linux: "Linux", win32: "Windows", windows: "Windows", js: "Browser", browser: "Browser", web: "Browser", agent: "Agent" };
+  var clean2 = (v) => typeof v === "string" && v.trim() ? v.trim() : "";
+  function platformLabel(p) {
+    const v = clean2(p);
+    if (!v)
+      return "";
+    return Object.prototype.hasOwnProperty.call(PLATFORM, v.toLowerCase()) ? PLATFORM[v.toLowerCase()] : v;
+  }
+  function osVersionLabel(v) {
+    const s = clean2(v);
+    return !s || /^[a-z]+-?$/i.test(s) ? "" : s;
+  }
+  function rspLabel(protocol, notAdvertised) {
+    if (typeof protocol !== "string")
+      return "";
+    return protocol ? protocol.toUpperCase() : notAdvertised || "Not advertised";
+  }
+  var LINK_BASE = { twitter: "https://x.com/", linkedin: "https://www.linkedin.com/in/", github: "https://github.com/" };
+  var shortDate = (ms) => {
+    try {
+      return new Date(ms).toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
+    } catch (e) {
+      return new Date(ms).toLocaleString();
+    }
+  };
+  function friendCardView(friend, prof, T = {}, fmtDate2 = shortDate) {
+    const f = friend || {};
+    const p = prof || {};
+    const name = clean2(p.displayName) || clean2(f.alias) || clean2(f.name);
+    const ens = clean2(p.ens) || clean2(f.ensClaim) || clean2(f.ens);
+    const description = clean2(p.description) || clean2(f.description);
+    const avatarUrl = clean2(p.avatarUrl) || clean2(f.avatarUrl) || clean2(f.pushedAvatarUrl);
+    const punkId = p.punkId != null ? p.punkId : f.punkId != null ? f.punkId : null;
+    const userid = f.userId || f.id || "";
+    const address = clean2(f.address) || clean2(p.address);
+    const rows = [];
+    if (friend) {
+      const status = f.online ? T.statusOnline || "Online" : (T.statusOffline || "Offline") + (f.lastSessionAt ? " \xB7 " + (T.lastSeen || "last seen") + " " + fmtDate2(f.lastSessionAt) : "");
+      rows.push({ key: "status", label: T.status || "Status", value: status, online: !!f.online });
+    }
+    if (clean2(p.eth))
+      rows.push({ key: "eth", label: "ethereum", value: p.eth, copy: true, head: 8 });
+    if (clean2(p.sol))
+      rows.push({ key: "sol", label: "solana", value: p.sol, copy: true, head: 8 });
+    if (userid)
+      rows.push({ key: "userid", label: T.userId || "user id", value: userid, copy: true, head: 10 });
+    if (address && address !== userid)
+      rows.push({ key: "address", label: T.addr || "address", value: address, copy: true, head: 8 });
+    const links = Object.entries(p.links || {}).filter(([, h]) => clean2(h)).map(([k, h]) => ({ key: k, label: k, href: (LINK_BASE[k] || "") + h }));
+    const site = clean2(f.profileUrl);
+    if (site && !links.some((l) => l.href === site))
+      links.push({ key: "website", label: T.website || "website", href: site });
+    const client = [];
+    if (friend) {
+      const plat = platformLabel(f.platform);
+      if (plat)
+        client.push({ key: "platform", label: T.friendPlatform || "Platform", value: plat });
+      const os = osVersionLabel(f.osVersion);
+      if (os)
+        client.push({ key: "os", label: T.friendOsVersion || "OS version", value: os });
+      const app = clean2(f.appVersion);
+      if (app)
+        client.push({ key: "app", label: T.friendAppVersion || "App version", value: app });
+      const rsp = rspLabel(f.rspProtocol, T.friendRspNotAdvertised);
+      if (rsp)
+        client.push({ key: "rsp", label: "RSP", value: rsp });
+    }
+    return { name, ens, description, avatarUrl, punkId, userid, address, rows, links, client };
+  }
   function CopyBtn({ value, copiedText = "Copied", copyFailedText = "Copy failed", copyTitle = "Copy" }) {
     const [status, setStatus] = React.useState(null);
     const timer = React.useRef(null);
@@ -5234,7 +5355,7 @@ ${peer.address}`
   function DkPublicProfile({ T, userid, fallbackName, onClose, isFriend, isMe, onMessage, card, friend }) {
     const view = card ? nameCardView(card, friend ? [friend] : []) : null;
     const [st, setSt] = React.useState({ loading: true });
-    const ensV = useEnsVerdict(userid, st.prof && st.prof.ens);
+    const ensV = useEnsVerdict(userid, st.prof && st.prof.ens || friend && (friend.ensClaim || friend.ens) || "");
     const [addState, setAddState] = React.useState(null);
     const [recOpen, setRecOpen] = React.useState(false);
     const [recPeers, setRecPeers] = React.useState(null);
@@ -5250,13 +5371,14 @@ ${peer.address}`
     };
     const recommendTo = (p) => {
       const prof2 = st.prof || {};
+      const fc = friend ? friendCardView(friend, st.prof, T) : null;
       const text = dkEncodeBeagleContact({
-        name: prof2.displayName || fallbackName || "",
-        ens: prof2.ens || "",
+        name: fc && fc.name || prof2.displayName || fallbackName || "",
+        ens: fc && fc.ens || prof2.ens || "",
         userid,
-        address: prof2.address || "",
-        avatar: prof2.avatarUrl || "",
-        description: prof2.description || ""
+        address: fc && fc.address || prof2.address || "",
+        avatar: fc && fc.avatarUrl || prof2.avatarUrl || "",
+        description: fc && fc.description || prof2.description || ""
       });
       setRecState((s) => ({ ...s, [p.id]: "busy" }));
       fetch("/api/chat-send", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ userid: p.userId, text }) }).then((r) => r.json()).then((r) => setRecState((s) => ({ ...s, [p.id]: r.ok !== false ? "sent" : r.error || "failed" }))).catch((e) => setRecState((s) => ({ ...s, [p.id]: String(e && e.message || e) })));
@@ -5280,17 +5402,20 @@ ${peer.address}`
       };
     }, [userid]);
     const prof = st.prof;
-    const LINK_BASE = { twitter: "https://x.com/", linkedin: "https://www.linkedin.com/in/", github: "https://github.com/" };
-    const links = prof ? Object.entries(prof.links || {}) : [];
+    const fv = isFriend && friend ? friendCardView(friend, prof, T) : null;
+    const pv = prof || {};
+    const LINK_BASE2 = { twitter: "https://x.com/", linkedin: "https://www.linkedin.com/in/", github: "https://github.com/" };
+    const links = fv ? fv.links.map((l) => [l.label, l.href, true]) : prof ? Object.entries(prof.links || {}) : [];
+    const cardAddress = fv ? fv.address : pv.address;
     const lbl = { width: 110, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, color: "var(--faint)", textTransform: "uppercase", letterSpacing: 0.5 };
     const rowS = { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid var(--line)" };
-    return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: 420, maxWidth: "94vw", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, prof && prof.avatarUrl ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: prof.avatarUrl, seed: userid, size: 56, radius: 14 }) : prof && prof.punkId != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: prof.punkId, size: 56, radius: 14, fallbackSeed: userid }) : friend ? /* @__PURE__ */ React.createElement(DkAvatar, { peer: friend, size: 56, radius: 14, dot: false }) : card && card.avatar ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: card.avatar, seed: userid, size: 56, radius: 14 }) : /* @__PURE__ */ React.createElement(DkIdenticon, { seed: userid, size: 56, radius: 14 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 17, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, prof && prof.displayName || fallbackName || shortKey(userid, 10, 6)), prof && prof.ens && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)", marginTop: 2 } }, prof.ens, /* @__PURE__ */ React.createElement(DkEnsMark, { verdict: ensV, T }))), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), st.loading ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.dirLoading || "loading\u2026") : !prof && view ? /* @__PURE__ */ React.createElement(DkNameCardNoProfile, { T, view, card, onMessage, isMe }) : !prof ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.pubNone || "No public profile \u2014 this user has not registered a beagles.eth name.") : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column" } }, prof.description && /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)", paddingBottom: 12, lineHeight: 1.5 } }, prof.description), links.length > 0 && // Label keeps its column; pills wrap inside their OWN container so
+    return /* @__PURE__ */ React.createElement("div", { onClick: onClose, style: { position: "fixed", inset: 0, zIndex: 90, background: "color-mix(in oklab, #000, transparent 38%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }, /* @__PURE__ */ React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: 420, maxWidth: "94vw", maxHeight: "calc(100dvh - 48px)", overflowY: "auto", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14 } }, prof && prof.avatarUrl ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: prof.avatarUrl, seed: userid, size: 56, radius: 14 }) : prof && prof.punkId != null ? /* @__PURE__ */ React.createElement(DkPunkAvatar, { id: prof.punkId, size: 56, radius: 14, fallbackSeed: userid }) : fv && fv.avatarUrl ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: fv.avatarUrl, seed: userid, size: 56, radius: 14 }) : friend ? /* @__PURE__ */ React.createElement(DkAvatar, { peer: friend, size: 56, radius: 14, dot: false }) : card && card.avatar ? /* @__PURE__ */ React.createElement(DkImgAvatar, { url: card.avatar, seed: userid, size: 56, radius: 14 }) : /* @__PURE__ */ React.createElement(DkIdenticon, { seed: userid, size: 56, radius: 14 }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 17, fontWeight: 700, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, fv && fv.name || prof && prof.displayName || fallbackName || shortKey(userid, 10, 6)), (fv ? fv.ens : prof && prof.ens) && /* @__PURE__ */ React.createElement("div", { "data-testid": "friend-card-ens", style: { display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--mono)", fontSize: 12, color: "var(--accent)", marginTop: 2 } }, fv ? fv.ens : prof.ens, /* @__PURE__ */ React.createElement(DkEnsMark, { verdict: ensV, T }))), /* @__PURE__ */ React.createElement(Btn, { icon: "x", size: "sm", onClick: onClose })), st.loading && !fv ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.dirLoading || "loading\u2026") : !prof && !fv && view ? /* @__PURE__ */ React.createElement(DkNameCardNoProfile, { T, view, card, onMessage, isMe }) : !prof && !fv ? /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)" } }, T.pubNone || "No public profile \u2014 this user has not registered a beagles.eth name.") : /* @__PURE__ */ React.createElement("div", { "data-testid": fv ? "friend-card" : void 0, style: { display: "flex", flexDirection: "column" } }, (fv ? fv.description : pv.description) && /* @__PURE__ */ React.createElement("div", { "data-testid": "friend-card-bio", style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--dim)", paddingBottom: 12, lineHeight: 1.5, overflowWrap: "anywhere" } }, fv ? fv.description : pv.description), links.length > 0 && // Label keeps its column; pills wrap inside their OWN container so
     // an overflowing pill lands under the first pill, never under the label.
-    /* @__PURE__ */ React.createElement("div", { style: { ...rowS, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("span", { style: { ...lbl, paddingTop: 5 } }, T.linksCard || "links"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap" } }, links.map(([k, h]) => /* @__PURE__ */ React.createElement(
+    /* @__PURE__ */ React.createElement("div", { style: { ...rowS, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement("span", { style: { ...lbl, paddingTop: 5 } }, T.linksCard || "links"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, display: "flex", gap: 8, flexWrap: "wrap" } }, links.map(([k, h, full]) => /* @__PURE__ */ React.createElement(
       "a",
       {
         key: k,
-        href: (LINK_BASE[k] || "") + h,
+        href: full ? h : (LINK_BASE2[k] || "") + h,
         target: "_blank",
         rel: "noreferrer",
         style: { display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line)", textDecoration: "none", fontFamily: "var(--ui)", fontSize: 12, color: "var(--accent)" }
@@ -5299,10 +5424,13 @@ ${peer.address}`
       " \u2197"
     )))), (() => {
       const kvRow = (label, value, head = 8) => /* @__PURE__ */ React.createElement("div", { style: rowS, key: label }, /* @__PURE__ */ React.createElement("span", { style: lbl }, label), /* @__PURE__ */ React.createElement("span", { title: value, style: { flex: 1, minWidth: 0, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, shortKey(value, head, 6)), /* @__PURE__ */ React.createElement(CopyBtn, { value, copiedText: T.copied, copyFailedText: T.copyFailed, copyTitle: T.copy }));
+      if (fv) {
+        return /* @__PURE__ */ React.createElement(React.Fragment, null, fv.rows.map((r) => r.copy ? kvRow(r.label, r.value, r.head) : /* @__PURE__ */ React.createElement("div", { style: rowS, key: r.key, "data-testid": "friend-card-" + r.key }, /* @__PURE__ */ React.createElement("span", { style: lbl }, r.label), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--dim)" } }, r.key === "status" && /* @__PURE__ */ React.createElement("span", { style: { width: 7, height: 7, borderRadius: 999, flexShrink: 0, background: r.online ? "var(--online)" : "var(--faint)" } }), r.value))));
+      }
       return /* @__PURE__ */ React.createElement(React.Fragment, null, prof.eth && kvRow("ethereum", prof.eth), prof.sol && kvRow("solana", prof.sol), kvRow(T.userId || "user id", userid, 10), prof.address && kvRow(T.addr || "address", prof.address));
     })(), (() => {
       const cta = { padding: "7px 16px", borderRadius: 9, cursor: "pointer", fontFamily: "var(--ui)", fontSize: 12.5 };
-      return /* @__PURE__ */ React.createElement("div", { style: { ...rowS, justifyContent: "flex-end", gap: 8 } }, !isMe && prof.address && /* @__PURE__ */ React.createElement(
+      return /* @__PURE__ */ React.createElement("div", { style: { ...rowS, justifyContent: "flex-end", gap: 8 } }, !isMe && cardAddress && /* @__PURE__ */ React.createElement(
         "button",
         {
           onClick: openRecommend,
@@ -5316,10 +5444,10 @@ ${peer.address}`
           style: { ...cta, border: "none", background: "var(--accent)", color: "#fff" }
         },
         T.pubMessage || "Message"
-      ), !isMe && !isFriend && prof.address && (addState === "sent" ? /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, T.dirSent || "requested") : addState && addState !== "busy" ? /* @__PURE__ */ React.createElement("span", { title: addState, style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--warn, #f59e0b)" } }, T.addFailed || "failed") : /* @__PURE__ */ React.createElement(
+      ), !isMe && !isFriend && pv.address && (addState === "sent" ? /* @__PURE__ */ React.createElement(Tag, { tone: "accent" }, T.dirSent || "requested") : addState && addState !== "busy" ? /* @__PURE__ */ React.createElement("span", { title: addState, style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--warn, #f59e0b)" } }, T.addFailed || "failed") : /* @__PURE__ */ React.createElement(
         "button",
         {
-          onClick: () => addFriend(prof.address),
+          onClick: () => addFriend(pv.address),
           disabled: addState === "busy",
           style: { ...cta, border: "none", background: "var(--accent)", color: "#fff", opacity: addState === "busy" ? 0.6 : 1 }
         },
@@ -5335,7 +5463,7 @@ ${peer.address}`
       /* @__PURE__ */ React.createElement(DkAvatar, { peer: p, size: 26, radius: 7, dot: false }),
       /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0, fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, /* @__PURE__ */ React.createElement(DkVerifiedName, { userid: p.userId, name: p.alias, fallback: shortKey(p.userId, 8, 6), T })),
       recState[p.id] === "sent" ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--online)" } }, T.pubRecSent || "sent \u2713") : recState[p.id] === "busy" ? /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--faint)" } }, "\u2026") : recState[p.id] ? /* @__PURE__ */ React.createElement("span", { title: recState[p.id], style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--warn, #f59e0b)" } }, T.addFailed || "failed") : /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--ui)", fontSize: 11.5, color: "var(--accent)" } }, T.send || "Send")
-    ))))));
+    ))), fv && fv.client.length > 0 && /* @__PURE__ */ React.createElement("div", { "data-testid": "friend-card-client" }, fv.client.map((r) => /* @__PURE__ */ React.createElement("div", { key: r.key, style: rowS, "data-testid": "friend-card-" + r.key }, /* @__PURE__ */ React.createElement("span", { style: lbl }, r.label), /* @__PURE__ */ React.createElement("span", { title: r.value, style: { flex: 1, minWidth: 0, color: "var(--dim)", fontFamily: "var(--mono)", fontSize: 11.5, overflowWrap: "anywhere" } }, r.value)))))));
   }
   function dkAvatarDataUrl(file) {
     return new Promise((resolve, reject) => {
@@ -6213,6 +6341,8 @@ ${peer.address}`
       justifyContent: "center"
     } }, /* @__PURE__ */ React.createElement(Icon, { name: app.icon, size: 19, color: "var(--accent)", stroke: 1.8 })), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 14, fontWeight: 600, color: "var(--text)" } }, pickText(app.name, t && t.lang, app.id)), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--ui)", fontSize: 12.5, color: "var(--faint)", marginTop: 2 } }, pickText(app.blurb, t && t.lang, "")), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 11, color: "var(--dim)", marginTop: 3 } }, app.host ? zh ? "\u672C\u673A\u5E94\u7528" : "runs in this app" : String(app.origin || "").replace(/^https?:\/\//, ""))), /* @__PURE__ */ React.createElement(Btn, { tone: "accent", size: "sm", onClick: busy ? void 0 : () => open(app) }, busy === app.id ? zh ? "\u6253\u5F00\u4E2D\u2026" : "opening\u2026" : zh ? "\u6253\u5F00" : "Open")))));
   }
+  var DK_Z_CALL_OVERLAY = 1e3;
+  var DK_Z_INCOMING_CALL = 1010;
   var CLAIM_SUPPRESS_MS = 5 * 6e4;
   function newPageId() {
     return "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -7152,7 +7282,7 @@ ${peer.address}`
       return null;
     const peer = (peers || []).find((p) => p.id === inc.peerId) || { id: inc.peerId };
     const name = verifiedLabel(inc.peerId, peer.alias) || peer.name || shortKey(inc.peerId, 10, 6);
-    return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 80, background: "color-mix(in oklab, var(--bg), transparent 15%)", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 320, padding: 26, borderRadius: 18, background: "var(--panel)", border: "1px solid var(--line)", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", width: 96, height: 96, borderRadius: 999, border: "2px solid var(--accent)", animation: "dkpulse 2s ease-out infinite" } }), /* @__PURE__ */ React.createElement(DkIdenticon, { seed: inc.peerId, size: 72, radius: 18 })), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 17, fontWeight: 700, color: "var(--text)" } }, name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--faint)", marginTop: 4, display: "flex", gap: 6, alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: inc.video ? "video" : "phone", size: 14, stroke: 2 }), T && (inc.video ? T.incomingVideo : T.incomingAudio) || "Incoming " + (inc.video ? "video" : "audio") + " call"), (inc.via === "rsp" || inc.via === "rsp-doorbell") && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--faint)", fontSize: 12, marginTop: 6 } }, inc.via === "rsp-doorbell" ? "RSP \xB7 Doorbell" : "RSP"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, justifyContent: "center", marginTop: 22 } }, /* @__PURE__ */ React.createElement(CallBtn, { icon: "phone", label: T && T.decline || "Decline", danger: true, onClick: ctl.reject }), /* @__PURE__ */ React.createElement(CallBtn, { icon: inc.video ? "video" : "phone", label: T && T.accept || "Accept", active: true, onClick: ctl.accept }))));
+    return /* @__PURE__ */ React.createElement("div", { "data-testid": "incoming-call", style: { position: "fixed", inset: 0, zIndex: DK_Z_INCOMING_CALL, background: "color-mix(in oklab, var(--bg), transparent 15%)", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 320, padding: 26, borderRadius: 18, background: "var(--panel)", border: "1px solid var(--line)", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.4)" } }, /* @__PURE__ */ React.createElement("div", { style: { position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { position: "absolute", width: 96, height: 96, borderRadius: 999, border: "2px solid var(--accent)", animation: "dkpulse 2s ease-out infinite" } }), /* @__PURE__ */ React.createElement(DkIdenticon, { seed: inc.peerId, size: 72, radius: 18 })), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 17, fontWeight: 700, color: "var(--text)" } }, name), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--faint)", marginTop: 4, display: "flex", gap: 6, alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(Icon, { name: inc.video ? "video" : "phone", size: 14, stroke: 2 }), T && (inc.video ? T.incomingVideo : T.incomingAudio) || "Incoming " + (inc.video ? "video" : "audio") + " call"), (inc.via === "rsp" || inc.via === "rsp-doorbell") && /* @__PURE__ */ React.createElement("div", { style: { color: "var(--faint)", fontSize: 12, marginTop: 6 } }, inc.via === "rsp-doorbell" ? "RSP \xB7 Doorbell" : "RSP"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 14, justifyContent: "center", marginTop: 22 } }, /* @__PURE__ */ React.createElement(CallBtn, { icon: "phone", label: T && T.decline || "Decline", danger: true, onClick: ctl.reject }), /* @__PURE__ */ React.createElement(CallBtn, { icon: inc.video ? "video" : "phone", label: T && T.accept || "Accept", active: true, onClick: ctl.accept }))));
   }
   function CallBtn({ icon, label, onClick, active, danger, wide }) {
     const bg = danger ? "var(--danger)" : active ? "var(--accent)" : "var(--chip)";
@@ -7205,7 +7335,7 @@ ${peer.address}`
     };
     const canShare = connected && typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia;
     const controls = /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 18, alignItems: "flex-start" } }, /* @__PURE__ */ React.createElement(CallBtn, { icon: muted ? "micFill" : "mic", label: muted ? T && T.unmute || "unmute" : T && T.mute || "mute", active: muted, onClick: toggleMute }), canShare && /* @__PURE__ */ React.createElement(CallBtn, { icon: "monitor", label: ctl.sharing ? T && T.stopShare || "stop share" : T && T.share || "share", active: ctl.sharing, onClick: ctl.toggleShare }), /* @__PURE__ */ React.createElement(CallBtn, { icon: "phone", label: T && T.endCall || "end", danger: true, wide: true, onClick: ctl.hangup }));
-    return /* @__PURE__ */ React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 70, background: "var(--bg)", display: "flex", flexDirection: "column" } }, ctl.remoteStream && /* @__PURE__ */ React.createElement(AudioSink, { stream: ctl.remoteStream }), /* @__PURE__ */ React.createElement("div", { style: { height: 52, flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "0 18px", borderBottom: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(Icon, { name: video ? "video" : "phone", size: 16, color: "var(--accent)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: "var(--text)" } }, name), /* @__PURE__ */ React.createElement(Tag, { tone: callStateTone(call.ended ? call.state : connected ? "connected" : call.state) }, stateLabel), noticeText && /* @__PURE__ */ React.createElement(Tag, { tone: "danger" }, noticeText), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), connected && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, color: "var(--text)", letterSpacing: 1 } }, mm, ":", ss)), video ? (() => {
+    return /* @__PURE__ */ React.createElement("div", { "data-testid": "call-overlay", style: { position: "fixed", inset: 0, zIndex: DK_Z_CALL_OVERLAY, background: "var(--bg)", display: "flex", flexDirection: "column" } }, ctl.remoteStream && /* @__PURE__ */ React.createElement(AudioSink, { stream: ctl.remoteStream }), /* @__PURE__ */ React.createElement("div", { style: { height: 52, flexShrink: 0, display: "flex", alignItems: "center", gap: 10, padding: "0 18px", borderBottom: "1px solid var(--line)" } }, /* @__PURE__ */ React.createElement(Icon, { name: video ? "video" : "phone", size: 16, color: "var(--accent)", stroke: 2 }), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 13, fontWeight: 700, color: "var(--text)" } }, name), /* @__PURE__ */ React.createElement(Tag, { tone: callStateTone(call.ended ? call.state : connected ? "connected" : call.state) }, stateLabel), noticeText && /* @__PURE__ */ React.createElement(Tag, { tone: "danger" }, noticeText), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }), connected && /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "var(--mono)", fontSize: 14, fontWeight: 700, color: "var(--text)", letterSpacing: 1 } }, mm, ":", ss)), video ? (() => {
       const tiles = [
         { key: "remote", stream: ctl.remoteStream, label: name, mirror: false },
         { key: "local", stream: ctl.localStream, label: ctl.sharing ? T && T.yourScreen || "Your screen" : T && T.you || "You", mirror: !ctl.sharing }
@@ -7414,6 +7544,8 @@ ${peer.address}`
   var DEFAULTS = {
     openTimeoutMs: 2e4,
     // DataChannel open
+    offerResendMs: 3e3,
+    // sender: repeat the offer until answered
     highWater: 4 * 1024 * 1024,
     // in-flight bytes before the send loop waits
     bufferWaitMs: 3e4,
@@ -7506,6 +7638,7 @@ ${peer.address}`
     const PC = o.RTCPeerConnection;
     const sessions = /* @__PURE__ */ new Map();
     const finished = /* @__PURE__ */ new Map();
+    const ended = /* @__PURE__ */ new Map();
     const envelope = (fileId, type, extra) => Object.assign({ dkRtc: 1, kind: FILE_RTC_KIND, fileId, type, ts: Date.now() }, extra || {});
     const signal = (peerId, fileId, type, extra) => o.bus.send(peerId, envelope(fileId, type, extra));
     let off = null;
@@ -7514,6 +7647,9 @@ ${peer.address}`
       for (const [id, at] of finished)
         if (at < cut)
           finished.delete(id);
+      for (const [id, at] of ended)
+        if (at < cut)
+          ended.delete(id);
     };
     const closeRecv = (fileId) => {
       const s = sessions.get(fileId);
@@ -7532,6 +7668,7 @@ ${peer.address}`
       } catch (e) {
       }
       sessions.delete(fileId);
+      ended.set(fileId, Date.now());
     };
     const attachChannel = (peerId, fileId, s, dc) => {
       dc.binaryType = "arraybuffer";
@@ -7592,15 +7729,17 @@ ${peer.address}`
       try {
         if (env.type === "offer") {
           pruneFinished();
-          if (finished.has(fileId)) {
+          if (finished.has(fileId) || ended.has(fileId)) {
             log("[file-rtc] offer for a finished transfer ignored " + fileId);
             return;
           }
-          if (s && s.pc && s.pc.signalingState !== "closed") {
-            log("[file-rtc] duplicate offer ignored for " + fileId);
+          if (s) {
+            if (s.answerSdp && s.peerId === peerId)
+              signal(peerId, fileId, "answer", { sdp: s.answerSdp }).catch(() => {
+              });
             return;
           }
-          const sess = { peerId, pc: null, dc: null, meta: env.meta || null, chunks: [], received: 0, pendingCandidates: [], completed: false };
+          const sess = { peerId, pc: null, dc: null, meta: env.meta || null, chunks: [], received: 0, pendingCandidates: [], completed: false, answerSdp: null };
           sessions.set(fileId, sess);
           const pc = new PC({ iceServers: await o.iceServers() });
           sess.pc = pc;
@@ -7621,6 +7760,7 @@ ${peer.address}`
           }
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
+          sess.answerSdp = answer.sdp;
           await signal(peerId, fileId, "answer", { sdp: answer.sdp });
         } else if (env.type === "candidate" && s && env.candidate) {
           if (s.pc && s.pc.remoteDescription) {
@@ -7656,6 +7796,8 @@ ${peer.address}`
           log("[file-rtc] stale answer ignored for " + env.fileId + " state=" + s.pc.signalingState);
           return;
         }
+        if (s.stopResend)
+          s.stopResend();
         await s.pc.setRemoteDescription({ type: "answer", sdp: env.sdp });
         for (const c of s.pendingCandidates.splice(0)) {
           try {
@@ -7677,7 +7819,7 @@ ${peer.address}`
       const fileId = newId();
       const pc = new PC({ iceServers: await o.iceServers() });
       const dc = pc.createDataChannel("agentnet-file", { ordered: true });
-      const s = { peerId, pc, dc, pendingCandidates: [] };
+      const s = { peerId, pc, dc, pendingCandidates: [], stopResend: null };
       senders.set(fileId, s);
       let acked = null;
       const ack = new Promise((resolve) => {
@@ -7693,7 +7835,15 @@ ${peer.address}`
         } catch (e) {
         }
       });
+      let resendTimer = null;
+      s.stopResend = () => {
+        if (resendTimer) {
+          clearInterval(resendTimer);
+          resendTimer = null;
+        }
+      };
       const cleanup = () => {
+        s.stopResend();
         try {
           dc.close();
         } catch (e) {
@@ -7715,8 +7865,25 @@ ${peer.address}`
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         const mime = file.type || "application/octet-stream";
-        await signal(peerId, fileId, "offer", { sdp: offer.sdp, meta: { name: file.name, size: file.size, mime } });
-        await waitForOpen(dc, opt.openTimeoutMs, () => rtcState(pc));
+        const meta = { name: file.name, size: file.size, mime };
+        await signal(peerId, fileId, "offer", { sdp: offer.sdp, meta });
+        let resends = 0;
+        resendTimer = setInterval(() => {
+          if (pc.signalingState !== "have-local-offer" || dc.readyState !== "connecting") {
+            s.stopResend();
+            return;
+          }
+          resends++;
+          log("[file-rtc] no answer yet, offer resent (" + resends + ") " + fileId);
+          const sdp = pc.localDescription && pc.localDescription.sdp || offer.sdp;
+          signal(peerId, fileId, "offer", { sdp, meta }).catch(() => {
+          });
+        }, opt.offerResendMs);
+        try {
+          await waitForOpen(dc, opt.openTimeoutMs, () => rtcState(pc));
+        } finally {
+          s.stopResend();
+        }
         dc.send(JSON.stringify({ type: "meta", name: file.name, size: file.size, mime }));
         let sent = 0;
         const startedAt = Date.now();
@@ -7798,7 +7965,8 @@ ${peer.address}`
       sendFile,
       // for tests
       _sessions: sessions,
-      _finished: finished
+      _finished: finished,
+      _ended: ended
     };
   }
   function dkFileIceServers() {
@@ -8358,6 +8526,15 @@ ${peer.address}`
       updLanNoRestart: "Installed, but the daemon did not come back within a minute \u2014 the new version applies on its next start.",
       pubOpen: "View public profile",
       pubNone: "No public profile \u2014 this user has not registered a beagles.eth name.",
+      friendPlatform: "Platform",
+      friendOsVersion: "OS version",
+      friendAppVersion: "App version",
+      friendRspNotAdvertised: "Not advertised",
+      status: "Status",
+      statusOnline: "Online",
+      statusOffline: "Offline",
+      lastSeen: "last seen",
+      website: "website",
       ensNoEthWallet: "no Ethereum wallet extension found (MetaMask\u2026)",
       ensNoSolWallet: "no Solana wallet extension found (Phantom\u2026)",
       ensWalletOwned: "registered via your mobile wallet as",
@@ -8595,6 +8772,15 @@ ${peer.address}`
       updLanNoRestart: "\u5DF2\u5B89\u88C5,\u4F46 daemon \u4E00\u5206\u949F\u5185\u6CA1\u6709\u91CD\u65B0\u8D77\u6765\u2014\u2014\u4E0B\u6B21\u542F\u52A8\u65F6\u751F\u6548\u3002",
       pubOpen: "\u67E5\u770B\u516C\u5F00\u8D44\u6599",
       pubNone: "\u6682\u65E0\u516C\u5F00\u8D44\u6599\u2014\u2014\u5BF9\u65B9\u8FD8\u6CA1\u6709\u6CE8\u518C beagles.eth \u540D\u5B57\u3002",
+      friendPlatform: "\u5E73\u53F0",
+      friendOsVersion: "\u7CFB\u7EDF\u7248\u672C",
+      friendAppVersion: "\u5E94\u7528\u7248\u672C",
+      friendRspNotAdvertised: "\u672A\u58F0\u660E\u652F\u6301",
+      status: "\u72B6\u6001",
+      statusOnline: "\u5728\u7EBF",
+      statusOffline: "\u79BB\u7EBF",
+      lastSeen: "\u6700\u540E\u5728\u7EBF",
+      website: "\u7F51\u7AD9",
       ensNoEthWallet: "\u672A\u68C0\u6D4B\u5230\u4EE5\u592A\u574A\u94B1\u5305\u63D2\u4EF6(MetaMask \u7B49)",
       ensNoSolWallet: "\u672A\u68C0\u6D4B\u5230 Solana \u94B1\u5305\u63D2\u4EF6(Phantom \u7B49)",
       ensWalletOwned: "\u5DF2\u901A\u8FC7\u624B\u673A\u94B1\u5305\u6CE8\u518C\u4E3A",
@@ -9166,19 +9352,20 @@ ${peer.address}`
       });
       if (!peerTakesRtcFile(peerId))
         return toxcore();
+      const viaCarrier = (rtcError) => toxcore().then((rr) => Object.assign({}, rr, { rtcFailed: true, rtcError: rtcError || "WebRTC file send failed" }));
       return rtcFileCtl.sendFile(peerId, file, onProgress).then((r) => {
         if (r && r.ok && r.via === "webrtc") {
           return fetch(
             "/api/webrtc-file-save?dir=out&userid=" + encodeURIComponent(peerId) + "&name=" + encodeURIComponent(file.name),
             { method: "POST", body: file }
-          ).then(() => {
+          ).catch(() => null).then(() => {
             data.loadThread(peerId);
             data.refresh();
             return { ok: true, via: "webrtc" };
           });
         }
-        return toxcore();
-      }).catch(() => toxcore());
+        return viaCarrier(r && r.error);
+      }, (e) => viaCarrier(e && e.message || String(e)));
     };
     const onSendRtcFile = (file, onProgress) => {
       if (!activeId || !file)

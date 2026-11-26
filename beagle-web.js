@@ -1,4 +1,4 @@
-globalThis.__BEAGLE_BUILD__={"web":"ebffb3d","peer":"0.1.185","ui":"0.2.53","webrtc":"0.3.3","builtAt":"2026-11-26T03:44:59.771Z"};
+globalThis.__BEAGLE_BUILD__={"web":"2b66a78","peer":"0.1.185","ui":"0.2.55","webrtc":"0.3.3","builtAt":"2026-11-26T04:29:47.721Z"};
 (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -20752,7 +20752,17 @@ ${ts}`);
         }, HANDOVER_TIMEOUT_MS);
       });
       bc.postMessage({ type: "request-release" });
-      const clean3 = await releasedCleanly;
+      let watch;
+      const granted = new Promise((resolve2) => {
+        watch = setInterval(() => {
+          if (held)
+            resolve2(true);
+        }, 25);
+      });
+      const clean3 = await Promise.race([releasedCleanly, granted]);
+      clearInterval(watch);
+      if (held)
+        return { held: true, via: "queued" };
       for (let i = 0; i < 40 && !held; i++)
         await new Promise((r) => setTimeout(r, 25));
       if (held)
@@ -21645,10 +21655,10 @@ ${ts}`);
     }
     return Math.ceil((obj.byteLength || obj.size) * BASE64_OVERHEAD);
   }
-  function utf8Length2(str) {
+  function utf8Length2(str2) {
     let c = 0, length = 0;
-    for (let i = 0, l = str.length; i < l; i++) {
-      c = str.charCodeAt(i);
+    for (let i = 0, l = str2.length; i < l; i++) {
+      c = str2.charCodeAt(i);
       if (c < 128) {
         length += 1;
       } else if (c < 2048) {
@@ -21671,15 +21681,15 @@ ${ts}`);
   init_process_global();
   init_worker_timers();
   function encode2(obj) {
-    let str = "";
+    let str2 = "";
     for (let i in obj) {
       if (obj.hasOwnProperty(i)) {
-        if (str.length)
-          str += "&";
-        str += encodeURIComponent(i) + "=" + encodeURIComponent(obj[i]);
+        if (str2.length)
+          str2 += "&";
+        str2 += encodeURIComponent(i) + "=" + encodeURIComponent(obj[i]);
       }
     }
-    return str;
+    return str2;
   }
   function decode3(qs) {
     let qry = {};
@@ -22397,15 +22407,15 @@ ${ts}`);
     "query",
     "anchor"
   ];
-  function parse(str) {
-    if (str.length > 8e3) {
+  function parse(str2) {
+    if (str2.length > 8e3) {
       throw "URI too long";
     }
-    const src = str, b = str.indexOf("["), e = str.indexOf("]");
+    const src = str2, b = str2.indexOf("["), e = str2.indexOf("]");
     if (b != -1 && e != -1) {
-      str = str.substring(0, b) + str.substring(b, e).replace(/:/g, ";") + str.substring(e, str.length);
+      str2 = str2.substring(0, b) + str2.substring(b, e).replace(/:/g, ";") + str2.substring(e, str2.length);
     }
-    let m = re.exec(str || ""), uri = {}, i = 14;
+    let m = re.exec(str2 || ""), uri = {}, i = 14;
     while (i--) {
       uri[parts[i]] = m[i] || "";
     }
@@ -23226,20 +23236,20 @@ ${ts}`);
      * Encode packet as string.
      */
     encodeAsString(obj) {
-      let str = "" + obj.type;
+      let str2 = "" + obj.type;
       if (obj.type === PacketType.BINARY_EVENT || obj.type === PacketType.BINARY_ACK) {
-        str += obj.attachments + "-";
+        str2 += obj.attachments + "-";
       }
       if (obj.nsp && "/" !== obj.nsp) {
-        str += obj.nsp + ",";
+        str2 += obj.nsp + ",";
       }
       if (null != obj.id) {
-        str += obj.id;
+        str2 += obj.id;
       }
       if (null != obj.data) {
-        str += JSON.stringify(obj.data, this.replacer);
+        str2 += JSON.stringify(obj.data, this.replacer);
       }
-      return str;
+      return str2;
     }
     /**
      * Encode packet as 'buffer sequence' by removing blobs, and
@@ -23304,20 +23314,20 @@ ${ts}`);
      * @param {String} str
      * @return {Object} packet
      */
-    decodeString(str) {
+    decodeString(str2) {
       let i = 0;
       const p = {
-        type: Number(str.charAt(0))
+        type: Number(str2.charAt(0))
       };
       if (PacketType[p.type] === void 0) {
         throw new Error("unknown packet type " + p.type);
       }
       if (p.type === PacketType.BINARY_EVENT || p.type === PacketType.BINARY_ACK) {
         const start = i + 1;
-        while (str.charAt(++i) !== "-" && i != str.length) {
+        while (str2.charAt(++i) !== "-" && i != str2.length) {
         }
-        const buf = str.substring(start, i);
-        if (buf != Number(buf) || str.charAt(i) !== "-") {
+        const buf = str2.substring(start, i);
+        if (buf != Number(buf) || str2.charAt(i) !== "-") {
           throw new Error("Illegal attachments");
         }
         const n = Number(buf);
@@ -23328,35 +23338,35 @@ ${ts}`);
         }
         p.attachments = n;
       }
-      if ("/" === str.charAt(i + 1)) {
+      if ("/" === str2.charAt(i + 1)) {
         const start = i + 1;
         while (++i) {
-          const c = str.charAt(i);
+          const c = str2.charAt(i);
           if ("," === c)
             break;
-          if (i === str.length)
+          if (i === str2.length)
             break;
         }
-        p.nsp = str.substring(start, i);
+        p.nsp = str2.substring(start, i);
       } else {
         p.nsp = "/";
       }
-      const next = str.charAt(i + 1);
+      const next = str2.charAt(i + 1);
       if ("" !== next && Number(next) == next) {
         const start = i + 1;
         while (++i) {
-          const c = str.charAt(i);
+          const c = str2.charAt(i);
           if (null == c || Number(c) != c) {
             --i;
             break;
           }
-          if (i === str.length)
+          if (i === str2.length)
             break;
         }
-        p.id = Number(str.substring(start, i + 1));
+        p.id = Number(str2.substring(start, i + 1));
       }
-      if (str.charAt(++i)) {
-        const payload = this.tryParse(str.substr(i));
+      if (str2.charAt(++i)) {
+        const payload = this.tryParse(str2.substr(i));
         if (_Decoder.isPayloadValid(p.type, payload)) {
           p.data = payload;
         } else {
@@ -23365,9 +23375,9 @@ ${ts}`);
       }
       return p;
     }
-    tryParse(str) {
+    tryParse(str2) {
       try {
-        return JSON.parse(str, this.opts.reviver);
+        return JSON.parse(str2, this.opts.reviver);
       } catch (e) {
         return false;
       }
@@ -26115,6 +26125,66 @@ ${ts}`);
     };
   }
 
+  // src/friend-profile.js
+  init_buffer_global();
+  init_process_global();
+  init_worker_timers();
+  var str = (v, max = 256) => typeof v === "string" && v.trim() && v.length <= max ? v.trim() : void 0;
+  var httpUrl = (v) => {
+    const s = str(v, 2048);
+    if (!s)
+      return void 0;
+    try {
+      const u = new URL(s);
+      return u.protocol === "https:" || u.protocol === "http:" ? s : void 0;
+    } catch {
+      return void 0;
+    }
+  };
+  function rspProtocolFromExtra(extra) {
+    if (typeof extra !== "string" || extra.length > 1024)
+      return "";
+    try {
+      const rsp = JSON.parse(extra)?.rsp;
+      if (typeof rsp?.protocol === "string" && /^rsp\/[1-9]\d{0,3}$/i.test(rsp.protocol) && httpUrl(rsp.nodeUrl)) {
+        return rsp.protocol.toLowerCase();
+      }
+    } catch {
+    }
+    return "";
+  }
+  function browserOsVersion(ua = globalThis.navigator?.userAgent || "") {
+    const os = /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /CrOS/.test(ua) ? "ChromeOS" : /Linux/.test(ua) ? "Linux" : "";
+    const tokens = [["Edg", "Edge"], ["OPR", "Opera"], ["FxiOS", "Firefox"], ["Firefox", "Firefox"], ["CriOS", "Chrome"], ["Chrome", "Chrome"]];
+    let browser = "browser";
+    for (const [tok, name] of tokens) {
+      const m = ua.match(new RegExp(`${tok}/(\\d+)`));
+      if (m) {
+        browser = `${name} ${m[1]}`;
+        break;
+      }
+    }
+    if (browser === "browser" && /Safari\//.test(ua)) {
+      const m = ua.match(/Version\/(\d+)/);
+      if (m)
+        browser = `Safari ${m[1]}`;
+    }
+    return (os ? `${browser} \xB7 ${os}` : browser).slice(0, 64);
+  }
+  function pushedProfile(f = {}) {
+    const ens = typeof f.ens === "string" && /^[a-z0-9-]+(\.[a-z0-9-]+)*\.eth$/i.test(f.ens.trim()) ? f.ens.trim().toLowerCase() : null;
+    const profileArrived = typeof f.extra === "string" || typeof f.protoVersion === "number" || typeof f.platform === "string";
+    return {
+      osVersion: str(f.osVersion, 64) ?? null,
+      description: str(f.description, 512) ?? str(f.descr, 512) ?? null,
+      profileUrl: httpUrl(f.url) ?? null,
+      ensClaim: ens,
+      pushedAvatarUrl: httpUrl(f.avatarUrl) ?? null,
+      rspProtocol: profileArrived ? rspProtocolFromExtra(f.extra) : null,
+      lastSessionAt: typeof f.sessionAt === "number" ? f.sessionAt : null
+    };
+  }
+
   // src/request-picture.js
   init_buffer_global();
   init_process_global();
@@ -26270,6 +26340,10 @@ ${ts}`);
       },
       platform: "js",
       appVersion: "beagle-web",
+      // What a friend's card shows as the OS line. Unset, the SDK sent its Node
+      // default built from process.version, which the browser shim leaves empty:
+      // every friend saw "node-". Coarse, like the phones' "iOS 26.1".
+      osVersion: browserOsVersion(),
       debugLabel: "browser",
       // ?peerdebug=1 turns on the SDK's own logging. It is gated on env vars
       // otherwise, which a browser does not have — so until now the peer was
@@ -26698,6 +26772,10 @@ ${ts}`);
         // cannot, and treats the offer as an incoming CALL.
         platform: f.platform || "",
         appVersion: f.appVersion || "",
+        // The rest of their pushed profile, for the friend card (friend-profile.js):
+        // osVersion, description, profileUrl, ensClaim, pushedAvatarUrl,
+        // rspProtocol, lastSessionAt — beagle-app's fields and rules.
+        ...pushedProfile(f),
         // The avatar they advertised over Carrier, in the userinfo `gender`
         // field. Peer-to-peer, so it works for a friend who never registered a
         // beagles.eth name — which until now meant an identicon and nothing else.
@@ -27319,9 +27397,9 @@ ${ts}`);
     }
   }
   var B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  function base58Decode(str) {
+  function base58Decode(str2) {
     const bytes = [];
-    for (const c of String(str)) {
+    for (const c of String(str2)) {
       let carry = B58.indexOf(c);
       if (carry < 0)
         throw new Error("not base58");
@@ -27335,7 +27413,7 @@ ${ts}`);
         carry >>= 8;
       }
     }
-    for (const c of String(str)) {
+    for (const c of String(str2)) {
       if (c !== "1")
         break;
       bytes.push(0);
@@ -31324,6 +31402,14 @@ ${body.length}`);
       // Advertised client, so the UI can pick a file transport the peer supports.
       platform: f.platform ?? "",
       appVersion: f.appVersion ?? "",
+      // The rest of their pushed profile, for the friend card — beagle-app's
+      // (8766) peer fields; null when they sent nothing (src/friend-profile.js).
+      osVersion: f.osVersion ?? null,
+      profileUrl: f.profileUrl ?? null,
+      ensClaim: f.ensClaim ?? null,
+      pushedAvatarUrl: f.pushedAvatarUrl ?? null,
+      rspProtocol: f.rspProtocol ?? null,
+      lastSessionAt: f.lastSessionAt ?? null,
       avatarUrl: dir?.avatarUrl ?? null,
       // What they advertised over Carrier wins over the directory: it is what
       // they are using on their device right now, it needs no gateway, and it
@@ -32097,8 +32183,16 @@ ${body.length}`);
       this.routers = { early: null, full: null };
       resolveReady(async (path, init) => {
         const pathname = new URL(path, location.origin).pathname;
-        if (pathname === "/api/update-check")
-          return jsonResponse(await updateCheck());
+        if (pathname === "/api/update-check") {
+          const r2 = await updateCheck();
+          if (r2.updates.some((u) => u.pkg === "beagle-web" && u.behind)) {
+            this.reloadWhenIdle("update-run");
+            r2.reloading = true;
+            for (const u of r2.updates)
+              u.behind = false;
+          }
+          return jsonResponse(r2);
+        }
         if (pathname === "/api/update-run") {
           this.reloadWhenIdle("update-run");
           return jsonResponse({ ok: true, reloading: true });
@@ -32403,7 +32497,10 @@ ${body.length}`);
     async takeover() {
       if (this.lock?.held && !this.readOnly)
         return this.lockState;
-      this.lockState = await this.lock.takeover();
+      const result = await this.lock.takeover();
+      if (!this.readOnly)
+        return this.lockState;
+      this.lockState = result;
       if (this.lockState.held) {
         this.readOnly = false;
         this.routers.early = null;
